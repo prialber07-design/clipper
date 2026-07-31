@@ -242,7 +242,7 @@ def zscore(valor: float, historial) -> float:
 
 # --- montaje de la ventana ----------------------------------------------------
 
-CONTADORES = ROOT / "work" / "_contadores.json"
+CONTADORES = WORK / "_contadores.json"
 
 
 def elegir_duracion(canal: str) -> tuple[str, dict]:
