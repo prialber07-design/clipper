@@ -112,8 +112,8 @@ def cmd_estado():
         print("No hay vigilantes en marcha.")
         return
     for canal in sorted(set(vivos)):
-        listos = len(list((ROOT / "out" / "LISTOS").glob(f"*_{canal}_*.mp4"))) \
-            if (ROOT / "out" / "LISTOS").exists() else 0
+        bandeja = Path(os.environ.get("CLIPPER_DATA", ROOT)) / "out" / "LISTOS"
+        listos = len(list(bandeja.glob(f"*_{canal}_*.mp4"))) if bandeja.exists() else 0
         print(f"{canal:22s} VIVO   {listos} clips")
 
 

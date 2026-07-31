@@ -42,7 +42,8 @@ if ($Estado) {
         }
         $clips = 0
         if (Test-Path "$raiz\out\LISTOS") {
-            $clips = @(Get-ChildItem "$raiz\out\LISTOS" -Filter "$($v.canal)_*.mp4" -EA SilentlyContinue).Count
+            # Los clips van numerados delante: 004_elcalvolol_2026-08-01.mp4
+            $clips = @(Get-ChildItem "$raiz\out\LISTOS" -Filter "*_$($v.canal)_*.mp4" -EA SilentlyContinue).Count
         }
         "{0,-20} PID {1,-7} {2} clips | {3}" -f $v.canal, $v.pid, $clips, $ultimo
     }
