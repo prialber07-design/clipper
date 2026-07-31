@@ -104,8 +104,17 @@ def cmd_estado():
                               "get", "ProcessId,CommandLine"],
                              capture_output=True, text=True).stdout
     else:
-        out = subprocess.run(["ps", "-eo", "pid,args"], capture_output=True,
-                             text=True).stdout
+        try:
+            out = subprocess.run(["ps", "-eo", "pid,args"], capture_output=True,
+                                 text=True).stdout
+        except FileNotFoundError:
+            cmdlines = []
+            for p in Path("/proc").glob("[0-9]*/cmdline"):
+                try:
+                    cmdlines.append(p.read_bytes().replace(b"\x00", b" ").decode("utf-8", "ignore"))
+                except OSError:
+                    pass
+            out = "\n".join(cmdlines)
     for linea in out.splitlines():
         m = re.search(r"live\.py\s+watch\s+([A-Za-z0-9_]+)", linea)
         if m:
