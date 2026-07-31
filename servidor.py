@@ -17,11 +17,13 @@ import subprocess
 import sys
 import time
 from datetime import datetime
-from pathlib import Path
+import clipper
 
-ROOT = Path(__file__).resolve().parent
-LOGS = ROOT / "logs"
-CONFIG = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
+ROOT = clipper.ROOT
+DATA = clipper.DATA
+OUT = clipper.OUT
+LOGS = DATA / "logs"
+CONFIG = clipper.CONFIG
 
 REINTENTO_MIN_S = 15
 REINTENTO_MAX_S = 300
@@ -112,8 +114,8 @@ def cmd_estado():
         print("No hay vigilantes en marcha.")
         return
     for canal in sorted(set(vivos)):
-        listos = len(list((ROOT / "out" / "LISTOS").glob(f"*_{canal}_*.mp4"))) \
-            if (ROOT / "out" / "LISTOS").exists() else 0
+        listos = len(list((OUT / "LISTOS").glob(f"*_{canal}_*.mp4"))) \
+            if (OUT / "LISTOS").exists() else 0
         print(f"{canal:22s} VIVO   {listos} clips")
 
 
@@ -139,7 +141,7 @@ def main():
         import web
         web.arrancar(en_hilo=True)
     except Exception as e:
-        print(f"[!] Galeria web no disponible ({e}); los clips siguen en /data")
+        print(f"[!] Galeria web no disponible ({e}); los clips siguen en {OUT}")
 
     vigilantes = [Vigilante(f) for f in lista]
     for v in vigilantes:
