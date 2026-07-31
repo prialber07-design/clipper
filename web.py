@@ -504,8 +504,116 @@ HTML_TEMPLATE = """<!doctype html>
       margin-bottom: 0.5rem;
     }
 
-    .empty-state p {
-      color: var(--text-muted);
+    /* --- Modal de Previsualización de Vídeos y Archivos --- */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    .modal-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      width: 100%;
+      max-width: 600px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    }
+
+    .modal-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .modal-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .modal-close-btn {
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: var(--text-main);
+      font-size: 1.2rem;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+
+    .modal-close-btn:hover {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    .modal-body {
+      padding: 1.5rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+    }
+
+    .modal-video-player {
+      width: 100%;
+      max-height: 60vh;
+      border-radius: 16px;
+      background: #000;
+      object-fit: contain;
+      aspect-ratio: 9 / 16;
+    }
+
+    .modal-text-viewer {
+      width: 100%;
+      background: #050811;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #38bdf8;
+      max-height: 50vh;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    .modal-footer {
+      padding: 1.25rem 1.5rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 1rem;
     }
   </style>
 </head>
@@ -579,6 +687,22 @@ HTML_TEMPLATE = """<!doctype html>
     </section>
   </main>
 
+  <!-- Modal de Previsualización -->
+  <div class="modal-overlay" id="previewModal" onclick="cerrarPrevisualizacion(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalTitle">Previsualización</h3>
+        <button class="modal-close-btn" onclick="cerrarPrevisualizacion()">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-footer">
+        <a id="modalDownloadBtn" href="#" download class="download-btn">
+          <span>⬇️ DESCARGAR AHORA</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
   <script>
     let currentPath = '';
 
@@ -586,6 +710,10 @@ HTML_TEMPLATE = """<!doctype html>
       cargarClips();
       cargarArchivos('');
       cargarLogs();
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') cerrarPrevisualizacion();
+      });
     });
 
     function switchTab(tabId, btn) {
@@ -625,7 +753,7 @@ HTML_TEMPLATE = """<!doctype html>
 
       container.innerHTML = clips.map(c => `
         <article class="clip-card" data-search="${(c.canal + ' ' + c.gancho).toLowerCase()}">
-          <div class="video-wrapper">
+          <div class="video-wrapper" onclick="abrirPrevisualizacion('${c.url}', '${c.gancho || c.nombre}', 'video')">
             <video src="${c.url}" controls preload="metadata" playsinline></video>
           </div>
           <div class="clip-details">
@@ -635,9 +763,14 @@ HTML_TEMPLATE = """<!doctype html>
             </div>
             <h2 class="clip-title">${c.gancho || '(Sin título)'}</h2>
             ${esRevisar && c.motivo ? `<div class="clip-reason">⚠️ ${c.motivo}</div>` : ''}
-            <a href="${c.url}" download class="download-btn">
-              <span>⬇️ DESCARGAR VÍDEO</span>
-            </a>
+            <div style="display:flex; gap:0.5rem; margin-top:auto;">
+              <button onclick="abrirPrevisualizacion('${c.url}', '${c.gancho || c.nombre}', 'video')" class="action-btn-sm" style="flex:1; justify-content:center; padding:0.8rem; font-size:0.95rem;">
+                👁️ Previsualizar
+              </button>
+              <a href="${c.url}" download class="download-btn" style="flex:1.2;">
+                <span>⬇️ Descargar</span>
+              </a>
+            </div>
           </div>
         </article>
       `).join('');
@@ -678,7 +811,10 @@ HTML_TEMPLATE = """<!doctype html>
         grid.innerHTML = data.items.map(item => {
           const icon = item.is_dir ? '📂' : (item.name.endsWith('.mp4') ? '🎬' : (item.name.endsWith('.log') || item.name.endsWith('.txt') ? '📄' : '📁'));
           const itemPath = subpath ? (subpath + '/' + item.name) : item.name;
-          
+          const fileUrl = '/files/' + itemPath;
+          const isVideo = item.name.endsWith('.mp4');
+          const isText = item.name.endsWith('.txt') || item.name.endsWith('.log') || item.name.endsWith('.csv') || item.name.endsWith('.json');
+
           if (item.is_dir) {
             return `
               <div class="file-item-card" onclick="cargarArchivos('${itemPath}')">
@@ -690,16 +826,15 @@ HTML_TEMPLATE = """<!doctype html>
                 <button class="action-btn-sm">Abrir ➔</button>
               </div>`;
           } else {
-            const fileUrl = '/files/' + itemPath;
             return `
               <div class="file-item-card">
-                <span class="file-icon">${icon}</span>
-                <div class="file-info">
+                <span class="file-icon" onclick="${isVideo ? `abrirPrevisualizacion('${fileUrl}', '${item.name}', 'video')` : (isText ? `abrirPrevisualizacion('${fileUrl}', '${item.name}', 'text')` : '')}">${icon}</span>
+                <div class="file-info" onclick="${isVideo ? `abrirPrevisualizacion('${fileUrl}', '${item.name}', 'video')` : (isText ? `abrirPrevisualizacion('${fileUrl}', '${item.name}', 'text')` : '')}">
                   <div class="file-name" title="${item.name}">${item.name}</div>
                   <div class="file-meta">${item.size}</div>
                 </div>
                 <div class="file-actions">
-                  <a href="${fileUrl}" target="_blank" class="action-btn-sm">👁️ Ver</a>
+                  ${isVideo || isText ? `<button onclick="abrirPrevisualizacion('${fileUrl}', '${item.name}', '${isVideo ? 'video' : 'text'}')" class="action-btn-sm">👁️ Ver</button>` : ''}
                   <a href="${fileUrl}" download class="action-btn-sm">⬇️</a>
                 </div>
               </div>`;
@@ -709,6 +844,41 @@ HTML_TEMPLATE = """<!doctype html>
       } catch (e) {
         console.error("Error explorando archivos:", e);
       }
+    }
+
+    async function abrirPrevisualizacion(url, title, type) {
+      const modal = document.getElementById('previewModal');
+      const modalTitle = document.getElementById('modalTitle');
+      const modalBody = document.getElementById('modalBody');
+      const modalDownloadBtn = document.getElementById('modalDownloadBtn');
+
+      modalTitle.textContent = title || 'Previsualización';
+      modalDownloadBtn.href = url;
+      modalBody.innerHTML = 'Cargando contenido...';
+
+      if (type === 'video') {
+        modalBody.innerHTML = `<video src="${url}" class="modal-video-player" controls autoplay playsinline></video>`;
+      } else if (type === 'text') {
+        try {
+          const res = await fetch(url);
+          const text = await res.text();
+          modalBody.innerHTML = `<div class="modal-text-viewer">${text || '(Archivo vacío)'}</div>`;
+        } catch (e) {
+          modalBody.innerHTML = `<p style="color:var(--danger)">No se pudo cargar el archivo de texto.</p>`;
+        }
+      } else {
+        modalBody.innerHTML = `<p>Archivo sin vista previa disponible.</p>`;
+      }
+
+      modal.classList.add('active');
+    }
+
+    function cerrarPrevisualizacion(e) {
+      if (e && e.target !== document.getElementById('previewModal') && !e.target.classList.contains('modal-close-btn')) return;
+      const modal = document.getElementById('previewModal');
+      const modalBody = document.getElementById('modalBody');
+      modal.classList.remove('active');
+      modalBody.innerHTML = '';
     }
 
     async function cargarLogs() {
