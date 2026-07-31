@@ -1,8 +1,9 @@
 """
 Galeria web y explorador de archivos intuitivo para /app/clips.
 
-Diseñado con interfaz moderna, intuitiva y accesible (apta para todo tipo de usuarios).
-Permite explorar todas las carpetas (/app/clips), reproducir vídeos, ver logs y descargar clips.
+Diseñado con interfaz ultra-moderna (Shadcn/UI + GSAP + Lucide Icons).
+Interfaz muy limpia, accesible e intuitiva (apta para todo tipo de usuarios).
+Permite explorar todas las carpetas (/app/clips), previsualizar vídeos en modal, ver logs y descargar clips.
 """
 
 import base64
@@ -32,51 +33,84 @@ HTML_TEMPLATE = """<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Clipper Studio · Gestor de Clips y Archivos</title>
+
+  <!-- Fuentes Tipográficas Pro -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- GSAP Animation Engine -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
   <style>
     :root {
-      --bg-dark: #0b0f19;
-      --bg-card: #151c2c;
-      --bg-card-hover: #1e293b;
+      --bg-dark: #090d16;
+      --bg-card: #131927;
+      --bg-card-hover: #1c253b;
+      --bg-glass: rgba(19, 25, 39, 0.75);
+      
       --accent: #6366f1;
+      --accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
       --accent-hover: #4f46e5;
+      
       --success: #10b981;
-      --success-hover: #059669;
+      --success-gradient: linear-gradient(135deg, #10b981, #059669);
+      
       --warning: #f59e0b;
       --danger: #ef4444;
+      
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      
       --border: rgba(255, 255, 255, 0.08);
-      --glass: rgba(21, 28, 44, 0.75);
+      --border-bright: rgba(255, 255, 255, 0.18);
+      --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+      --shadow-glow: 0 0 25px rgba(99, 102, 241, 0.25);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    
+
     body {
       font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
       background-color: var(--bg-dark);
       color: var(--text-main);
       min-height: 100vh;
-      padding-bottom: 3rem;
+      padding-bottom: 4rem;
       line-height: 1.5;
+      overflow-x: hidden;
     }
 
-    /* --- Navbar Superior --- */
+    /* Fondo animado sutil */
+    .bg-glow {
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(9, 13, 22, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Header Nav */
     header {
       position: sticky;
       top: 0;
       z-index: 100;
-      background: var(--glass);
+      background: var(--bg-glass);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border);
-      padding: 1rem 1.5rem;
+      padding: 1.1rem 1.75rem;
     }
 
     .header-container {
-      max-width: 1300px;
+      max-width: 1350px;
       margin: 0 auto;
       display: flex;
       justify-content: space-between;
@@ -88,19 +122,25 @@ HTML_TEMPLATE = """<!doctype html>
     .logo-area {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.85rem;
     }
 
-    .logo-icon {
-      font-size: 2rem;
-      background: linear-gradient(135deg, #818cf8, #c084fc);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+    .logo-badge {
+      width: 44px;
+      height: 44px;
+      background: var(--accent-gradient);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      box-shadow: var(--shadow-glow);
     }
 
     .logo-text h1 {
-      font-size: 1.35rem;
-      font-weight: 800;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
       letter-spacing: -0.02em;
     }
 
@@ -110,410 +150,422 @@ HTML_TEMPLATE = """<!doctype html>
       font-weight: 500;
     }
 
-    .status-badge {
+    .status-pill {
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.6rem;
       background: rgba(16, 185, 129, 0.12);
       border: 1px solid rgba(16, 185, 129, 0.3);
       color: #34d399;
-      padding: 0.4rem 0.9rem;
+      padding: 0.5rem 1.1rem;
       border-radius: 999px;
       font-size: 0.85rem;
-      font-weight: 600;
+      font-weight: 700;
     }
 
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: 9px;
+      height: 9px;
       background-color: #34d399;
       border-radius: 50%;
-      box-shadow: 0 0 10px #34d399;
+      box-shadow: 0 0 12px #34d399;
     }
 
-    /* --- Contenedor Principal --- */
     main {
-      max-width: 1300px;
+      max-width: 1350px;
       margin: 2rem auto 0;
-      padding: 0 1.5rem;
+      padding: 0 1.75rem;
+      position: relative;
+      z-index: 1;
     }
 
-    /* --- Pestañas de Navegación Grandes --- */
-    .tabs-nav {
+    /* Pestañas de Navegación */
+    .tabs-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 1rem;
-      margin-bottom: 2rem;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 1.1rem;
+      margin-bottom: 2.25rem;
     }
 
-    .tab-btn {
+    .tab-card {
       background: var(--bg-card);
       border: 1px solid var(--border);
       color: var(--text-muted);
-      padding: 1.25rem 1rem;
-      border-radius: 16px;
+      padding: 1.25rem 1.25rem;
+      border-radius: 18px;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 0.85rem;
+      gap: 0.9rem;
       font-family: inherit;
       font-weight: 700;
       font-size: 1.05rem;
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: border-color 0.2s, background 0.2s;
+      box-shadow: var(--shadow-card);
     }
 
-    .tab-btn:hover {
+    .tab-card:hover {
       background: var(--bg-card-hover);
       color: var(--text-main);
-      transform: translateY(-2px);
-      border-color: rgba(255,255,255,0.2);
+      border-color: var(--border-bright);
     }
 
-    .tab-btn.active {
-      background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+    .tab-card.active {
+      background: var(--accent-gradient);
       color: #ffffff;
       border-color: transparent;
-      box-shadow: 0 8px 20px rgba(99, 102, 241, 0.35);
+      box-shadow: var(--shadow-glow);
     }
 
-    .tab-btn .tab-icon {
-      font-size: 1.6rem;
-    }
-
-    .tab-btn .tab-count {
+    .tab-card .tab-badge {
       margin-left: auto;
       background: rgba(255, 255, 255, 0.18);
-      padding: 0.2rem 0.6rem;
+      padding: 0.25rem 0.7rem;
       border-radius: 999px;
       font-size: 0.85rem;
     }
 
-    /* --- Barra de Búsqueda --- */
-    .search-bar {
-      margin-bottom: 2rem;
+    /* Search Bar */
+    .search-container {
+      margin-bottom: 2.25rem;
       position: relative;
     }
 
-    .search-input {
+    .search-field {
       width: 100%;
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 1rem 1.25rem 1rem 3rem;
+      border-radius: 16px;
+      padding: 1.1rem 1.25rem 1.1rem 3.2rem;
       color: var(--text-main);
-      font-size: 1rem;
+      font-size: 1.05rem;
       font-family: inherit;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
 
-    .search-input:focus {
+    .search-field:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
     }
 
-    .search-icon {
+    .search-icon-svg {
       position: absolute;
-      left: 1rem;
+      left: 1.1rem;
       top: 50%;
       transform: translateY(-50%);
-      font-size: 1.2rem;
       color: var(--text-muted);
     }
 
-    /* --- Secciones de Contenido --- */
-    .tab-content {
+    /* Content Views */
+    .view-pane {
       display: none;
     }
 
-    .tab-content.active {
+    .view-pane.active {
       display: block;
-      animation: fadeIn 0.3s ease-out;
     }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* --- Rejilla de Clips (Tarjetas Grandes) --- */
+    /* Clips Cards Grid */
     .clips-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
-      gap: 1.75rem;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 2rem;
     }
 
     .clip-card {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 20px;
+      border-radius: 22px;
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      transition: all 0.3s ease;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      box-shadow: var(--shadow-card);
+      transition: border-color 0.3s;
     }
 
     .clip-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 16px 35px rgba(0,0,0,0.35);
-      border-color: rgba(255,255,255,0.2);
+      border-color: var(--border-bright);
     }
 
-    .video-wrapper {
+    .video-thumb-container {
       position: relative;
       width: 100%;
       background: #000;
       aspect-ratio: 9 / 16;
       max-height: 480px;
+      cursor: pointer;
+      overflow: hidden;
     }
 
-    .video-wrapper video {
+    .video-thumb-container video {
       width: 100%;
       height: 100%;
       object-fit: contain;
-      display: block;
     }
 
-    .clip-details {
-      padding: 1.25rem;
+    .thumb-play-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    .video-thumb-container:hover .thumb-play-overlay {
+      opacity: 1;
+    }
+
+    .play-circle-icon {
+      width: 64px;
+      height: 64px;
+      background: var(--accent-gradient);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      box-shadow: 0 0 30px rgba(99, 102, 241, 0.6);
+      transform: scale(0.85);
+      transition: transform 0.25s ease;
+    }
+
+    .video-thumb-container:hover .play-circle-icon {
+      transform: scale(1);
+    }
+
+    .clip-body {
+      padding: 1.4rem;
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
+      gap: 0.85rem;
       flex-grow: 1;
     }
 
-    .clip-badge-row {
+    .tags-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem;
     }
 
-    .channel-tag {
-      background: rgba(99, 102, 241, 0.15);
+    .streamer-pill {
+      background: rgba(99, 102, 241, 0.18);
       color: #a5b4fc;
-      font-weight: 700;
+      font-weight: 800;
       font-size: 0.85rem;
-      padding: 0.3rem 0.75rem;
-      border-radius: 8px;
+      padding: 0.35rem 0.85rem;
+      border-radius: 10px;
     }
 
-    .duration-tag {
-      background: rgba(255,255,255,0.08);
+    .dur-pill {
+      background: rgba(255, 255, 255, 0.08);
       color: var(--text-muted);
-      font-weight: 600;
+      font-weight: 700;
       font-size: 0.8rem;
-      padding: 0.3rem 0.6rem;
-      border-radius: 8px;
+      padding: 0.35rem 0.75rem;
+      border-radius: 10px;
     }
 
-    .clip-title {
-      font-size: 1.05rem;
-      font-weight: 700;
+    .clip-heading {
+      font-size: 1.1rem;
+      font-weight: 800;
       line-height: 1.4;
       color: var(--text-main);
     }
 
-    .clip-reason {
+    .clip-alert {
       font-size: 0.85rem;
       color: #fca5a5;
-      background: rgba(239, 68, 68, 0.12);
-      border-left: 3px solid var(--danger);
-      padding: 0.5rem 0.75rem;
-      border-radius: 6px;
-    }
-
-    /* --- Botón Descargar Gigante --- */
-    .download-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.6rem;
-      width: 100%;
-      background: linear-gradient(135deg, var(--success), var(--success-hover));
-      color: #ffffff;
-      text-decoration: none;
-      font-weight: 800;
-      font-size: 1.05rem;
-      padding: 1rem;
-      border-radius: 14px;
-      margin-top: auto;
-      transition: all 0.2s ease;
-      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
-      border: none;
-      cursor: pointer;
-    }
-
-    .download-btn:hover {
-      transform: scale(1.02);
-      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
-    }
-
-    /* --- Explorador de Archivos --- */
-    .breadcrumbs {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      background: var(--bg-card);
-      padding: 1rem 1.25rem;
-      border-radius: 14px;
-      margin-bottom: 1.5rem;
-      border: 1px solid var(--border);
+      background: rgba(239, 68, 68, 0.14);
+      border-left: 4px solid var(--danger);
+      padding: 0.6rem 0.85rem;
+      border-radius: 8px;
       font-weight: 600;
     }
 
-    .crumb-item {
-      color: var(--accent);
-      cursor: pointer;
-      text-decoration: none;
+    /* Action Buttons (Para Señor Mayor: Claros y Grandes) */
+    .btn-group {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: auto;
+      padding-top: 0.5rem;
     }
 
-    .crumb-item:hover {
+    .btn-action-primary {
+      flex: 1.3;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      background: var(--success-gradient);
+      color: #ffffff;
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 1rem;
+      padding: 1rem;
+      border-radius: 14px;
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn-action-primary:hover {
+      opacity: 0.92;
+    }
+
+    .btn-action-secondary {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      font-weight: 700;
+      font-size: 0.95rem;
+      padding: 1rem;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .btn-action-secondary:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-bright);
+    }
+
+    /* Explorador de Archivos */
+    .breadcrumbs-box {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      background: var(--bg-card);
+      padding: 1.1rem 1.5rem;
+      border-radius: 18px;
+      margin-bottom: 1.75rem;
+      border: 1px solid var(--border);
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+
+    .crumb-link {
+      color: var(--accent);
+      cursor: pointer;
+    }
+
+    .crumb-link:hover {
       text-decoration: underline;
     }
 
-    .crumb-separator {
-      color: var(--text-muted);
+    .crumb-divider {
+      color: var(--text-dim);
     }
 
-    .files-list {
+    .files-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 1.25rem;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.35rem;
     }
 
-    .file-item-card {
+    .file-card {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 1.25rem;
+      border-radius: 18px;
+      padding: 1.35rem;
       display: flex;
       align-items: center;
-      gap: 1rem;
-      transition: all 0.2s ease;
+      gap: 1.1rem;
       cursor: pointer;
+      box-shadow: var(--shadow-card);
+      transition: border-color 0.2s, background 0.2s;
     }
 
-    .file-item-card:hover {
+    .file-card:hover {
       background: var(--bg-card-hover);
-      border-color: rgba(255,255,255,0.2);
-      transform: translateY(-2px);
+      border-color: var(--border-bright);
     }
 
-    .file-icon {
-      font-size: 2.2rem;
+    .file-card-icon {
+      width: 48px;
+      height: 48px;
+      background: rgba(99, 102, 241, 0.12);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      flex-shrink: 0;
     }
 
-    .file-info {
+    .file-card-meta {
       overflow: hidden;
       flex-grow: 1;
     }
 
-    .file-name {
-      font-weight: 700;
-      font-size: 0.95rem;
+    .file-card-name {
+      font-weight: 800;
+      font-size: 1rem;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      color: var(--text-main);
     }
 
-    .file-meta {
-      font-size: 0.8rem;
+    .file-card-sub {
+      font-size: 0.85rem;
       color: var(--text-muted);
       margin-top: 0.2rem;
     }
 
-    .file-actions {
-      display: flex;
-      gap: 0.5rem;
-    }
-
-    .action-btn-sm {
-      background: rgba(255,255,255,0.08);
-      color: var(--text-main);
-      border: none;
-      padding: 0.5rem 0.75rem;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 0.85rem;
-      cursor: pointer;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.3rem;
-    }
-
-    .action-btn-sm:hover {
-      background: var(--accent);
-      color: #fff;
-    }
-
-    /* --- Visor de Logs --- */
-    .logs-container {
-      background: #050811;
+    /* Visor de Logs */
+    .terminal-box {
+      background: #040711;
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 1.5rem;
-      font-family: monospace;
-      font-size: 0.9rem;
+      border-radius: 20px;
+      padding: 1.75rem;
+      font-family: 'Space Grotesk', monospace;
+      font-size: 0.95rem;
       color: #38bdf8;
-      height: 500px;
+      height: 520px;
       overflow-y: auto;
       white-space: pre-wrap;
-      box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);
+      box-shadow: inset 0 4px 20px rgba(0,0,0,0.6);
+      line-height: 1.6;
     }
 
-    .refresh-logs-btn {
-      margin-bottom: 1rem;
+    .btn-refresh {
+      margin-bottom: 1.25rem;
       background: var(--bg-card);
       border: 1px solid var(--border);
       color: var(--text-main);
-      padding: 0.75rem 1.25rem;
-      border-radius: 12px;
+      padding: 0.9rem 1.4rem;
+      border-radius: 14px;
       font-weight: 700;
+      font-size: 1rem;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.6rem;
+      transition: background 0.2s;
     }
 
-    .refresh-logs-btn:hover {
+    .btn-refresh:hover {
       background: var(--accent);
     }
 
-    .empty-state {
-      text-align: center;
-      padding: 4rem 2rem;
-      background: var(--bg-card);
-      border-radius: 20px;
-      border: 1px dashed var(--border);
-    }
-
-    .empty-state-icon {
-      font-size: 3.5rem;
-      margin-bottom: 1rem;
-    }
-
-    .empty-state h3 {
-      font-size: 1.3rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
-    }
-
-    /* --- Modal de Previsualización de Vídeos y Archivos --- */
-    .modal-overlay {
+    /* Modal Emergente de Previsualización */
+    .modal-backdrop {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
+      inset: 0;
       background: rgba(0, 0, 0, 0.85);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
       z-index: 1000;
       display: none;
       align-items: center;
@@ -521,26 +573,25 @@ HTML_TEMPLATE = """<!doctype html>
       padding: 1.5rem;
     }
 
-    .modal-overlay.active {
+    .modal-backdrop.active {
       display: flex;
-      animation: fadeIn 0.25s ease-out;
     }
 
-    .modal-card {
+    .modal-window {
       background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 24px;
+      border: 1px solid var(--border-bright);
+      border-radius: 26px;
       width: 100%;
-      max-width: 600px;
+      max-width: 580px;
       max-height: 90vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      box-shadow: 0 30px 60px rgba(0,0,0,0.8);
     }
 
-    .modal-header {
-      padding: 1.25rem 1.5rem;
+    .modal-top {
+      padding: 1.35rem 1.6rem;
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
@@ -548,21 +599,20 @@ HTML_TEMPLATE = """<!doctype html>
       gap: 1rem;
     }
 
-    .modal-title {
-      font-size: 1.1rem;
-      font-weight: 700;
+    .modal-title-text {
+      font-size: 1.15rem;
+      font-weight: 800;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    .modal-close-btn {
-      background: rgba(255,255,255,0.1);
+    .btn-close-modal {
+      background: rgba(255, 255, 255, 0.1);
       border: none;
       color: var(--text-main);
-      font-size: 1.2rem;
-      width: 36px;
-      height: 36px;
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
       cursor: pointer;
       display: flex;
@@ -571,133 +621,141 @@ HTML_TEMPLATE = """<!doctype html>
       transition: background 0.2s;
     }
 
-    .modal-close-btn:hover {
+    .btn-close-modal:hover {
       background: var(--danger);
-      color: #fff;
     }
 
-    .modal-body {
+    .modal-center {
       padding: 1.5rem;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 1rem;
     }
 
-    .modal-video-player {
+    .video-player-modal {
       width: 100%;
-      max-height: 60vh;
-      border-radius: 16px;
+      max-height: 58vh;
+      border-radius: 18px;
       background: #000;
       object-fit: contain;
       aspect-ratio: 9 / 16;
     }
 
-    .modal-text-viewer {
-      width: 100%;
-      background: #050811;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1rem;
-      font-family: monospace;
-      font-size: 0.85rem;
-      color: #38bdf8;
-      max-height: 50vh;
-      overflow-y: auto;
-      white-space: pre-wrap;
+    .modal-bottom {
+      padding: 1.35rem 1.6rem;
+      border-top: 1px solid var(--border);
     }
 
-    .modal-footer {
-      padding: 1.25rem 1.5rem;
-      border-top: 1px solid var(--border);
-      display: flex;
-      gap: 1rem;
+    .empty-box {
+      text-align: center;
+      padding: 4.5rem 2rem;
+      background: var(--bg-card);
+      border-radius: 24px;
+      border: 1px dashed var(--border);
+      grid-column: 1 / -1;
+    }
+
+    .empty-icon-svg {
+      margin-bottom: 1rem;
+      color: var(--text-muted);
     }
   </style>
 </head>
 <body>
 
+  <div class="bg-glow"></div>
+
+  <!-- Header Navbar -->
   <header>
     <div class="header-container">
       <div class="logo-area">
-        <span class="logo-icon">🎬</span>
+        <div class="logo-badge">
+          <i data-lucide="film" style="width:24px;height:24px;"></i>
+        </div>
         <div class="logo-text">
           <h1>Clipper Studio</h1>
           <p>Gestor de Vídeos y Archivos</p>
         </div>
       </div>
-      <div class="status-badge">
+      <div class="status-pill">
         <span class="status-dot"></span>
-        <span>Servidor Activo · /app/clips</span>
+        <span>Servidor en Línea · /app/clips</span>
       </div>
     </div>
   </header>
 
+  <!-- Main Container -->
   <main>
-    <!-- Pestañas Principales para Navegación Intuitiva -->
-    <nav class="tabs-nav">
-      <button class="tab-btn active" onclick="switchTab('listos', this)">
-        <span class="tab-icon">🎬</span>
+    <!-- Navigation Tabs -->
+    <nav class="tabs-grid">
+      <button class="tab-card active" onclick="switchTab('listos', this)">
+        <i data-lucide="play-circle" style="width:24px;height:24px;"></i>
         <span>Clips Listos</span>
-        <span class="tab-count" id="count-listos">0</span>
+        <span class="tab-badge" id="count-listos">0</span>
       </button>
-      <button class="tab-btn" onclick="switchTab('revisar', this)">
-        <span class="tab-icon">⚠️</span>
+      <button class="tab-card" onclick="switchTab('revisar', this)">
+        <i data-lucide="alert-triangle" style="width:24px;height:24px;"></i>
         <span>En Revisión</span>
-        <span class="tab-count" id="count-revisar">0</span>
+        <span class="tab-badge" id="count-revisar">0</span>
       </button>
-      <button class="tab-btn" onclick="switchTab('explorador', this)">
-        <span class="tab-icon">📁</span>
+      <button class="tab-card" onclick="switchTab('explorador', this)">
+        <i data-lucide="folder" style="width:24px;height:24px;"></i>
         <span>Explorador /app/clips</span>
       </button>
-      <button class="tab-btn" onclick="switchTab('logs', this)">
-        <span class="tab-icon">📋</span>
+      <button class="tab-card" onclick="switchTab('logs', this)">
+        <i data-lucide="terminal" style="width:24px;height:24px;"></i>
         <span>Logs del Servidor</span>
       </button>
     </nav>
 
-    <!-- Buscador de Vídeos -->
-    <div class="search-bar">
-      <span class="search-icon">🔍</span>
-      <input type="text" id="searchInput" class="search-input" placeholder="Buscar clip por streamer o por título..." onkeyup="filtrarClips()">
+    <!-- Search Input -->
+    <div class="search-container">
+      <i data-lucide="search" class="search-icon-svg" style="width:22px;height:22px;"></i>
+      <input type="text" id="searchInput" class="search-field" placeholder="Buscar clip por streamer o título del gancho..." onkeyup="filtrarClips()">
     </div>
 
-    <!-- Pestaña 1: Clips Listos para Subir -->
-    <section id="tab-listos" class="tab-content active">
+    <!-- Tab 1: Clips Listos -->
+    <section id="tab-listos" class="view-pane active">
       <div class="clips-grid" id="grid-listos"></div>
     </section>
 
-    <!-- Pestaña 2: Clips en Revisión -->
-    <section id="tab-revisar" class="tab-content">
+    <!-- Tab 2: Clips en Revisión -->
+    <section id="tab-revisar" class="view-pane">
       <div class="clips-grid" id="grid-revisar"></div>
     </section>
 
-    <!-- Pestaña 3: Explorador de Archivos y Carpetas -->
-    <section id="tab-explorador" class="tab-content">
-      <div class="breadcrumbs" id="breadcrumbs"></div>
-      <div class="files-list" id="files-grid"></div>
+    <!-- Tab 3: Explorador de Archivos -->
+    <section id="tab-explorador" class="view-pane">
+      <div class="breadcrumbs-box" id="breadcrumbs"></div>
+      <div class="files-grid" id="files-grid"></div>
     </section>
 
-    <!-- Pestaña 4: Registros / Logs del Servidor -->
-    <section id="tab-logs" class="tab-content">
-      <button class="refresh-logs-btn" onclick="cargarLogs()">🔄 Actualizar Registros</button>
-      <div class="logs-container" id="logs-box">Cargando registros del servidor...</div>
+    <!-- Tab 4: Logs del Servidor -->
+    <section id="tab-logs" class="view-pane">
+      <button class="btn-refresh" onclick="cargarLogs()">
+        <i data-lucide="refresh-cw" style="width:20px;height:20px;"></i>
+        <span>Actualizar Registros</span>
+      </button>
+      <div class="terminal-box" id="logs-box">Cargando registros...</div>
     </section>
   </main>
 
-  <!-- Modal de Previsualización -->
-  <div class="modal-overlay" id="previewModal" onclick="cerrarPrevisualizacion(event)">
-    <div class="modal-card" onclick="event.stopPropagation()">
-      <div class="modal-header">
-        <h3 class="modal-title" id="modalTitle">Previsualización</h3>
-        <button class="modal-close-btn" onclick="cerrarPrevisualizacion()">✕</button>
+  <!-- Modal Previsualizador de Vídeos y Archivos -->
+  <div class="modal-backdrop" id="previewModal" onclick="cerrarPrevisualizacion(event)">
+    <div class="modal-window" onclick="event.stopPropagation()">
+      <div class="modal-top">
+        <h3 class="modal-title-text" id="modalTitle">Previsualización</h3>
+        <button class="btn-close-modal" onclick="cerrarPrevisualizacion()">
+          <i data-lucide="x" style="width:20px;height:20px;"></i>
+        </button>
       </div>
-      <div class="modal-body" id="modalBody"></div>
-      <div class="modal-footer">
-        <a id="modalDownloadBtn" href="#" download class="download-btn">
-          <span>⬇️ DESCARGAR AHORA</span>
+      <div class="modal-center" id="modalBody"></div>
+      <div class="modal-bottom">
+        <a id="modalDownloadBtn" href="#" download class="btn-action-primary">
+          <i data-lucide="download" style="width:20px;height:20px;"></i>
+          <span>DESCARGAR VÍDEO AHORA</span>
         </a>
       </div>
     </div>
@@ -707,6 +765,8 @@ HTML_TEMPLATE = """<!doctype html>
     let currentPath = '';
 
     document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      animateHeader();
       cargarClips();
       cargarArchivos('');
       cargarLogs();
@@ -716,24 +776,39 @@ HTML_TEMPLATE = """<!doctype html>
       });
     });
 
+    function animateHeader() {
+      gsap.from('header', { y: -30, opacity: 0, duration: 0.6, ease: 'power3.out' });
+      gsap.from('.tab-card', { y: 20, opacity: 0, duration: 0.5, stagger: 0.08, ease: 'power2.out' });
+    }
+
+    function animateGrid(selector) {
+      gsap.from(selector, { y: 25, opacity: 0, duration: 0.4, stagger: 0.05, ease: 'power2.out' });
+    }
+
     function switchTab(tabId, btn) {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      
+      document.querySelectorAll('.tab-card').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.view-pane').forEach(c => c.classList.remove('active'));
+
       btn.classList.add('active');
-      document.getElementById('tab-' + tabId).classList.add('active');
+      const view = document.getElementById('tab-' + tabId);
+      view.classList.add('active');
+
+      if (tabId === 'listos') animateGrid('#grid-listos .clip-card');
+      if (tabId === 'revisar') animateGrid('#grid-revisar .clip-card');
+      if (tabId === 'explorador') animateGrid('#files-grid .file-card');
     }
 
     async function cargarClips() {
       try {
         const res = await fetch('/api/clips');
         const data = await res.json();
-        
+
         document.getElementById('count-listos').textContent = data.listos.length;
         document.getElementById('count-revisar').textContent = data.revisar.length;
 
         renderGrid('grid-listos', data.listos, false);
         renderGrid('grid-revisar', data.revisar, true);
+        lucide.createIcons();
       } catch (e) {
         console.error("Error cargando clips:", e);
       }
@@ -743,37 +818,46 @@ HTML_TEMPLATE = """<!doctype html>
       const container = document.getElementById(containerId);
       if (!clips || clips.length === 0) {
         container.innerHTML = `
-          <div class="empty-state" style="grid-column: 1 / -1;">
-            <div class="empty-state-icon">${esRevisar ? '✨' : '☕'}</div>
+          <div class="empty-box">
+            <i data-lucide="${esRevisar ? 'sparkles' : 'coffee'}" style="width:48px;height:48px;" class="empty-icon-svg"></i>
             <h3>${esRevisar ? 'No hay clips pendientes de revisión' : 'No hay clips listos para subir todavía'}</h3>
-            <p>${esRevisar ? 'Todos los clips generados cumplen con la calidad recomendada.' : 'Los clips aparecerán aquí automáticamente cuando los streamers emitan en directo.'}</p>
+            <p style="color:var(--text-muted);">${esRevisar ? 'Todos los clips generados han superado el filtro de calidad.' : 'Los clips aparecerán aquí de forma automática en cuanto salten picos en los directos.'}</p>
           </div>`;
         return;
       }
 
       container.innerHTML = clips.map(c => `
         <article class="clip-card" data-search="${(c.canal + ' ' + c.gancho).toLowerCase()}">
-          <div class="video-wrapper" onclick="abrirPrevisualizacion('${c.url}', '${c.gancho || c.nombre}', 'video')">
+          <div class="video-thumb-container" onclick="abrirPrevisualizacion('${c.url}', '${c.gancho || c.nombre}', 'video')">
             <video src="${c.url}" controls preload="metadata" playsinline></video>
-          </div>
-          <div class="clip-details">
-            <div class="clip-badge-row">
-              <span class="channel-tag">#${c.canal}</span>
-              <span class="duration-tag">⏱️ ${c.duracion}s</span>
+            <div class="thumb-play-overlay">
+              <div class="play-circle-icon">
+                <i data-lucide="play" style="width:32px;height:32px;fill:#fff;"></i>
+              </div>
             </div>
-            <h2 class="clip-title">${c.gancho || '(Sin título)'}</h2>
-            ${esRevisar && c.motivo ? `<div class="clip-reason">⚠️ ${c.motivo}</div>` : ''}
-            <div style="display:flex; gap:0.5rem; margin-top:auto;">
-              <button onclick="abrirPrevisualizacion('${c.url}', '${c.gancho || c.nombre}', 'video')" class="action-btn-sm" style="flex:1; justify-content:center; padding:0.8rem; font-size:0.95rem;">
-                👁️ Previsualizar
+          </div>
+          <div class="clip-body">
+            <div class="tags-row">
+              <span class="streamer-pill">#${c.canal}</span>
+              <span class="dur-pill">⏱️ ${c.duracion}s</span>
+            </div>
+            <h2 class="clip-heading">${c.gancho || '(Sin título)'}</h2>
+            ${esRevisar && c.motivo ? `<div class="clip-alert">⚠️ ${c.motivo}</div>` : ''}
+            <div class="btn-group">
+              <button onclick="abrirPrevisualizacion('${c.url}', '${c.gancho || c.nombre}', 'video')" class="btn-action-secondary">
+                <i data-lucide="eye" style="width:18px;height:18px;"></i>
+                <span>Ver</span>
               </button>
-              <a href="${c.url}" download class="download-btn" style="flex:1.2;">
-                <span>⬇️ Descargar</span>
+              <a href="${c.url}" download class="btn-action-primary">
+                <i data-lucide="download" style="width:18px;height:18px;"></i>
+                <span>Descargar</span>
               </a>
             </div>
           </div>
         </article>
       `).join('');
+
+      animateGrid('#' + containerId + ' .clip-card');
     }
 
     function filtrarClips() {
@@ -789,27 +873,27 @@ HTML_TEMPLATE = """<!doctype html>
       try {
         const res = await fetch('/api/browse?path=' + encodeURIComponent(subpath));
         const data = await res.json();
-        
-        // Render Migas de Pan (Breadcrumbs)
+
+        // Render Breadcrumbs
         const parts = subpath ? subpath.split('/').filter(Boolean) : [];
-        let breadHTML = `<span class="crumb-item" onclick="cargarArchivos('')">🏠 Inicio (/app/clips)</span>`;
+        let breadHTML = `<span class="crumb-link" onclick="cargarArchivos('')">🏠 Inicio (/app/clips)</span>`;
         let acc = '';
-        parts.forEach((p, idx) => {
+        parts.forEach((p) => {
           acc += (acc ? '/' : '') + p;
           const target = acc;
-          breadHTML += ` <span class="crumb-separator">/</span> <span class="crumb-item" onclick="cargarArchivos('${target}')">${p}</span>`;
+          breadHTML += ` <span class="crumb-divider">/</span> <span class="crumb-link" onclick="cargarArchivos('${target}')">${p}</span>`;
         });
         document.getElementById('breadcrumbs').innerHTML = breadHTML;
 
-        // Render Archivos y Carpetas
+        // Render Grid
         const grid = document.getElementById('files-grid');
         if (!data.items || data.items.length === 0) {
-          grid.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1;"><p>Esta carpeta está vacía.</p></div>`;
+          grid.innerHTML = `<div class="empty-box"><p style="color:var(--text-muted)">Esta carpeta está vacía.</p></div>`;
           return;
         }
 
         grid.innerHTML = data.items.map(item => {
-          const icon = item.is_dir ? '📂' : (item.name.endsWith('.mp4') ? '🎬' : (item.name.endsWith('.log') || item.name.endsWith('.txt') ? '📄' : '📁'));
+          const iconName = item.is_dir ? 'folder' : (item.name.endsWith('.mp4') ? 'film' : 'file-text');
           const itemPath = subpath ? (subpath + '/' + item.name) : item.name;
           const fileUrl = '/files/' + itemPath;
           const isVideo = item.name.endsWith('.mp4');
@@ -817,29 +901,38 @@ HTML_TEMPLATE = """<!doctype html>
 
           if (item.is_dir) {
             return `
-              <div class="file-item-card" onclick="cargarArchivos('${itemPath}')">
-                <span class="file-icon">${icon}</span>
-                <div class="file-info">
-                  <div class="file-name">${item.name}</div>
-                  <div class="file-meta">Carpeta</div>
+              <div class="file-card" onclick="cargarArchivos('${itemPath}')">
+                <div class="file-card-icon">
+                  <i data-lucide="folder" style="width:24px;height:24px;"></i>
                 </div>
-                <button class="action-btn-sm">Abrir ➔</button>
+                <div class="file-card-meta">
+                  <div class="file-card-name">${item.name}</div>
+                  <div class="file-card-sub">Carpeta</div>
+                </div>
+                <i data-lucide="chevron-right" style="width:20px;height:20px;color:var(--text-dim);"></i>
               </div>`;
           } else {
             return `
-              <div class="file-item-card">
-                <span class="file-icon" onclick="${isVideo ? `abrirPrevisualizacion('${fileUrl}', '${item.name}', 'video')` : (isText ? `abrirPrevisualizacion('${fileUrl}', '${item.name}', 'text')` : '')}">${icon}</span>
-                <div class="file-info" onclick="${isVideo ? `abrirPrevisualizacion('${fileUrl}', '${item.name}', 'video')` : (isText ? `abrirPrevisualizacion('${fileUrl}', '${item.name}', 'text')` : '')}">
-                  <div class="file-name" title="${item.name}">${item.name}</div>
-                  <div class="file-meta">${item.size}</div>
+              <div class="file-card">
+                <div class="file-card-icon" onclick="${isVideo ? `abrirPrevisualizacion('${fileUrl}', '${item.name}', 'video')` : (isText ? `abrirPrevisualizacion('${fileUrl}', '${item.name}', 'text')` : '')}">
+                  <i data-lucide="${iconName}" style="width:24px;height:24px;"></i>
                 </div>
-                <div class="file-actions">
-                  ${isVideo || isText ? `<button onclick="abrirPrevisualizacion('${fileUrl}', '${item.name}', '${isVideo ? 'video' : 'text'}')" class="action-btn-sm">👁️ Ver</button>` : ''}
-                  <a href="${fileUrl}" download class="action-btn-sm">⬇️</a>
+                <div class="file-card-meta" onclick="${isVideo ? `abrirPrevisualizacion('${fileUrl}', '${item.name}', 'video')` : (isText ? `abrirPrevisualizacion('${fileUrl}', '${item.name}', 'text')` : '')}">
+                  <div class="file-card-name" title="${item.name}">${item.name}</div>
+                  <div class="file-card-sub">${item.size}</div>
+                </div>
+                <div style="display:flex; gap:0.4rem;">
+                  ${isVideo || isText ? `<button onclick="abrirPrevisualizacion('${fileUrl}', '${item.name}', '${isVideo ? 'video' : 'text'}')" class="btn-action-secondary" style="padding:0.6rem 0.8rem; flex:none;"><i data-lucide="eye" style="width:16px;height:16px;"></i></button>` : ''}
+                  <a href="${fileUrl}" download class="btn-action-secondary" style="padding:0.6rem 0.8rem; flex:none;">
+                    <i data-lucide="download" style="width:16px;height:16px;"></i>
+                  </a>
                 </div>
               </div>`;
           }
         }).join('');
+
+        lucide.createIcons();
+        animateGrid('#files-grid .file-card');
 
       } catch (e) {
         console.error("Error explorando archivos:", e);
@@ -854,43 +947,45 @@ HTML_TEMPLATE = """<!doctype html>
 
       modalTitle.textContent = title || 'Previsualización';
       modalDownloadBtn.href = url;
-      modalBody.innerHTML = 'Cargando contenido...';
+      modalBody.innerHTML = '<p style="color:var(--text-muted)">Cargando...</p>';
 
       if (type === 'video') {
-        modalBody.innerHTML = `<video src="${url}" class="modal-video-player" controls autoplay playsinline></video>`;
+        modalBody.innerHTML = `<video src="${url}" class="video-player-modal" controls autoplay playsinline></video>`;
       } else if (type === 'text') {
         try {
           const res = await fetch(url);
           const text = await res.text();
-          modalBody.innerHTML = `<div class="modal-text-viewer">${text || '(Archivo vacío)'}</div>`;
+          modalBody.innerHTML = `<div style="width:100%; background:#040711; border:1px solid var(--border); border-radius:14px; padding:1.25rem; font-family:'Space Grotesk',monospace; font-size:0.9rem; color:#38bdf8; max-height:50vh; overflow-y:auto; white-space:pre-wrap;">${text || '(Archivo vacío)'}</div>`;
         } catch (e) {
-          modalBody.innerHTML = `<p style="color:var(--danger)">No se pudo cargar el archivo de texto.</p>`;
+          modalBody.innerHTML = `<p style="color:var(--danger)">No se pudo cargar el contenido del archivo.</p>`;
         }
-      } else {
-        modalBody.innerHTML = `<p>Archivo sin vista previa disponible.</p>`;
       }
 
       modal.classList.add('active');
+      gsap.from('.modal-window', { scale: 0.9, opacity: 0, duration: 0.3, ease: 'back.out(1.5)' });
+      lucide.createIcons();
     }
 
     function cerrarPrevisualizacion(e) {
-      if (e && e.target !== document.getElementById('previewModal') && !e.target.classList.contains('modal-close-btn')) return;
+      if (e && e.target !== document.getElementById('previewModal') && !e.target.classList.contains('btn-close-modal')) return;
       const modal = document.getElementById('previewModal');
       const modalBody = document.getElementById('modalBody');
-      modal.classList.remove('active');
-      modalBody.innerHTML = '';
+      gsap.to('.modal-window', { scale: 0.9, opacity: 0, duration: 0.2, onComplete: () => {
+        modal.classList.remove('active');
+        modalBody.innerHTML = '';
+      }});
     }
 
     async function cargarLogs() {
       const box = document.getElementById('logs-box');
-      box.textContent = "Cargando registros recientes...";
+      box.textContent = "Cargando registros del servidor...";
       try {
         const res = await fetch('/api/logs');
         const data = await res.text();
-        box.textContent = data || "No hay registros disponibles en este momento.";
+        box.textContent = data || "No hay registros de actividad todavía.";
         box.scrollTop = box.scrollHeight;
       } catch (e) {
-        box.textContent = "Error al obtener los logs del servidor.";
+        box.textContent = "Error obteniendo los logs del servidor.";
       }
     }
   </script>
@@ -943,7 +1038,6 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        # Endpoint de salud público
         if self.path == "/salud":
             cuerpo = b"ok"
             self.send_response(HTTPStatus.OK)
@@ -953,32 +1047,26 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(cuerpo)
             return
 
-        # Verificar credenciales para todo el resto
         if not self._autorizado():
             return self._pedir_credenciales()
 
         url_parsed = urlparse(self.path)
         path = url_parsed.path
 
-        # 1. Página principal de la interfaz
         if path in ["/", "/index.html"]:
             return self._responder_html(HTML_TEMPLATE)
 
-        # 2. API: Lista de clips (Listos y Revisar)
         if path == "/api/clips":
             return self._handle_api_clips()
 
-        # 3. API: Explorador de carpetas (/app/clips)
         if path == "/api/browse":
             query = parse_qs(url_parsed.query)
             subpath = query.get("path", [""])[0]
             return self._handle_api_browse(subpath)
 
-        # 4. API: Logs del servidor
         if path == "/api/logs":
             return self._handle_api_logs()
 
-        # 5. Descargas / visualización de archivos de /app/clips
         if path.startswith("/files/"):
             rel_path = unquote(path[7:])
             self.path = "/" + rel_path
@@ -1002,7 +1090,7 @@ class Handler(SimpleHTTPRequestHandler):
         for mp4 in sorted(dir_path.glob("*.mp4"), reverse=True):
             partes = mp4.stem.split("_")
             canal = partes[1] if len(partes) >= 2 else "clip"
-            
+
             gancho = ""
             motivo = ""
             txt_file = mp4.with_suffix(".txt")
@@ -1010,7 +1098,7 @@ class Handler(SimpleHTTPRequestHandler):
 
             if motivos_file.exists():
                 motivo = motivos_file.read_text(encoding="utf-8", errors="replace").strip()
-            
+
             if txt_file.exists():
                 contenido = txt_file.read_text(encoding="utf-8", errors="replace")
                 m = re.search(r"gancho en pantalla:\s*(.*)", contenido)
@@ -1018,11 +1106,11 @@ class Handler(SimpleHTTPRequestHandler):
                     gancho = m.group(1).strip()
 
             rel_url = f"/files/out/{'REVISAR' if es_revisar else 'LISTOS'}/{mp4.name}"
-            
+
             clips.append({
                 "nombre": mp4.name,
                 "canal": canal,
-                "duracion": 30,  # estimado o extraíble
+                "duracion": 30,
                 "gancho": gancho or mp4.stem,
                 "motivo": motivo,
                 "url": rel_url
@@ -1031,7 +1119,6 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _handle_api_browse(self, subpath: str):
         target = (DATA / subpath).resolve()
-        # Seguridad para evitar que salgan de /app/clips
         if not str(target).startswith(str(DATA.resolve())):
             target = DATA.resolve()
 
