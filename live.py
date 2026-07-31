@@ -19,8 +19,10 @@ import argparse
 import collections
 import json
 import math
+import os
 import queue
 import re
+import signal
 import socket
 import subprocess
 import sys
@@ -134,7 +136,6 @@ class Captura:
                     subprocess.run(["taskkill", "/PID", str(p.pid), "/T", "/F"],
                                    capture_output=True)
                 else:
-                    import signal
                     os.killpg(os.getpgid(p.pid), signal.SIGKILL)
             except (OSError, ProcessLookupError):
                 p.kill()

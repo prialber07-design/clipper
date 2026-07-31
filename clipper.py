@@ -29,6 +29,25 @@ WORK = DATA / "work"
 OUT = DATA / "out"
 
 
+def _cargar_env():
+    """Lee .env si existe.
+
+    config.json va al repositorio y por eso no lleva valores reales; los tuyos
+    viven en .env, que esta en .gitignore. Sin esto, ejecutar en local usaria
+    los marcadores de ejemplo.
+    """
+    ruta = ROOT / ".env"
+    if not ruta.exists():
+        return
+    for linea in ruta.read_text(encoding="utf-8").splitlines():
+        linea = linea.strip()
+        if not linea or linea.startswith("#") or "=" not in linea:
+            continue
+        clave, valor = linea.split("=", 1)
+        # Lo que ya venga del entorno manda: en Docker gana el compose.
+        os.environ.setdefault(clave.strip(), valor.strip().strip('"').strip("'"))
+
+
 def _aplicar_entorno(cfg: dict) -> dict:
     """Variables de entorno por encima del fichero.
 
@@ -52,6 +71,7 @@ def _aplicar_entorno(cfg: dict) -> dict:
     return cfg
 
 
+_cargar_env()
 CONFIG = _aplicar_entorno(json.loads((ROOT / "config.json").read_text(encoding="utf-8")))
 
 
