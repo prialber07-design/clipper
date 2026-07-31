@@ -238,6 +238,16 @@ def publicar(mp4: Path, meta: dict) -> Path:
     destino = registrar_listo(mp4, meta)
     gancho = meta.get("hook", "") or "(sin gancho)"
     dur = meta.get("duracion", "?")
+    canal = meta.get("canal", "desconocido")
+
+    print("\n" + "=" * 60, flush=True)
+    print(f"🎬 [NUEVO CLIP GENERADO - LISTO]", flush=True)
+    print(f"   👤 Streamer : {canal}", flush=True)
+    print(f"   📁 Archivo  : {destino.name}", flush=True)
+    print(f"   ⏱️  Duración : {dur} segundos", flush=True)
+    print(f"   📌 Gancho   : {gancho}", flush=True)
+    print("=" * 60 + "\n", flush=True)
+
     aviso = f"{gancho}\n\n{dur}s"
     if isinstance(dur, int):
         aviso += " (monetiza en TikTok)" if dur > 60 else " (menos de 1 min)"
@@ -251,8 +261,8 @@ def publicar(mp4: Path, meta: dict) -> Path:
         aviso += f"\n\n{enlace}"
 
     avisar(
-        titulo=f"Clip #{meta.get('n', '?'):03d} · {meta.get('canal','')}"
-              if isinstance(meta.get("n"), int) else f"Clip listo: {meta.get('canal','')}",
+        titulo=f"Clip #{meta.get('n', '?'):03d} · {canal}"
+              if isinstance(meta.get("n"), int) else f"Clip listo: {canal}",
         mensaje=aviso,
         adjunto=destino,
         enlace=enlace,

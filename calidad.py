@@ -149,4 +149,16 @@ def apartar(mp4: Path, motivos: list[str], meta: dict) -> Path:
         "NO PUBLICAR. Motivos:\n- " + "\n- ".join(motivos) +
         f"\n\ngancho: {meta.get('hook','')}\ncanal: {meta.get('canal','')}\n",
         encoding="utf-8")
+
+    canal = meta.get("canal", "desconocido")
+    dur = meta.get("duracion", "?")
+
+    print("\n" + "=" * 60, flush=True)
+    print(f"⚠️ [NUEVO CLIP GENERADO - EN REVISIÓN]", flush=True)
+    print(f"   👤 Streamer : {canal}", flush=True)
+    print(f"   📁 Archivo  : {destino.name}", flush=True)
+    print(f"   ⏱️  Duración : {dur} segundos", flush=True)
+    print(f"   ❌ Motivos  : {'; '.join(motivos)}", flush=True)
+    print("=" * 60 + "\n", flush=True)
+
     return destino
