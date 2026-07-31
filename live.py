@@ -30,6 +30,7 @@ import threading
 import time
 from pathlib import Path
 
+import bloqueo
 import calidad
 import clipper
 import notify
@@ -392,7 +393,11 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
     _, t_pico = montar_ventana(cap, t_video, slug, antes=antes)
 
     args = argparse.Namespace(slug=slug, n=1, device=device, func=None)
-    clipper.cmd_transcribe(args)
+    if CONFIG.get("cpu", {}).get("una_tarea_pesada_a_la_vez", True):
+        with bloqueo.exclusivo(DATA / ".cpu.lock", etiqueta=canal):
+            clipper.cmd_transcribe(args)
+    else:
+        clipper.cmd_transcribe(args)
 
     d = WORK / slug
     datos = json.loads((d / "transcript.json").read_text(encoding="utf-8"))
@@ -432,7 +437,12 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
     (d / "clips.json").write_text(json.dumps({"clips": [clip]}, ensure_ascii=False, indent=2),
                                   encoding="utf-8")
 
-    clipper.cmd_render(argparse.Namespace(slug=slug, only=None, layout=None, func=None))
+    render_args = argparse.Namespace(slug=slug, only=None, layout=None, func=None)
+    if CONFIG.get("cpu", {}).get("una_tarea_pesada_a_la_vez", True):
+        with bloqueo.exclusivo(DATA / ".cpu.lock", etiqueta=f"render de {canal}"):
+            clipper.cmd_render(render_args)
+    else:
+        clipper.cmd_render(render_args)
 
     mp4 = clipper.OUT / slug / f"{slug}-01.mp4"
     if mp4.exists():

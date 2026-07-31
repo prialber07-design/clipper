@@ -250,5 +250,9 @@
                                                         ]
                                    },
                      "maximo":  8
-                 }
+                 },
+    "cpu":  {
+                "una_tarea_pesada_a_la_vez":  true,
+                "_nota":  "Sin GPU, dos transcripciones a la vez se pelean por los nucleos y las dos van lentas. En fila, cada una usa la maquina entera y el total sale antes. Con GPU, ponlo a false."
+            }
 }
