@@ -11,7 +11,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY *.py config.json ./
+COPY *.py *.sh config.json ./
+RUN chmod +x *.sh
 
 # El codigo va como root y de solo lectura; los datos, de un usuario sin
 # privilegios sobre el volumen.
