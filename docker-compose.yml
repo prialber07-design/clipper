@@ -28,8 +28,11 @@ services:
     # ports:
     #   - "8080:8080"
 
-  # HTTPS automatico con tu dominio. Sin esto la clave viaja en claro.
+  # HTTPS automatico para Docker "a pelo". NO hace falta con EasyPanel, Coolify
+  # o Dokploy: esos ya traen su propio proxy con certificados.
+  #   docker compose --profile proxy up -d
   caddy:
+    profiles: [proxy]
     image: caddy:2-alpine
     container_name: clipper-caddy
     restart: unless-stopped

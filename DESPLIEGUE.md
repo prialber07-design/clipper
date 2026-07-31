@@ -86,7 +86,46 @@ systemctl enable --now clipper && journalctl -u clipper -f
 Con GPU añade `nvidia-cuda-toolkit` y
 `pip install nvidia-cublas-cu12 nvidia-cudnn-cu12`.
 
-## Opción C — Docker (recomendada para servidor)
+## Opción C — EasyPanel (lo más rápido si ya lo tienes)
+
+EasyPanel construye la imagen desde el repositorio y ya trae proxy con
+certificado automático, así que **no necesitas Caddy ni el docker-compose**.
+
+1. **Create Service → App**, origen **GitHub**, tu repositorio, rama `main`.
+2. **Build**: `Dockerfile` (o `Dockerfile.gpu` si el servidor tiene GPU).
+3. **Environment**: pega esto ajustando valores.
+
+   ```
+   CLIPPER_NTFY_ACTIVO=1
+   CLIPPER_NTFY_TOPIC=tu-topic-aleatorio
+   CLIPPER_MARCA=@TuCanal
+   CLIPPER_CARPETA_SINCRONIZADA=
+   CLIPPER_WEB_USUARIO=clips
+   CLIPPER_WEB_CLAVE=una-clave-larga
+   CLIPPER_WEB_PUERTO=8080
+   CLIPPER_URL_PUBLICA=https://clips.tudominio.com
+   CLIPPER_MODELO=small
+   CLIPPER_COMPUTE=int8
+   ```
+
+4. **Volumes**: volumen persistente montado en **`/data`**. Sin esto pierdes
+   los clips y el modelo en cada despliegue.
+5. **Domains**: tu dominio, puerto **8080**, HTTPS activado.
+6. **Deploy**.
+
+La galería queda en `https://tu-dominio` y el aviso del móvil trae el enlace
+directo al clip.
+
+### Ajustes obligatorios en EasyPanel
+
+- **`CLIPPER_MODELO=small`** salvo que el servidor tenga GPU. Con
+  `large-v3-turbo` en CPU los picos se encolan y pierdes clips.
+- **Menos canales**: edita `config.json` o arranca con
+  `python servidor.py --canales a,b,c`. Con 3–4 va bien; con 10 en CPU, no.
+- **El buffer va a disco** (en compose iba a tmpfs). Son ~1 GB por canal
+  rodando; cuenta el espacio y el desgaste del SSD.
+
+## Opción D — Docker a pelo
 
 ```bash
 cp .env.ejemplo .env      # y ajusta topic, marca y modelo
@@ -98,6 +137,12 @@ Con GPU (necesita NVIDIA Container Toolkit en el host):
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+```
+
+Con HTTPS propio (solo si no usas un panel que ya lo traiga):
+
+```bash
+docker compose --profile proxy up -d --build
 ```
 
 ### Qué hace la imagen
