@@ -13,6 +13,7 @@ mandar) avisos. Por eso se genera aleatorio y no se comparte.
 import csv
 import json
 import os
+import re
 import shutil
 import urllib.error
 import urllib.request
@@ -31,6 +32,24 @@ NOTIF = CONFIG.get("notificaciones", {})
 
 
 CONTADOR = LISTOS / ".contador"
+
+
+def _titulo_para_archivo(hook: str | None, tope: int = 70) -> str:
+    """Convierte el gancho en algo que Windows acepte como nombre de fichero.
+
+    Se conservan tildes y ñ: el nombre lo lees tu en el movil, no lo parsea
+    nadie. Lo que se quita son los caracteres que Windows prohibe.
+    """
+    texto = (hook or "").strip()
+    if not texto or texto.startswith("ESCRIBE"):
+        return "sin-gancho"
+    texto = re.sub(r'[<>:"/\\|?*¿¡,;.…]', "", texto)
+    texto = re.sub(r"[\s_]+", "-", texto).strip("-.")
+    texto = re.sub(r"-{2,}", "-", texto)
+    if len(texto) > tope:
+        # Cortar por palabra entera: un nombre partido a mitad se lee peor.
+        texto = texto[:tope].rsplit("-", 1)[0]
+    return texto or "sin-gancho"
 
 
 def _siguiente_numero() -> int:
@@ -60,6 +79,12 @@ def _sincronizar(destino: Path, txt: Path | None):
         shutil.copy2(destino, carpeta / destino.name)
         if txt and txt.exists():
             shutil.copy2(txt, carpeta / txt.name)
+
+        # La carpeta sincronizada es un espejo de la bandeja: si falta algo
+        # (por un renombrado a medias o un borrado), se repone aqui.
+        for p in LISTOS.iterdir():
+            if p.suffix in (".mp4", ".txt") and not (carpeta / p.name).exists():
+                shutil.copy2(p, carpeta / p.name)
         print(f"[>] Sincronizado a {carpeta}")
     except OSError as e:
         print(f"[!] No se pudo sincronizar ({e}). El clip esta en out/LISTOS igual.")
@@ -70,9 +95,9 @@ def registrar_listo(mp4: Path, meta: dict) -> Path:
     LISTOS.mkdir(parents=True, exist_ok=True)
     ts = datetime.now()
     n = _siguiente_numero()
-    # El numero va delante y manda: es el mismo que uso al darte el guion, para
-    # que "el 007" signifique lo mismo en la carpeta, en el movil y en el chat.
-    base = f"{n:03d}_{meta.get('canal','clip')}_{ts:%Y-%m-%d}"
+    # Numero + canal + gancho: el nombre del archivo ya dice de que va el clip,
+    # sin abrir el .txt.
+    base = f"{n:03d}_{meta.get('canal','clip')}_{_titulo_para_archivo(meta.get('hook'))}"
     if (LISTOS / f"{base}.mp4").exists():
         base = f"{base}_{ts:%H%M%S}"
     meta = {**meta, "n": n}
