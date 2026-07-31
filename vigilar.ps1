@@ -88,6 +88,16 @@ foreach ($canal in $Canales) {
     if ($info.plataforma -ne "twitch") { $argumentos += "--solo-audio" }
 
     New-Item -ItemType Directory -Force "$raiz\logs" | Out-Null
+
+    # Start-Process trunca el fichero de salida. Sin rotar, cada reinicio borra
+    # el historial y con el la unica forma de medir que tal va el detector.
+    $log = "$raiz\logs\$canal.log"
+    if (Test-Path $log) {
+        Move-Item $log "$raiz\logs\$canal.$(Get-Date -Format yyyyMMdd-HHmmss).log" -Force
+    }
+    Get-ChildItem "$raiz\logs" -Filter "$canal.*.log" -EA SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -Skip 15 | Remove-Item -Force -EA SilentlyContinue
+
     # Sin esto el log sale con mojibake ("Â¿CuÃ¡ntas?") y los ganchos con tildes
     # se vuelven ilegibles justo donde mas falta hace leerlos.
     $env:PYTHONIOENCODING = "utf-8"
