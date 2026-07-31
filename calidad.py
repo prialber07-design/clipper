@@ -68,7 +68,9 @@ def _gancho_flojo(hook: str) -> str | None:
     if len(palabras) < 4:
         return "gancho de menos de 4 palabras"
     # Empezar en minuscula delata que la frase venia cortada por la mitad.
-    if not re.match(r"^[¿¡A-ZÁÉÍÓÚÑ0-9]", hook.strip()):
+    # Ojo con '¿': "¿sabes que..." abre interrogacion pero sigue siendo un
+    # trozo suelto, asi que la primera letra real tambien tiene que ir en alta.
+    if not re.match(r"^[¿¡]?[A-ZÁÉÍÓÚÑ0-9]", hook.strip()):
         return "el gancho empieza a media frase (minuscula inicial)"
 
     # Un gancho se lee de un vistazo en un movil. Pasado de ahi ya no engancha,

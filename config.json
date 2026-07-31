@@ -192,7 +192,8 @@
                     "hook_min_chars":  18,
                     "volumen_min_db":  -40,
                     "negro_max_s":  2,
-                    "publicar_con_gancho_automatico":  true
+                    "publicar_con_gancho_automatico":  true,
+                    "gancho_puntuacion_minima":  3
                 },
     "duraciones":  {
                        "corto":  {

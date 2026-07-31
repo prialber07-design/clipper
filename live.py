@@ -351,11 +351,14 @@ def gancho_automatico(segs, t_pico: float, chat=None) -> str:
         if calidad._gancho_flojo(txt):
             continue
 
-        punt = (len(SEÑALES_GANCHO.findall(txt)) * 2
+        # La cercania al pico orienta, pero no puede enterrar una frase con
+        # sustancia: se limita a 3 puntos de penalizacion.
+        cerca = min(abs(s["start"] - t_pico) * 0.04, 3.0)
+        punt = (len(SEÑALES_GANCHO.findall(txt)) * 3
                 + txt.count("?") * 2 + txt.count("!") * 2
-                + (2 if calidad.REVERSO.search(txt) else 0)
-                + (2 if calidad.CONDICIONAL.match(txt) else 0)
-                - abs(s["start"] - t_pico) * 0.06)
+                + (3 if calidad.REVERSO.search(txt) else 0)
+                + (3 if calidad.CONDICIONAL.match(txt) else 0)
+                - cerca)
 
         # Lo que repite el chat es lo que le importa: una frase que comparte
         # vocabulario con la reaccion es, casi siempre, la que la provoco.
@@ -373,7 +376,14 @@ def gancho_automatico(segs, t_pico: float, chat=None) -> str:
 
     if not candidatas:
         return ""
-    return max(candidatas)[1]
+    punt, mejor = max(candidatas)
+    # Por debajo del listón preferimos no dar gancho: el clip va a REVISAR y se
+    # escribe a mano, en vez de publicar algo vago como "¿Y tú sabes por qué?".
+    minimo = float(CONFIG.get("calidad", {}).get("gancho_puntuacion_minima", 3))
+    if punt < minimo:
+        print(f"[.] Mejor gancho posible demasiado flojo ({punt:.1f}): {mejor[:50]}")
+        return ""
+    return mejor
 
 
 def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str, chat=None):
