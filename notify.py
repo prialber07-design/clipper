@@ -64,6 +64,21 @@ def _siguiente_numero() -> int:
     return n
 
 
+SINCRONIZADOS = LISTOS / ".sincronizados"
+
+
+def _ya_sincronizados() -> set:
+    try:
+        return set(SINCRONIZADOS.read_text(encoding="utf-8").split("\n")) - {""}
+    except OSError:
+        return set()
+
+
+def _guardar_sincronizados(nombres: set):
+    SINCRONIZADOS.parent.mkdir(parents=True, exist_ok=True)
+    SINCRONIZADOS.write_text("\n".join(sorted(nombres)), encoding="utf-8")
+
+
 def _sincronizar(destino: Path, txt: Path | None):
     """Copia el clip a la carpeta de OneDrive/Dropbox para que llegue al movil.
 
@@ -76,16 +91,19 @@ def _sincronizar(destino: Path, txt: Path | None):
     carpeta = Path(ruta)
     try:
         carpeta.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(destino, carpeta / destino.name)
-        if txt and txt.exists():
-            shutil.copy2(txt, carpeta / txt.name)
-
-        # La carpeta sincronizada es un espejo de la bandeja: si falta algo
-        # (por un renombrado a medias o un borrado), se repone aqui.
-        for p in LISTOS.iterdir():
-            if p.suffix in (".mp4", ".txt") and not (carpeta / p.name).exists():
-                shutil.copy2(p, carpeta / p.name)
-        print(f"[>] Sincronizado a {carpeta}")
+        # Cada clip se copia UNA vez. Si luego lo borras porque ya lo subiste,
+        # no vuelve a aparecer: la carpeta es tu bandeja de entrada, no un espejo.
+        ya = _ya_sincronizados()
+        nuevos = 0
+        for p in [destino] + ([txt] if txt and txt.exists() else []):
+            if p.name in ya:
+                continue
+            shutil.copy2(p, carpeta / p.name)
+            ya.add(p.name)
+            nuevos += 1
+        _guardar_sincronizados(ya)
+        if nuevos:
+            print(f"[>] Sincronizado a {carpeta}")
     except OSError as e:
         print(f"[!] No se pudo sincronizar ({e}). El clip esta en out/LISTOS igual.")
 

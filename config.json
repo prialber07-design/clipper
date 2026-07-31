@@ -255,5 +255,9 @@
     "cpu":  {
                 "una_tarea_pesada_a_la_vez":  true,
                 "_nota":  "Sin GPU, dos transcripciones a la vez se pelean por los nucleos y las dos van lentas. En fila, cada una usa la maquina entera y el total sale antes. Con GPU, ponlo a false."
-            }
+            },
+    "visual":  {
+                   "activo":  true,
+                   "_nota":  "En canales irl, si el audio no da gancho, el clip no se tira: se guarda en out/PENDIENTE_GANCHO con su contact sheet para escribirle el gancho mirandolo."
+               }
 }

@@ -386,6 +386,30 @@ def gancho_automatico(segs, t_pico: float, chat=None) -> str:
     return mejor
 
 
+def _pendiente_visual(mp4: Path, slug: str, canal: str, clip: dict, segs) -> Path:
+    """Aparta el clip con su contact sheet y su transcripcion, listo para que
+    alguien mire que pasa y le escriba el gancho."""
+    carpeta = clipper.OUT / "PENDIENTE_GANCHO"
+    carpeta.mkdir(parents=True, exist_ok=True)
+    destino = carpeta / f"{slug}.mp4"
+    destino.write_bytes(mp4.read_bytes())
+
+    hoja = clipper.mosaico(slug)
+    if hoja:
+        (carpeta / f"{slug}_mosaico.png").write_bytes(hoja.read_bytes())
+
+    texto = "\n".join(f"[{s['start']:6.1f}] {s['text'].strip()}" for s in segs)
+    (carpeta / f"{slug}.md").write_text(
+        f"# {slug}\n\n"
+        f"canal: {canal}  ·  {clip['end'] - clip['start']:.0f}s\n\n"
+        f"Sin gancho aprovechable en el audio. Mira `{slug}_mosaico.png` y "
+        f"escribe el gancho en `work/{slug}/clips.json`, luego:\n\n"
+        f"    python clipper.py render {slug}\n\n"
+        f"## Lo que se oye\n\n```\n{texto}\n```\n",
+        encoding="utf-8")
+    return destino
+
+
 def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str, chat=None):
     recargar()  # coge los ajustes de config.json sin reiniciar
     aplicar_ajustes_canal(canal)
@@ -435,6 +459,12 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
 
     dentro = [s for s in segs if ini <= s["start"] < fin]
     gancho = gancho_automatico(dentro, t_pico, chat)
+
+    # En un IRL el momento es visual y la transcripcion no da para gancho casi
+    # nunca. En vez de tirar el clip, se guarda con su contact sheet para
+    # escribirle el gancho mirandolo.
+    visual = (not gancho and rc.get("layout") == "irl"
+              and CONFIG.get("visual", {}).get("activo", True))
     clip = {
         "id": "01",
         "start": round(ini, 2),
@@ -462,6 +492,10 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
         if apto:
             destino = notify.publicar(mp4, meta)
             print(f"[ok] bandeja: {destino}")
+        elif visual and fallos == ["sin gancho"]:
+            destino = _pendiente_visual(mp4, slug, canal, clip, dentro)
+            print(f"[>] Sin gancho en el audio, pero es IRL: guardado para "
+                  f"gancho visual en {destino}")
         else:
             destino = calidad.apartar(mp4, fallos, meta)
             print(f"[!] NO publicado. Motivos: {'; '.join(fallos)}")

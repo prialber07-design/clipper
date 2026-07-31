@@ -513,6 +513,37 @@ def _vf_reaccion(rc: dict) -> str:
             f"{marcos},setsar=1,ass=subs.ass[v]")
 
 
+def mosaico(slug: str, columnas: int = 4, filas: int = 2) -> Path | None:
+    """Contact sheet del clip.
+
+    En un IRL el momento es visual: sin mirar los fotogramas no hay forma de
+    saber que pasa, porque la transcripcion trae musica y frases sueltas.
+    """
+    d = WORK / slug
+    fuente = d / "source.mp4"
+    if not fuente.exists():
+        return None
+    destino = d / "mosaico.png"
+    total = columnas * filas
+    try:
+        p = run([FFPROBE, "-v", "error", "-show_entries", "format=duration",
+                 "-of", "default=nw=1:nk=1", str(fuente)])
+        dur = float(p.stdout.strip())
+    except (SystemExit, ValueError):
+        return None
+    # Un fotograma cada 1/total de la duracion, repartidos por todo el clip.
+    paso = max(1, int(dur * 30 / total))
+    run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error", "-i", str(fuente),
+         "-vf", f"select='not(mod(n\\,{paso}))',scale=340:-1,tile={columnas}x{filas}",
+         "-frames:v", "1", str(destino)])
+    return destino if destino.exists() else None
+
+
+def cmd_mosaico(args):
+    r = mosaico(args.slug)
+    print(f"[ok] {r}" if r else "[x] No se pudo generar el mosaico")
+
+
 def cmd_rejilla(args):
     """Frame del original con rejilla de coordenadas, para leer el cam_rect a ojo."""
     d = WORK / args.slug
@@ -624,6 +655,10 @@ def main():
     t.add_argument("--n", type=int, default=10, help="numero de candidatos")
     t.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     t.set_defaults(func=cmd_transcribe)
+
+    m = sub.add_parser("mosaico", help="contact sheet del clip, para ver de que va")
+    m.add_argument("slug")
+    m.set_defaults(func=cmd_mosaico)
 
     g = sub.add_parser("rejilla", help="saca un frame con rejilla para localizar la webcam")
     g.add_argument("slug")
