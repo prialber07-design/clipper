@@ -183,7 +183,7 @@
                  "ventana_antes_largo_s":  115
              },
     "whisper":  {
-                    "modelo":  "large-v3-turbo",
+                    "modelo":  "small",
                     "idioma":  "es",
                     "compute_type":  "int8"
                 },

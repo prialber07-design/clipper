@@ -16,15 +16,15 @@ COPY *.py config.json ./
 # El codigo va como root y de solo lectura; los datos, de un usuario sin
 # privilegios sobre el volumen.
 RUN useradd --system --uid 10001 clipper \
-    && mkdir -p /data/modelos && chown -R clipper:clipper /data
+    && mkdir -p /app/clips/modelos && chown -R clipper:clipper /app/clips
 
-ENV CLIPPER_DATA=/data \
-    HF_HOME=/data/modelos \
+ENV CLIPPER_DATA=/app/clips \
+    HF_HOME=/app/clips/modelos \
     PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8
 
 USER clipper
-VOLUME ["/data"]
+VOLUME ["/app/clips"]
 
 # tini recoge los zombis de streamlink y ffmpeg, que se lanzan por cada canal.
 ENTRYPOINT ["/usr/bin/tini", "--"]
