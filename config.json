@@ -1,0 +1,254 @@
+{
+    "_nota":  "permiso_clips: PENDIENTE hasta que verifiques su politica oficial de clips. No monetices ningun canal marcado PENDIENTE. Handles resueltos y verificados contra la API de Kick el 2026-07-31.",
+    "canales":  [
+                    {
+                        "nombre":  "Davoo Xeneize",
+                        "plataforma":  "kick",
+                        "canal":  "davooxeneize",
+                        "seguidores":  2030263,
+                        "verificado":  true,
+                        "detector":  "solo_audio",
+                        "permiso_clips":  "PENDIENTE",
+                        "layout":  "reaccion"
+                    },
+                    {
+                        "nombre":  "La Cobra",
+                        "plataforma":  "kick",
+                        "canal":  "lacobraaa",
+                        "seguidores":  1830408,
+                        "verificado":  true,
+                        "detector":  "solo_audio",
+                        "permiso_clips":  "PENDIENTE",
+                        "layout":  "reaccion"
+                    },
+                    {
+                        "nombre":  "RdJavi",
+                        "plataforma":  "kick",
+                        "canal":  "rdjavi",
+                        "seguidores":  967634,
+                        "verificado":  true,
+                        "detector":  "solo_audio",
+                        "permiso_clips":  "PENDIENTE",
+                        "layout":  "reaccion"
+                    },
+                    {
+                        "nombre":  "Rey de la city",
+                        "plataforma":  "kick",
+                        "canal":  "reydelacity",
+                        "seguidores":  158772,
+                        "verificado":  true,
+                        "detector":  "solo_audio",
+                        "permiso_clips":  "PENDIENTE",
+                        "layout":  "irl"
+                    },
+                    {
+                        "nombre":  "Mario Taxi",
+                        "plataforma":  "kick",
+                        "canal":  "mariotaxi",
+                        "seguidores":  6029,
+                        "verificado":  true,
+                        "detector":  "solo_audio",
+                        "permiso_clips":  "PENDIENTE",
+                        "layout":  "irl"
+                    },
+                    {
+                        "nombre":  "Viviendo en la calle",
+                        "plataforma":  "kick",
+                        "canal":  "viviendoenlacalle",
+                        "seguidores":  5280,
+                        "verificado":  true,
+                        "detector":  "solo_audio",
+                        "permiso_clips":  "PENDIENTE",
+                        "layout":  "irl"
+                    },
+                    {
+                        "nombre":  "Lopezfnx",
+                        "plataforma":  "twitch",
+                        "canal":  "lopezfnx",
+                        "verificado":  true,
+                        "detector":  "reaccion",
+                        "permiso_clips":  "PENDIENTE",
+                        "seguidores":  null,
+                        "fuente":  "URL facilitada por el usuario, existencia verificada en twitch.tv",
+                        "layout":  "reaccion"
+                    },
+                    {
+                        "nombre":  "El Calvo",
+                        "plataforma":  "twitch",
+                        "canal":  "elcalvolol",
+                        "verificado":  true,
+                        "detector":  "reaccion",
+                        "permiso_clips":  "PENDIENTE",
+                        "seguidores":  null,
+                        "fuente":  "URL facilitada por el usuario, existencia verificada en twitch.tv",
+                        "layout":  "irl",
+                        "render":  {
+                                       "silencio_corta_bloque_s":  0.6,
+                                       "sub_max_hold_s":  0.4
+                                   },
+                        "_nota_render":  "sin subtitulos mientras nadie habla: el bloque se corta si hay mas de 0.6s de pausa y ninguna palabra se sostiene mas de 0.4s tras pronunciarse"
+                    },
+                    {
+                        "nombre":  "Franbuve",
+                        "plataforma":  "twitch",
+                        "canal":  "franbeuve",
+                        "verificado":  true,
+                        "detector":  "reaccion",
+                        "permiso_clips":  "PENDIENTE",
+                        "seguidores":  null,
+                        "fuente":  "URL facilitada por el usuario, existencia verificada en twitch.tv",
+                        "layout":  "reaccion"
+                    },
+                    {
+                        "nombre":  "Jose Nogales",
+                        "plataforma":  "twitch",
+                        "canal":  "josenogales1",
+                        "verificado":  true,
+                        "detector":  "reaccion",
+                        "permiso_clips":  "PENDIENTE",
+                        "seguidores":  null,
+                        "fuente":  "URL facilitada por el usuario, existencia verificada en twitch.tv",
+                        "layout":  "reaccion"
+                    }
+                ],
+    "render":  {
+                   "layout":  "irl",
+                   "fps":  30,
+                   "crf":  20,
+                   "duracion_min_s":  26,
+                   "duracion_max_s":  34,
+                   "zoom":  1.6,
+                   "video_y":  700,
+                   "reaccion":  {
+                                    "cam_rect":  [
+                                                     1470,
+                                                     528,
+                                                     452,
+                                                     254
+                                                 ],
+                                    "cam_y":  175,
+                                    "cam_altura":  480,
+                                    "contenido_y":  885,
+                                    "separacion_px":  6,
+                                    "_nota":  "cam_rect es [x,y,w,h] de la webcam DENTRO del frame original. Sacalo con: clip.ps1 rejilla \u003cslug\u003e. Si es null, la banda de arriba usa el frame entero.",
+                                    "margen_px":  30,
+                                    "borde_color":  "white@0.22",
+                                    "borde_px":  3
+                                },
+                   "marca":  "@TuCanal",
+                   "marca_y":  130,
+                   "marca_size":  34,
+                   "sub_y":  1430,
+                   "sub_size":  92,
+                   "palabras_por_bloque":  3,
+                   "color_resaltado":  "\u0026H0000FFFF\u0026",
+                   "escala_palabra_activa":  112,
+                   "hook_y":  520,
+                   "hook_size":  58,
+                   "hook_persistente":  true,
+                   "hook_duracion_s":  3.0,
+                   "_nota":  "layout completo: el video entra entero, sin recortar nada. El bloque gancho-video-subtitulos queda centrado en la pantalla y por encima de la interfaz de TikTok/Reels. \u0027zoom\u0027 amplia y recorta los lados; \u0027crop\u0027 recorta a saco.",
+                   "irl":  {
+                               "margen_px":  24,
+                               "video_y":  720,
+                               "borde_color":  "white@0.22",
+                               "borde_px":  3,
+                               "_nota":  "Una sola camara: sin banda de webcam. video 1032x581 en y=680, gancho encima, subtitulos debajo. Bloque centrado en la pantalla."
+                           },
+                   "silencio_corta_bloque_s":  0.6,
+                   "sub_max_hold_s":  0.4
+               },
+    "notificaciones":  {
+                           "activo":  true,
+                           "ntfy_topic":  "cambia-esto-por-un-topic-aleatorio",
+                           "prioridad":  "high",
+                           "adjuntar_video":  true,
+                           "limite_adjunto_mb":  2,
+                           "carpeta_sincronizada":  "",
+                           "_nota":  "ntfy.sh anonimo solo admite 2MB por adjunto (comprobado en su API), asi que un clip vertical de 30s NO cabe con calidad decente: el aviso cae a texto solo. El video llega al movil por carpeta_sincronizada (OneDrive), no por ntfy."
+                       },
+    "live":  {
+                 "segmento_s":  10,
+                 "buffer_max_s":  900,
+                 "poll_online_s":  45,
+                 "chat_lag_s":  8,
+                 "ventana_antes_s":  40,
+                 "ventana_despues_s":  12,
+                 "cooldown_s":  120,
+                 "umbral_reaccion_z":  2.4,
+                 "umbral_audio_z":  2.4,
+                 "peso_risa":  2,
+                 "peso_pide_clip":  5,
+                 "peso_sorpresa":  2,
+                 "ventana_antes_largo_s":  115
+             },
+    "whisper":  {
+                    "modelo":  "large-v3-turbo",
+                    "idioma":  "es",
+                    "compute_type":  "int8"
+                },
+    "calidad":  {
+                    "palabras_por_segundo_min":  1.2,
+                    "hook_min_chars":  18,
+                    "volumen_min_db":  -40,
+                    "negro_max_s":  2,
+                    "publicar_con_gancho_automatico":  true
+                },
+    "duraciones":  {
+                       "corto":  {
+                                     "min":  26,
+                                     "max":  34
+                                 },
+                       "largo":  {
+                                     "min":  64,
+                                     "max":  95
+                                 },
+                       "uno_largo_cada":  3,
+                       "_nota":  "1 de cada 3 clips sale largo (\u003e60s) para poder monetizar en TikTok Creator Rewards, que exige mas de 1 minuto. El resto cortos, que rinden mejor en Reels y Shorts."
+                   },
+    "hashtags":  {
+                     "base":  [
+                                  "#clips",
+                                  "#viral",
+                                  "#parati",
+                                  "#fyp",
+                                  "#twitch",
+                                  "#directo"
+                              ],
+                     "por_canal":  {
+                                       "elcalvolol":  [
+                                                          "#elcalvolol",
+                                                          "#elcalvo"
+                                                      ],
+                                       "lopezfnx":  [
+                                                        "#lopezfnx"
+                                                    ],
+                                       "davooxeneize":  [
+                                                            "#davooxeneize",
+                                                            "#davoo"
+                                                        ],
+                                       "lacobraaa":  [
+                                                         "#lacobra"
+                                                     ],
+                                       "rdjavi":  [
+                                                      "#rdjavi"
+                                                  ],
+                                       "reydelacity":  [
+                                                           "#reydelacity"
+                                                       ],
+                                       "mariotaxi":  [
+                                                         "#mariotaxi"
+                                                     ],
+                                       "viviendoenlacalle":  [
+                                                                 "#viviendoenlacalle"
+                                                             ],
+                                       "franbeuve":  [
+                                                         "#franbeuve"
+                                                     ],
+                                       "josenogales1":  [
+                                                            "#josenogales"
+                                                        ]
+                                   },
+                     "maximo":  8
+                 }
+}

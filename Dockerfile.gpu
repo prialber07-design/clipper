@@ -1,0 +1,34 @@
+# Variante GPU: la unica que aguanta varios canales sin encolar transcripciones.
+# Requiere NVIDIA Container Toolkit en el host y arrancar con --gpus all.
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3.12 python3-pip ffmpeg ca-certificates tini \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt \
+    && pip3 install --no-cache-dir --break-system-packages \
+        nvidia-cublas-cu12 nvidia-cudnn-cu12
+
+COPY *.py config.json ./
+
+RUN useradd --system --uid 10001 clipper \
+    && mkdir -p /data/modelos && chown -R clipper:clipper /data
+
+ENV CLIPPER_DATA=/data \
+    HF_HOME=/data/modelos \
+    CLIPPER_COMPUTE=float16 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONIOENCODING=utf-8
+
+USER clipper
+VOLUME ["/data"]
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+HEALTHCHECK --interval=2m --timeout=20s --start-period=180s --retries=3 \
+    CMD python3 servidor.py --estado | grep -q VIVO || exit 1
+
+CMD ["python3", "servidor.py"]

@@ -1,0 +1,20 @@
+# Datos: nunca dentro de la imagen. Sin esto se copian gigas de video.
+work/
+out/
+buffer/
+logs/
+*.log
+*.mp4
+*.ts
+*.wav
+*.png
+
+# Local
+.venv/
+__pycache__/
+*.pyc
+vigilantes.json
+live.pid
+clip.ps1
+vigilar.ps1
+.env

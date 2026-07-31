@@ -1,0 +1,27 @@
+services:
+  clipper:
+    build:
+      context: .
+      dockerfile: ${CLIPPER_DOCKERFILE:-Dockerfile}
+    container_name: clipper
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Dentro del contenedor no existe OneDrive: los clips se quedan en el
+      # volumen y se recogen desde el host.
+      CLIPPER_CARPETA_SINCRONIZADA: ""
+    volumes:
+      - clipper-data:/data
+    # El buffer rodante son ~1 GB por canal: en tmpfs evita machacar el disco.
+    tmpfs:
+      - /data/buffer:size=16g
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+volumes:
+  clipper-data:

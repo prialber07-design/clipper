@@ -1,0 +1,20 @@
+# Datos generados: nada de esto va al repositorio
+work/
+out/
+buffer/
+logs/
+*.mp4
+*.ts
+*.wav
+*.png
+*.log
+
+# Secretos y ajustes locales
+.env
+vigilantes.json
+live.pid
+
+# Python
+__pycache__/
+*.pyc
+.venv/

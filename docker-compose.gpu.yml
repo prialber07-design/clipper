@@ -1,0 +1,15 @@
+# Superposicion para GPU:
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+services:
+  clipper:
+    build:
+      dockerfile: Dockerfile.gpu
+    environment:
+      CLIPPER_COMPUTE: float16
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
