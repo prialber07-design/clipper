@@ -132,6 +132,15 @@ def main():
         sys.exit("[x] Ningun canal verificado que vigilar")
 
     print(f"[>] {datetime.now():%Y-%m-%d %H:%M} arrancando {len(lista)} vigilantes")
+
+    # La galeria va en el mismo proceso: un contenedor, un puerto, una cosa
+    # que vigilar.
+    try:
+        import web
+        web.arrancar(en_hilo=True)
+    except Exception as e:
+        print(f"[!] Galeria web no disponible ({e}); los clips siguen en /data")
+
     vigilantes = [Vigilante(f) for f in lista]
     for v in vigilantes:
         v.arrancar()

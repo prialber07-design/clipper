@@ -12,11 +12,13 @@ mandar) avisos. Por eso se genera aleatorio y no se comparte.
 
 import csv
 import json
+import os
 import shutil
 import urllib.error
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 
 import clipper
 
@@ -193,7 +195,8 @@ def _duracion(mp4: Path) -> float:
         return 0.0
 
 
-def avisar(titulo: str, mensaje: str, adjunto: Path | None = None):
+def avisar(titulo: str, mensaje: str, adjunto: Path | None = None,
+           enlace: str | None = None):
     """Manda el aviso a ntfy. Nunca revienta el pipeline si falla la red."""
     if not NOTIF.get("activo"):
         return
@@ -207,6 +210,9 @@ def avisar(titulo: str, mensaje: str, adjunto: Path | None = None):
         "Priority": str(NOTIF.get("prioridad", "default")),
         "Tags": "clapper",
     }
+    if enlace:
+        # Tocar la notificacion abre el clip directamente.
+        cabeceras["Click"] = enlace
 
     envio = None
     if adjunto and NOTIF.get("adjuntar_video"):
@@ -231,9 +237,24 @@ def avisar(titulo: str, mensaje: str, adjunto: Path | None = None):
 def publicar(mp4: Path, meta: dict) -> Path:
     destino = registrar_listo(mp4, meta)
     gancho = meta.get("hook", "") or "(sin gancho)"
+    dur = meta.get("duracion", "?")
+    aviso = f"{gancho}\n\n{dur}s"
+    if isinstance(dur, int):
+        aviso += " (monetiza en TikTok)" if dur > 60 else " (menos de 1 min)"
+    aviso += f"\n{destino.name}"
+
+    # Con el PC apagado el enlace es lo unico que convierte el aviso en algo
+    # accionable: abres, ves el clip y lo descargas al movil.
+    base = os.environ.get("CLIPPER_URL_PUBLICA", "").rstrip("/")
+    enlace = f"{base}/{quote(destino.name)}" if base else None
+    if enlace:
+        aviso += f"\n\n{enlace}"
+
     avisar(
-        titulo=f"Clip listo: {meta.get('canal','')}",
-        mensaje=f"{gancho}\n\n{meta.get('duracion','?')}s | {meta.get('motivo','')}\n{destino.name}",
+        titulo=f"Clip #{meta.get('n', '?'):03d} · {meta.get('canal','')}"
+              if isinstance(meta.get("n"), int) else f"Clip listo: {meta.get('canal','')}",
+        mensaje=aviso,
         adjunto=destino,
+        enlace=enlace,
     )
     return destino

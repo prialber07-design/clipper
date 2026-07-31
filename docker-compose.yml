@@ -8,12 +8,14 @@ services:
     env_file:
       - .env
     environment:
-      # Dentro del contenedor no existe OneDrive: los clips se quedan en el
-      # volumen y se recogen desde el host.
+      # Dentro del contenedor no existe OneDrive ni una carpeta del PC: los
+      # clips viven en el volumen y se recogen por la galeria web.
       CLIPPER_CARPETA_SINCRONIZADA: ""
+      CLIPPER_WEB_PUERTO: "8080"
     volumes:
       - clipper-data:/data
-    # El buffer rodante son ~1 GB por canal: en tmpfs evita machacar el disco.
+    # El buffer rodante son ~1 GB por canal y es material que se descarta:
+    # en tmpfs no desgasta el disco.
     tmpfs:
       - /data/buffer:size=16g
     stop_grace_period: 30s
@@ -22,6 +24,27 @@ services:
       options:
         max-size: "20m"
         max-file: "5"
+    # Sin proxy delante, descomenta para entrar por IP:puerto.
+    # ports:
+    #   - "8080:8080"
+
+  # HTTPS automatico con tu dominio. Sin esto la clave viaja en claro.
+  caddy:
+    image: caddy:2-alpine
+    container_name: clipper-caddy
+    restart: unless-stopped
+    depends_on: [clipper]
+    environment:
+      CLIPPER_DOMINIO: ${CLIPPER_DOMINIO:?define CLIPPER_DOMINIO en .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
 
 volumes:
   clipper-data:
+  caddy-data:
+  caddy-config:

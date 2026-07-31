@@ -113,17 +113,38 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
   como enfermo y el orquestador lo reinicia.
 - **Modelo en el volumen**, no en la imagen: son 1,6 GB que se descargan una vez.
 
-### Recoger los clips
+### Recoger los clips con el PC apagado
 
-Dentro del contenedor no existe OneDrive, así que `CLIPPER_CARPETA_SINCRONIZADA`
-va vacía y los clips se quedan en el volumen:
+Esta es la pieza que cierra el círculo. El contenedor levanta una **galería web**
+con los clips numerados, en vertical, con su gancho y botón de descarga, y el
+aviso de ntfy incluye el **enlace directo**: te llega la notificación, la tocas,
+se abre el clip en el móvil y lo descargas. Sin PC.
+
+1. Apunta un dominio por DNS a la IP del servidor.
+2. En `.env`: `CLIPPER_DOMINIO`, `CLIPPER_WEB_CLAVE` y
+   `CLIPPER_URL_PUBLICA=https://tu-dominio`.
+3. `docker compose up -d --build`
+
+Caddy saca el certificado solo y sirve todo por HTTPS.
+
+**La galería no arranca sin `CLIPPER_WEB_CLAVE`**, a propósito: una bandeja de
+clips abierta en internet es una fuga, no una comodidad.
+
+#### Sin dominio
+
+Cloudflare Tunnel te da una URL con HTTPS sin abrir puertos ni tener IP fija:
 
 ```bash
-docker cp clipper:/data/out/LISTOS ./clips
+cloudflared tunnel --url http://localhost:8080
 ```
 
-Para sincronización continua, monta una carpeta del host en vez del volumen y
-apunta ahí tu rclone/Nextcloud/OneDrive del servidor.
+Sirve para probar; para uso diario, un túnel con nombre y un dominio.
+
+#### Alternativa sin web
+
+Si prefieres que los clips aparezcan solos en el móvil, monta una carpeta del
+host en vez del volumen y sincronízala con rclone a Drive/Dropbox. Es más
+cómodo, pero depende de las cuotas del proveedor.
 
 ### Variables (`.env`)
 

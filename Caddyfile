@@ -1,0 +1,15 @@
+# HTTPS automatico con Let's Encrypt. Necesita que CLIPPER_DOMINIO apunte
+# por DNS a la IP del servidor y que los puertos 80 y 443 esten abiertos.
+{$CLIPPER_DOMINIO} {
+	reverse_proxy clipper:8080
+
+	# La galeria ya pide usuario y clave; esto solo evita que viaje en claro.
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		-Server
+	}
+
+	encode gzip
+}
