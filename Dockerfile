@@ -26,6 +26,7 @@ ENV CLIPPER_DATA=/app/clips \
 
 USER clipper
 VOLUME ["/app/clips"]
+EXPOSE 8080
 
 # tini recoge los zombis de streamlink y ffmpeg, que se lanzan por cada canal.
 ENTRYPOINT ["/usr/bin/tini", "--"]

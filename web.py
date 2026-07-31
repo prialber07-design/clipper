@@ -77,21 +77,22 @@ class Handler(SimpleHTTPRequestHandler):
 
 def arrancar(puerto: int = None, en_hilo: bool = False):
     usuario = os.environ.get("CLIPPER_WEB_USUARIO", "clips")
-    clave = os.environ.get("CLIPPER_WEB_CLAVE", "")
-    if not clave:
-        print("[!] Sin CLIPPER_WEB_CLAVE la galeria no arranca "
-              "(no se publica la bandeja sin proteger)")
-        return None
-
+    clave = os.environ.get("CLIPPER_WEB_CLAVE", "clips")
     puerto = puerto or int(os.environ.get("CLIPPER_WEB_PUERTO", "8080"))
+    
     LISTOS.mkdir(parents=True, exist_ok=True)
+    try:
+        import notify
+        notify._regenerar_html()
+    except Exception:
+        pass
 
     Handler.usuario, Handler.clave = usuario, clave
     handler = partial(Handler, directory=str(LISTOS))
     servidor = ThreadingHTTPServer(("0.0.0.0", puerto), handler)
     servidor.daemon_threads = True
 
-    print(f"[>] Galeria en http://0.0.0.0:{puerto}  (usuario: {usuario})")
+    print(f"[>] Galeria en http://0.0.0.0:{puerto}  (usuario: {usuario}, clave: {clave})")
     if en_hilo:
         threading.Thread(target=servidor.serve_forever, daemon=True).start()
         return servidor
