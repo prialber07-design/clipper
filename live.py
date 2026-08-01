@@ -686,6 +686,11 @@ def cmd_watch(args):
                     try:
                         procesar(cap, t_video, args.canal, motivo, args.device,
                                  chat=chat_pico)
+                    except SystemExit as e:
+                        # clipper.run() hace sys.exit si ffmpeg falla. Eso mata
+                        # el vigilante entero por un clip: se pierde el resto
+                        # del directo por un fotograma corrupto.
+                        print(f"\n[x] Fallo de ffmpeg en este clip ({e}); sigo vigilando")
                     except Exception as e:
                         print(f"\n[x] Fallo procesando: {e}")
 
