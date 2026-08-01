@@ -21,3 +21,6 @@ __pycache__/
 
 # Secretos locales
 .clave-galeria.txt
+
+# Datos de investigacion (se regeneran)
+investigacion/
