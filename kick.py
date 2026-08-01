@@ -18,7 +18,7 @@ import aiohttp
 LOG = logging.getLogger(__name__)
 
 HYPE_WORDS = {"jaja", "jajaja", "kekw", "wtf", "lmao", "lol", "pog", "clip", "xd", "omg", "base"}
-PUSHER_KEY = "eb1fd122312b2d88b72d"
+PUSHER_KEY = "32cbd69e4b950bf97679"
 
 
 class KickDiscovery:
