@@ -223,7 +223,7 @@ def cmd_transcribe(args):
         print(f"[>] Transcribiendo en {dev}/{comp}...")
         segments, _ = model.transcribe(
             str(audio), language=wcfg["idioma"], word_timestamps=True,
-            vad_filter=True, vad_parameters={"min_silence_duration_ms": 300},
+            beam_size=1, vad_filter=True, vad_parameters={"min_silence_duration_ms": 300},
         )
         segs, words = [], []
         try:

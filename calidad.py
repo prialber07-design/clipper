@@ -15,23 +15,19 @@ import clipper
 from clipper import CONFIG
 
 
-def _volumen_medio(mp4: Path) -> float:
-    """dB medios. Silencio total ronda -91; una voz normal, entre -30 y -14."""
-    p = subprocess.run(
-        [clipper.FFMPEG, "-hide_banner", "-i", str(mp4), "-af", "volumedetect",
-         "-f", "null", "-"],
-        capture_output=True, text=True, encoding="utf-8", errors="replace")
-    m = re.search(r"mean_volume:\s*(-?\d+(?:\.\d+)?) dB", p.stderr or "")
-    return float(m.group(1)) if m else -99.0
-
-
-def _negro_segundos(mp4: Path) -> float:
-    """Segundos totales en negro (cortes publicitarios, transiciones muertas)."""
+def _analizar_calidad_av(mp4: Path) -> tuple[float, float]:
+    """Saca dB medios y segundos en negro en 1 solo pase de FFmpeg (2x mas rapido)."""
     p = subprocess.run(
         [clipper.FFMPEG, "-hide_banner", "-i", str(mp4),
-         "-vf", "blackdetect=d=0.5:pix_th=0.10", "-f", "null", "-"],
+         "-af", "volumedetect",
+         "-vf", "blackdetect=d=0.5:pix_th=0.10",
+         "-f", "null", "-"],
         capture_output=True, text=True, encoding="utf-8", errors="replace")
-    return sum(float(x) for x in re.findall(r"black_duration:(\d+(?:\.\d+)?)", p.stderr or ""))
+    stderr = p.stderr or ""
+    m_vol = re.search(r"mean_volume:\s*(-?\d+(?:\.\d+)?) dB", stderr)
+    vol = float(m_vol.group(1)) if m_vol else -99.0
+    negro = sum(float(x) for x in re.findall(r"black_duration:(\d+(?:\.\d+)?)", stderr))
+    return vol, negro
 
 
 # Un gancho que arranca con muletilla no engancha: es como empezar a hablar a
@@ -128,11 +124,10 @@ def evaluar(mp4: Path, clip: dict, segmentos: list,
         if flojo:
             fallos.append(flojo)
 
-    vol = _volumen_medio(mp4)
+    vol, negro = _analizar_calidad_av(mp4)
     if vol < q.get("volumen_min_db", -40):
         fallos.append(f"audio casi inaudible ({vol:.0f} dB)")
 
-    negro = _negro_segundos(mp4)
     if negro > q.get("negro_max_s", 2.0):
         fallos.append(f"{negro:.1f}s de pantalla en negro")
 

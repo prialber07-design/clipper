@@ -22,7 +22,11 @@ RUN useradd --system --uid 10001 clipper \
 ENV CLIPPER_DATA=/app/clips \
     HF_HOME=/app/clips/modelos \
     PYTHONUNBUFFERED=1 \
-    PYTHONIOENCODING=utf-8
+    PYTHONIOENCODING=utf-8 \
+    OMP_NUM_THREADS=8 \
+    MKL_NUM_THREADS=8 \
+    OPENBLAS_NUM_THREADS=8 \
+    CLIPPER_CPU_THREADS=8
 
 USER clipper
 VOLUME ["/app/clips"]
