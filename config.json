@@ -376,6 +376,111 @@
         "vinicius",
         "testosterona"
       ]
+    },
+    {
+      "nombre": "Elxokas",
+      "plataforma": "twitch",
+      "canal": "elxokas",
+      "layout": "reaccion",
+      "permiso_clips": "PENDIENTE",
+      "verificado": true,
+      "seguidores": null,
+      "detector": "reaccion",
+      "temas": [
+        "opinion",
+        "polemica",
+        "salseo",
+        "gobierno",
+        "politica",
+        "migracion",
+        "ceuta",
+        "españa",
+        "futbol",
+        "velada",
+        "ibai",
+        "carga",
+        "flipo",
+        "vergüenza",
+        "escandalo",
+        "denuncia",
+        "streamers",
+        "twitch",
+        "dinero",
+        "impuestos"
+      ],
+      "etiquetas": [
+        "ceuta",
+        "migracion",
+        "politica",
+        "salseo",
+        "ibai",
+        "velada",
+        "gobierno",
+        "pedrosanchez",
+        "españa",
+        "futbol"
+      ],
+      "fuente": "Pedido por el usuario, existencia verificada en twitch.tv"
+    },
+    {
+      "nombre": "Agustin51",
+      "plataforma": "twitch",
+      "canal": "agustin51",
+      "layout": "reaccion",
+      "permiso_clips": "PENDIENTE",
+      "verificado": true,
+      "seguidores": null,
+      "detector": "reaccion",
+      "temas": [
+        "susto",
+        "miedo",
+        "partida",
+        "grito",
+        "risa",
+        "reto",
+        "chat",
+        "donacion",
+        "xokas",
+        "polemica"
+      ],
+      "etiquetas": [
+        "xokas",
+        "salseo",
+        "twitch",
+        "gaming"
+      ],
+      "fuente": "Pedido por el usuario, existencia verificada en twitch.tv"
+    },
+    {
+      "nombre": "Peereira7",
+      "plataforma": "twitch",
+      "canal": "peereira7",
+      "layout": "reaccion",
+      "permiso_clips": "PENDIENTE",
+      "verificado": true,
+      "seguidores": null,
+      "detector": "reaccion",
+      "temas": [
+        "reto",
+        "apuesta",
+        "partida",
+        "risa",
+        "grito",
+        "susto",
+        "cocina",
+        "comida",
+        "chat",
+        "donacion",
+        "polemica",
+        "bronca"
+      ],
+      "etiquetas": [
+        "peereira",
+        "twitch",
+        "reto",
+        "gaming"
+      ],
+      "fuente": "Pedido por el usuario, existencia verificada en twitch.tv"
     }
   ],
   "render": {
@@ -541,6 +646,18 @@
       "viviendoenlacalle": [
         "#viviendoenlacalle",
         "#yony"
+      ],
+      "elxokas": [
+        "#elxokas",
+        "#elxokas"
+      ],
+      "agustin51": [
+        "#agustin51",
+        "#agustin51"
+      ],
+      "peereira7": [
+        "#peereira7",
+        "#peereira7"
       ]
     },
     "maximo": 5,

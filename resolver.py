@@ -56,20 +56,21 @@ def twitch(slug: str):
     <title>; si ademas esta emitiendo, el titulo lleva 'Live on Twitch'.
     Twitch no da el numero de seguidores por esta via.
     """
-    # Twitch falla de vez en cuando y devuelve HTML sin <title>: sin reintento
-    # eso se traduce en un falso "no existe", que es el peor error posible aqui.
+    # Twitch falla de vez en cuando y devuelve HTML sin <title>. Un falso
+    # "no existe" es el peor error posible aqui: el canal se queda sin vigilar
+    # y nadie se entera. Por eso se insiste con espera creciente.
     html = ""
-    for intento in range(3):
+    for intento in range(5):
         req = urllib.request.Request(f"https://www.twitch.tv/{slug}", headers=UA)
         try:
-            with urllib.request.urlopen(req, timeout=20) as r:
+            with urllib.request.urlopen(req, timeout=25) as r:
                 html = r.read().decode("utf-8", "ignore")
             if "<title>" in html or "og:title" in html:
                 break
         except (urllib.error.HTTPError, urllib.error.URLError, OSError):
             pass
-        time.sleep(1.5)
-    if not html:
+        time.sleep(1.5 * (intento + 1))
+    if "<title>" not in html and "og:title" not in html:
         return None
 
     titulo = None
