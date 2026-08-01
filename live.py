@@ -332,6 +332,56 @@ def montar_ventana(cap: Captura, t_video: float, slug: str, antes: float = None)
     return fuente, t_video - primero * seg
 
 
+FIN_DE_FRASE = re.compile(r"[.!?…]\s*$")
+
+
+def bordes_limpios(segs, t_pico: float, dur_min: float, dur_max: float,
+                   despues: float) -> tuple:
+    """Ajusta el corte a fronteras de frase.
+
+    Un clip que empieza o acaba a media conversacion se nota mucho. Se elige
+    entre los inicios y finales de segmento reales, y se prefiere el que venga
+    despues de una pausa o de un punto: ahi es donde empieza una idea nueva.
+    """
+    if not segs:
+        return 0.0, dur_max
+
+    objetivo_fin = t_pico + despues
+
+    # Cuanto "respira" cada inicio: silencio previo y punto final antes.
+    huecos = {}
+    for i, s in enumerate(segs):
+        anterior = segs[i - 1] if i else None
+        hueco = s["start"] - anterior["end"] if anterior else 99.0
+        cierra = bool(anterior and FIN_DE_FRASE.search(anterior["text"]))
+        huecos[s["start"]] = min(hueco, 5.0) + (1.5 if cierra else 0)
+
+    # Se buscan PAREJAS inicio-fin, no uno y luego el otro: fijar antes el
+    # final descarta cortes validos que acaban un poco antes.
+    parejas = []
+    for s in segs:
+        fin = s["end"]
+        for ini in huecos:
+            dur = fin - ini
+            if dur <= 0:
+                continue
+            # Innegociable: el momento que disparo el clip tiene que estar
+            # dentro. Sin esto se puede elegir un corte limpio y sin la escena.
+            if not (ini <= t_pico <= fin):
+                continue
+            fuera = max(0.0, dur_min - dur) + max(0.0, dur - dur_max)
+            parejas.append((
+                fuera * 30                    # respetar la franja manda
+                + abs(fin - objetivo_fin)     # y acabar cerca del pico
+                - huecos[ini] * 2,            # premiando el inicio mas limpio
+                ini, fin))
+
+    if not parejas:
+        return max(0.0, segs[-1]["end"] - dur_max), segs[-1]["end"]
+    _, ini, fin = min(parejas)
+    return ini, fin
+
+
 SEÑALES_GANCHO = re.compile(
     r"\b(nunca|jam[aá]s|nadie|te juro|de verdad|mira|escucha|no me|"
     r"incre[ií]ble|brutal|imposible|acabo de|mil|mill[oó]n|euros|d[oó]lares|"
@@ -490,12 +540,8 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
 
     # El clip se centra en el pico: termina justo despues de la reaccion y
     # arranca lo justo para dar contexto, no antes.
-    objetivo = rc["duracion_max_s"]
-    fin = min(t_pico + LIVE["ventana_despues_s"], segs[-1]["end"])
-    ini = max(0.0, fin - objetivo)
-    ini = min((s["start"] for s in segs if s["start"] >= ini), default=ini)
-    if fin - ini < rc["duracion_min_s"]:
-        ini = max(0.0, fin - rc["duracion_min_s"])
+    ini, fin = bordes_limpios(segs, t_pico, rc["duracion_min_s"],
+                              rc["duracion_max_s"], LIVE["ventana_despues_s"])
 
     # Si el tramo no da ni para el minimo, no hay clip posible: cortar aqui
     # ahorra el render entero (y la GPU) en vez de fabricar algo que el filtro
