@@ -9,7 +9,19 @@
       "verificado": true,
       "detector": "solo_audio",
       "permiso_clips": "PENDIENTE",
-      "layout": "reaccion"
+      "layout": "reaccion",
+      "temas": [
+        "boca",
+        "river",
+        "gol",
+        "penal",
+        "arbitro",
+        "robo",
+        "mundial",
+        "argentina",
+        "cobra",
+        "messi"
+      ]
     },
     {
       "nombre": "La Cobra",
@@ -19,7 +31,19 @@
       "verificado": true,
       "detector": "solo_audio",
       "permiso_clips": "PENDIENTE",
-      "layout": "reaccion"
+      "layout": "reaccion",
+      "temas": [
+        "gol",
+        "golazo",
+        "argentina",
+        "mundial",
+        "boca",
+        "penal",
+        "arbitro",
+        "davo",
+        "davoo",
+        "seleccion"
+      ]
     },
     {
       "nombre": "RdJavi",
@@ -29,7 +53,17 @@
       "verificado": true,
       "detector": "solo_audio",
       "permiso_clips": "PENDIENTE",
-      "layout": "reaccion"
+      "layout": "reaccion",
+      "temas": [
+        "gta",
+        "susto",
+        "policia",
+        "carro",
+        "damian",
+        "muerto",
+        "atraco",
+        "persecucion"
+      ]
     },
     {
       "nombre": "Rey de la city",
@@ -39,7 +73,15 @@
       "verificado": true,
       "detector": "solo_audio",
       "permiso_clips": "PENDIENTE",
-      "layout": "irl"
+      "layout": "irl",
+      "temas": [
+        "samuel",
+        "sami",
+        "zombies",
+        "partida",
+        "foto",
+        "chat"
+      ]
     },
     {
       "nombre": "Mario Taxi",
@@ -49,7 +91,17 @@
       "verificado": true,
       "detector": "solo_audio",
       "permiso_clips": "PENDIENTE",
-      "layout": "irl"
+      "layout": "irl",
+      "temas": [
+        "vtc",
+        "taxi",
+        "cliente",
+        "carrera",
+        "bici",
+        "semaforo",
+        "multa",
+        "trafico"
+      ]
     },
     {
       "nombre": "Viviendo en la calle",
@@ -59,7 +111,15 @@
       "verificado": true,
       "detector": "solo_audio",
       "permiso_clips": "PENDIENTE",
-      "layout": "irl"
+      "layout": "irl",
+      "temas": [
+        "yony",
+        "calle",
+        "furgoneta",
+        "citroen",
+        "caida",
+        "policia"
+      ]
     },
     {
       "nombre": "Lopezfnx",
@@ -70,7 +130,18 @@
       "permiso_clips": "PENDIENTE",
       "seguidores": null,
       "fuente": "URL facilitada por el usuario, existencia verificada en twitch.tv",
-      "layout": "reaccion"
+      "layout": "reaccion",
+      "temas": [
+        "iratxe",
+        "gael",
+        "cucharita",
+        "beso",
+        "mirada",
+        "amor",
+        "novia",
+        "pareja",
+        "tension"
+      ]
     },
     {
       "nombre": "El Calvo",
@@ -86,7 +157,19 @@
         "silencio_corta_bloque_s": 0.6,
         "sub_max_hold_s": 0.4
       },
-      "_nota_render": "sin subtitulos mientras nadie habla: el bloque se corta si hay mas de 0.6s de pausa y ninguna palabra se sostiene mas de 0.4s tras pronunciarse"
+      "_nota_render": "sin subtitulos mientras nadie habla: el bloque se corta si hay mas de 0.6s de pausa y ninguna palabra se sostiene mas de 0.4s tras pronunciarse",
+      "temas": [
+        "calvo",
+        "franbeuve",
+        "fran",
+        "beso",
+        "cobrilla",
+        "ligar",
+        "incomodo",
+        "verguenza",
+        "paula",
+        "iratxe"
+      ]
     },
     {
       "nombre": "Franbuve",
@@ -97,7 +180,16 @@
       "permiso_clips": "PENDIENTE",
       "seguidores": null,
       "fuente": "URL facilitada por el usuario, existencia verificada en twitch.tv",
-      "layout": "reaccion"
+      "layout": "reaccion",
+      "temas": [
+        "calvo",
+        "elcalvolol",
+        "beso",
+        "tias",
+        "ligar",
+        "pelea",
+        "incomodo"
+      ]
     },
     {
       "nombre": "Jose Nogales",
@@ -108,7 +200,19 @@
       "permiso_clips": "PENDIENTE",
       "seguidores": null,
       "fuente": "URL facilitada por el usuario, existencia verificada en twitch.tv",
-      "layout": "reaccion"
+      "layout": "reaccion",
+      "temas": [
+        "cortisol",
+        "psl",
+        "looksmax",
+        "mandibula",
+        "craneo",
+        "testosterona",
+        "mogging",
+        "moquea",
+        "medicado",
+        "reality"
+      ]
     }
   ],
   "render": {

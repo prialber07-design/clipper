@@ -365,7 +365,7 @@ def tono_del_chat(mensajes) -> str:
     return "neutro"
 
 
-def gancho_automatico(segs, t_pico: float, chat=None) -> str:
+def gancho_automatico(segs, t_pico: float, chat=None, temas=None) -> str:
     """Elige la mejor frase del clip como gancho.
 
     Solo compiten frases que ya pasan el filtro de calidad: asi el gancho se
@@ -382,7 +382,9 @@ def gancho_automatico(segs, t_pico: float, chat=None) -> str:
         txt = s["text"].strip().rstrip(" ,.;:")
         if not 15 <= len(txt) <= 85:
             continue
-        if calidad._gancho_flojo(txt):
+        bajo = txt.lower()
+        hay_tema = [t for t in (temas or []) if t.lower() in bajo]
+        if calidad._gancho_flojo(txt, tiene_tema=bool(hay_tema)):
             continue
 
         # La cercania al pico orienta, pero no puede enterrar una frase con
@@ -405,6 +407,11 @@ def gancho_automatico(segs, t_pico: float, chat=None) -> str:
             punt += 2
         elif tono == "risa" and "!" in txt:
             punt += 1
+
+        # Cada canal tiene su gente y sus temas: los clips mas vistos de
+        # Lopezfnx son todos con Iratxe, y los de La Cobra son goles. Una frase
+        # que los nombre es casi siempre la que su comunidad clipearia.
+        punt += len(hay_tema) * 4
 
         candidatas.append((punt, txt))
 
@@ -492,7 +499,8 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
         return
 
     dentro = [s for s in segs if ini <= s["start"] < fin]
-    gancho = gancho_automatico(dentro, t_pico, chat)
+    ficha = next((c for c in CONFIG.get("canales", []) if c.get("canal") == canal), {})
+    gancho = gancho_automatico(dentro, t_pico, chat, ficha.get("temas"))
 
     # En un IRL el momento es visual y la transcripcion no da para gancho casi
     # nunca. En vez de tirar el clip, se guarda con su contact sheet para

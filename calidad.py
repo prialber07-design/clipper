@@ -59,7 +59,10 @@ FUERZA = re.compile(
     r"\bfall[oó]\b|\bnadie sabe\b|\bharto\b|\bcansado\b)", re.IGNORECASE)
 
 
-def _gancho_flojo(hook: str) -> str | None:
+def _gancho_flojo(hook: str, tiene_tema: bool = False) -> str | None:
+    """`tiene_tema` = la frase nombra algo que su comunidad clipea siempre
+    (Iratxe en Lopezfnx, un gol en La Cobra). Eso ya es promesa suficiente,
+    aunque la frase no lleve cifra ni interrogacion."""
     q = CONFIG.get("calidad", {})
     palabras = hook.split()
 
@@ -83,7 +86,8 @@ def _gancho_flojo(hook: str) -> str | None:
     if re.search(r"[,;:]\s*$|\b(que|de|en|con|por|para|y|o|como|cuanto|cu[aá]nto)\s*$",
                  hook, re.IGNORECASE):
         return "el gancho se corta a media frase"
-    if not (FUERZA.search(hook) or CONDICIONAL.match(hook) or REVERSO.search(hook)):
+    if not (tiene_tema or FUERZA.search(hook) or CONDICIONAL.match(hook)
+            or REVERSO.search(hook)):
         return "el gancho no promete nada (sin cifra, pregunta ni carga)"
     return None
 
