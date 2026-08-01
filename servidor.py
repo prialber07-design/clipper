@@ -167,9 +167,26 @@ def main():
 
     try:
         while True:
-            time.sleep(20)
+            time.sleep(15)
             for v in vigilantes:
                 v.revisar()
+
+            # Heartbeat cada 15 segundos comprobando si hay grabación activa en buffer
+            buf_dir = DATA / "buffer"
+            grabando = []
+            if buf_dir.exists():
+                for cdir in buf_dir.iterdir():
+                    if cdir.is_dir():
+                        num_segs = len(list(cdir.glob("*.ts")))
+                        if num_segs > 0:
+                            grabando.append(f"{cdir.name} ({num_segs} segs)")
+
+            ts = datetime.now().strftime("%H:%M:%S")
+            if grabando:
+                print(f"[📡 ESTADO {ts}] 🔴 GRABANDO DIRECTO EN VIVO: {', '.join(grabando)}", flush=True)
+            else:
+                print(f"[📡 ESTADO {ts}] ⚪ Vigilando {len(vigilantes)} canales (sin directos activos)", flush=True)
+
     except KeyboardInterrupt:
         apagar()
 
