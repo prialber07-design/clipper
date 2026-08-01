@@ -145,6 +145,28 @@ class EstabilidadTests(unittest.TestCase):
             self.assertEqual(clips[0]["duracion"], 34)
             self.assertEqual(ejecutar.call_count, 1)
 
+    def test_web_expone_timestamp_real_en_listos(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            carpeta = Path(tmp)
+            mp4 = carpeta / "001_canal_2026-08-02.mp4"
+            mp4.write_bytes(b"video")
+            esperado = mp4.stat().st_mtime
+            handler = object.__new__(web.Handler)
+            web._duracion_video_cache.cache_clear()
+            with patch.object(clipper, "run", return_value=SimpleNamespace(stdout="30")):
+                clips = handler._obtener_clips_dir(carpeta, es_revisar=False)
+        self.assertEqual(clips[0]["nombre"], mp4.name)
+        self.assertEqual(clips[0]["timestamp"], esperado)
+
+    def test_web_reintento_fuerza_render_tras_error(self):
+        cargar = web.HTML_TEMPLATE.split("function cargarClips", 1)[1]
+        cargar = cargar.split("function switchTab", 1)[0]
+        self.assertIn('state.signature = "";', cargar)
+        self.assertLess(
+            cargar.index('state.signature = "";'),
+            cargar.index('replaceChildren(errorState')
+        )
+
     def test_web_muestra_evaluacion_llm_en_revisar(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

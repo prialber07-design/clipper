@@ -1,8 +1,8 @@
 """
-Galeria web y explorador de archivos intuitivo para /app/clips.
+Galería web y explorador de archivos intuitivo para /app/clips.
 
-Diseñado con interfaz ultra-moderna (Shadcn/UI + GSAP + Lucide Icons).
-Interfaz muy limpia, accesible e intuitiva (apta para todo tipo de usuarios).
+Diseñado con HTML, CSS y JavaScript nativos, sin dependencias de frontend.
+Interfaz editorial accesible para revisar vídeos, decisiones de Luna y archivos.
 Permite explorar todas las carpetas (/app/clips), previsualizar vídeos en modal, ver logs y descargar clips.
 """
 
@@ -65,1031 +65,2258 @@ def _leer_motivos(path: Path) -> tuple[str, dict, str]:
         gancho = encontrado.group(1).strip()
     return motivo.strip(), llm, gancho
 
-HTML_TEMPLATE = """<!doctype html>
+HTML_TEMPLATE = r"""<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Clipper Studio · Gestor de Clips y Archivos</title>
-
-  <!-- Fuentes Tipográficas Pro -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-
-  <!-- GSAP Animation Engine -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <meta name="color-scheme" content="dark">
+  <title>Clipper · Consola editorial</title>
 
   <style>
+    @import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+
     :root {
-      --bg-dark: #090d16;
-      --bg-card: #131927;
-      --bg-card-hover: #1c253b;
-      --bg-glass: rgba(19, 25, 39, 0.75);
-      
-      --accent: #6366f1;
-      --accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
-      --accent-hover: #4f46e5;
-      
-      --success: #10b981;
-      --success-gradient: linear-gradient(135deg, #10b981, #059669);
-      
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --text-dim: #64748b;
-      
-      --border: rgba(255, 255, 255, 0.08);
-      --border-bright: rgba(255, 255, 255, 0.18);
-      --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-      --shadow-glow: 0 0 25px rgba(99, 102, 241, 0.25);
+      --bg: #0a0f0d;
+      --surface: #111916;
+      --surface-2: #17231e;
+      --soft: #0e1512;
+      --line: #2b3a33;
+      --line-strong: #405248;
+      --text: #eff5ef;
+      --muted: #a8b8ad;
+      --dim: #718077;
+      --mint: #7ae0b6;
+      --mint-strong: #b4f3d5;
+      --amber: #f1bb52;
+      --red: #ff8b7a;
+      --focus: #ffe3a0;
+      --shadow: 0 18px 50px rgba(0, 0, 0, .24);
+      --radius: 16px;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-width: 320px;
+      background: var(--bg);
+    }
 
     body {
-      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-      background-color: var(--bg-dark);
-      color: var(--text-main);
       min-height: 100vh;
-      padding-bottom: 4rem;
-      line-height: 1.5;
+      margin: 0;
       overflow-x: hidden;
+      color: var(--text);
+      background: var(--bg);
+      font-family: "IBM Plex Sans", ui-sans-serif, sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
     }
 
-    /* Fondo animado sutil */
-    .bg-glow {
+    body::before {
+      content: "";
       position: fixed;
-      top: -200px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 800px;
-      height: 400px;
-      background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(9, 13, 22, 0) 70%);
+      z-index: -1;
+      inset: 0;
       pointer-events: none;
-      z-index: 0;
+      opacity: .24;
+      background-image:
+        linear-gradient(rgba(122, 224, 182, .035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(122, 224, 182, .035) 1px, transparent 1px);
+      background-size: 44px 44px;
     }
 
-    /* Header Nav */
-    header {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: var(--bg-glass);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border-bottom: 1px solid var(--border);
-      padding: 1.1rem 1.75rem;
+    button,
+    input {
+      font: inherit;
     }
 
-    .header-container {
-      max-width: 1350px;
-      margin: 0 auto;
+    button,
+    a {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    :focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    .icon {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .icon-sprite {
+      position: absolute;
+      width: 0;
+      height: 0;
+      overflow: hidden;
+    }
+
+    .skip-link {
+      position: fixed;
+      z-index: 20;
+      top: 10px;
+      left: 10px;
+      padding: 10px 14px;
+      color: var(--bg);
+      background: var(--focus);
+      border-radius: 8px;
+      transform: translateY(-160%);
+      transition: transform .18s ease;
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .topbar {
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 1rem;
+      gap: 24px;
+      min-height: 86px;
+      padding: 16px clamp(18px, 4vw, 64px);
+      border-bottom: 1px solid var(--line);
+      background: rgba(10, 15, 13, .94);
     }
 
-    .logo-area {
+    .brand,
+    .brand-copy,
+    .topbar-meta,
+    .status-pill,
+    .nav-label,
+    .stat-head,
+    .card-meta,
+    .card-actions,
+    .modal-head {
       display: flex;
       align-items: center;
-      gap: 0.85rem;
     }
 
-    .logo-badge {
+    .brand {
+      gap: 13px;
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
       width: 44px;
       height: 44px;
-      background: var(--accent-gradient);
-      border-radius: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      box-shadow: var(--shadow-glow);
+      color: var(--bg);
+      background: var(--mint);
+      border-radius: 11px;
+      box-shadow: 4px 4px 0 var(--amber);
     }
 
-    .logo-text h1 {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 1.4rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
+    .brand-mark .icon {
+      width: 23px;
+      height: 23px;
+      stroke-width: 2.2;
     }
 
-    .logo-text p {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      font-weight: 500;
+    .brand-copy {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .brand-name,
+    h1,
+    h2,
+    h3,
+    .stat-value {
+      font-family: "Barlow Condensed", Impact, sans-serif;
+      letter-spacing: .015em;
+    }
+
+    .brand-name {
+      font-size: 30px;
+      line-height: .9;
+      text-transform: uppercase;
+    }
+
+    .brand-subtitle {
+      color: var(--muted);
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 11px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .topbar-meta {
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
 
     .status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.6rem;
-      background: rgba(16, 185, 129, 0.12);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      color: #34d399;
-      padding: 0.5rem 1.1rem;
+      gap: 8px;
+      min-height: 38px;
+      padding: 8px 12px;
+      color: var(--muted);
+      border: 1px solid var(--line);
       border-radius: 999px;
-      font-size: 0.85rem;
-      font-weight: 700;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 11px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
     }
 
     .status-dot {
-      width: 9px;
-      height: 9px;
-      background-color: #34d399;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
-      box-shadow: 0 0 12px #34d399;
+      background: var(--amber);
+      box-shadow: 0 0 0 4px rgba(241, 187, 82, .12);
     }
 
-    main {
-      max-width: 1350px;
-      margin: 2rem auto 0;
-      padding: 0 1.75rem;
-      position: relative;
-      z-index: 1;
+    .status-pill.live .status-dot {
+      background: var(--mint);
+      box-shadow: 0 0 0 4px rgba(122, 224, 182, .12);
     }
 
-    /* Pestañas de Navegación */
-    .tabs-grid {
+    .status-pill.error .status-dot {
+      background: var(--red);
+      box-shadow: 0 0 0 4px rgba(255, 139, 122, .12);
+    }
+
+    .icon-button,
+    .button,
+    .text-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 9px 14px;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
+      border-radius: 9px;
+      text-decoration: none;
+      transition:
+        background .18s ease,
+        border-color .18s ease,
+        color .18s ease,
+        transform .18s ease;
+    }
+
+    .icon-button {
+      padding: 10px;
+    }
+
+    .icon-button:hover,
+    .button:hover,
+    .text-link:hover {
+      color: var(--mint-strong);
+      border-color: var(--mint);
+      background: var(--surface-2);
+    }
+
+    .button:active,
+    .icon-button:active {
+      transform: translateY(1px);
+    }
+
+    .button.primary {
+      color: #09100d;
+      background: var(--mint);
+      border-color: var(--mint);
+      font-weight: 700;
+    }
+
+    .button.primary:hover {
+      color: #09100d;
+      background: var(--mint-strong);
+    }
+
+    .button.quiet {
+      color: var(--muted);
+      background: transparent;
+      border-color: var(--line);
+    }
+
+    .shell {
+      width: min(1440px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 38px 0 64px;
+    }
+
+    .hero {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-      gap: 1.1rem;
-      margin-bottom: 2.25rem;
+      grid-template-columns: minmax(0, 1fr) minmax(240px, 330px);
+      gap: 30px;
+      align-items: end;
+      padding: 15px 0 38px;
     }
 
-    .tab-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      color: var(--text-muted);
-      padding: 1.25rem 1.25rem;
-      border-radius: 18px;
-      cursor: pointer;
+    .eyebrow,
+    .meta-label,
+    .stat-label,
+    .llm-kicker,
+    .section-note,
+    .card-file {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+    }
+
+    .eyebrow {
+      margin: 0 0 9px;
+      color: var(--amber);
+      font-size: 11px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    .hero h2 {
+      max-width: 720px;
+      margin: 0;
+      font-size: clamp(42px, 6vw, 76px);
+      line-height: .9;
+      text-transform: uppercase;
+    }
+
+    .hero-copy {
+      max-width: 630px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 17px;
+    }
+
+    .signal-card {
+      padding: 18px;
+      border-left: 3px solid var(--mint);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .signal-label,
+    .meta-label,
+    .stat-label,
+    .llm-kicker {
+      display: block;
+      color: var(--dim);
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .signal-card strong {
+      display: block;
+      margin: 6px 0;
+      color: var(--mint-strong);
+      font-family: "Barlow Condensed", Impact, sans-serif;
+      font-size: 28px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .signal-card span:last-child {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 32px;
+    }
+
+    .stat {
+      min-height: 112px;
+      padding: 16px 18px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-top: 2px solid var(--line-strong);
+    }
+
+    .stat.ready {
+      border-top-color: var(--mint);
+    }
+
+    .stat.review {
+      border-top-color: var(--amber);
+    }
+
+    .stat.warning {
+      border-top-color: #ff8d64;
+    }
+
+    .stat-head {
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .stat-head .icon {
+      color: var(--muted);
+    }
+
+    .stat-value {
+      display: block;
+      margin-top: 7px;
+      font-size: 42px;
+      line-height: .9;
+    }
+
+    .stat-label {
+      margin-top: 11px;
+      color: var(--muted);
+    }
+
+    .workspace-nav {
+      display: flex;
+      gap: 3px;
+      padding: 4px;
+      overflow-x: auto;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      scrollbar-width: thin;
+    }
+
+    .tab {
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-width: 128px;
+      min-height: 48px;
+      padding: 10px 14px;
+      color: var(--muted);
+      background: transparent;
+      border: 0;
+      border-radius: 7px;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 12px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .tab:hover {
+      color: var(--text);
+      background: var(--surface-2);
+    }
+
+    .tab[aria-selected="true"] {
+      color: var(--bg);
+      background: var(--mint);
+      font-weight: 600;
+    }
+
+    .tab-count {
+      display: grid;
+      place-items: center;
+      min-width: 24px;
+      height: 24px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, .16);
+    }
+
+    .panel {
+      padding-top: 30px;
+    }
+
+    .section-heading {
       display: flex;
       align-items: center;
-      gap: 0.9rem;
-      font-family: inherit;
-      font-weight: 700;
-      font-size: 1.05rem;
-      transition: border-color 0.2s, background 0.2s;
-      box-shadow: var(--shadow-card);
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 18px;
     }
 
-    .tab-card:hover {
-      background: var(--bg-card-hover);
-      color: var(--text-main);
-      border-color: var(--border-bright);
+    .section-heading h3 {
+      margin: 0;
+      font-size: 36px;
+      line-height: .95;
+      text-transform: uppercase;
     }
 
-    .tab-card.active {
-      background: var(--accent-gradient);
-      color: #ffffff;
-      border-color: transparent;
-      box-shadow: var(--shadow-glow);
+    .section-note {
+      color: var(--muted);
+      font-size: 11px;
     }
 
-    .tab-card .tab-badge {
-      margin-left: auto;
-      background: rgba(255, 255, 255, 0.18);
-      padding: 0.25rem 0.7rem;
-      border-radius: 999px;
-      font-size: 0.85rem;
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 20px;
+      padding: 10px;
+      background: var(--soft);
+      border: 1px solid var(--line);
     }
 
-    /* Search Bar */
-    .search-container {
-      margin-bottom: 2.25rem;
-      position: relative;
+    .search-wrap {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex: 1 1 280px;
+      min-height: 44px;
+      padding: 0 12px;
+      color: var(--dim);
+      background: var(--bg);
+      border: 1px solid var(--line);
     }
 
-    .search-field {
+    .search-wrap:focus-within {
+      border-color: var(--mint);
+      color: var(--mint);
+    }
+
+    .search-wrap input {
       width: 100%;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 1.1rem 1.25rem 1.1rem 3.2rem;
-      color: var(--text-main);
-      font-size: 1.05rem;
-      font-family: inherit;
-      outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
+      min-width: 0;
+      color: var(--text);
+      background: transparent;
+      border: 0;
+      outline: 0;
     }
 
-    .search-field:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
+    .search-wrap input::placeholder {
+      color: var(--dim);
     }
 
-    .search-icon-svg {
-      position: absolute;
-      left: 1.1rem;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--text-muted);
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
     }
 
-    /* Content Views */
-    .view-pane {
-      display: none;
+    .filter-chip {
+      min-height: 38px;
+      padding: 7px 11px;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 11px;
     }
 
-    .view-pane.active {
-      display: block;
+    .filter-chip.active {
+      color: var(--bg);
+      background: var(--amber);
+      border-color: var(--amber);
     }
 
-    /* Clips Cards Grid */
-    .clips-grid {
+    .clip-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 2rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
     }
 
     .clip-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 22px;
+      min-width: 0;
       overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      box-shadow: var(--shadow-card);
-      transition: border-color 0.3s;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+      transition:
+        border-color .18s ease,
+        transform .18s ease,
+        box-shadow .18s ease;
     }
 
     .clip-card:hover {
-      border-color: var(--border-bright);
+      border-color: var(--line-strong);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow);
     }
 
-    .video-thumb-container {
+    .clip-media {
       position: relative;
-      width: 100%;
-      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       aspect-ratio: 9 / 16;
-      max-height: 480px;
-      cursor: pointer;
-      overflow: hidden;
+      max-height: 560px;
+      background: #050806;
+      border-bottom: 1px solid var(--line);
     }
 
-    .video-thumb-container video {
+    .clip-media video {
+      display: block;
       width: 100%;
       height: 100%;
       object-fit: contain;
     }
 
-    .thumb-play-overlay {
+    .media-tag {
       position: absolute;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.35);
-      display: flex;
+      top: 10px;
+      left: 10px;
+      display: inline-flex;
       align-items: center;
-      justify-content: center;
-      opacity: 0;
-      transition: opacity 0.25s ease;
-    }
-
-    .video-thumb-container:hover .thumb-play-overlay {
-      opacity: 1;
-    }
-
-    .play-circle-icon {
-      width: 64px;
-      height: 64px;
-      background: var(--accent-gradient);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      box-shadow: 0 0 30px rgba(99, 102, 241, 0.6);
-      transform: scale(0.85);
-      transition: transform 0.25s ease;
-    }
-
-    .video-thumb-container:hover .play-circle-icon {
-      transform: scale(1);
-    }
-
-    .clip-body {
-      padding: 1.4rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.85rem;
-      flex-grow: 1;
-    }
-
-    .tags-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.5rem;
-    }
-
-    .streamer-pill {
-      background: rgba(99, 102, 241, 0.18);
-      color: #a5b4fc;
-      font-weight: 800;
-      font-size: 0.85rem;
-      padding: 0.35rem 0.85rem;
-      border-radius: 10px;
-    }
-
-    .dur-pill {
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--text-muted);
-      font-weight: 700;
-      font-size: 0.8rem;
-      padding: 0.35rem 0.75rem;
-      border-radius: 10px;
-    }
-
-    .clip-heading {
-      font-size: 1.1rem;
-      font-weight: 800;
-      line-height: 1.4;
-      color: var(--text-main);
-    }
-
-    .clip-alert {
-      font-size: 0.85rem;
-      color: #fca5a5;
-      background: rgba(239, 68, 68, 0.14);
-      border-left: 4px solid var(--danger);
-      padding: 0.6rem 0.85rem;
-      border-radius: 8px;
+      min-height: 26px;
+      padding: 3px 8px;
+      color: var(--bg);
+      background: var(--mint);
+      border-radius: 5px;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 10px;
       font-weight: 600;
+      letter-spacing: .1em;
     }
 
-    /* Action Buttons (Para Señor Mayor: Claros y Grandes) */
-    .btn-group {
-      display: flex;
-      gap: 0.75rem;
-      margin-top: auto;
-      padding-top: 0.5rem;
+    .media-tag.review {
+      background: var(--amber);
     }
 
-    .btn-action-primary {
-      flex: 1.3;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.6rem;
-      background: var(--success-gradient);
-      color: #ffffff;
-      text-decoration: none;
-      font-weight: 800;
-      font-size: 1rem;
-      padding: 1rem;
-      border-radius: 14px;
-      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
-      border: none;
-      cursor: pointer;
-      transition: opacity 0.2s;
+    .duration-tag {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      padding: 4px 7px;
+      color: var(--text);
+      background: rgba(5, 8, 6, .84);
+      border: 1px solid rgba(255, 255, 255, .18);
+      border-radius: 5px;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 11px;
     }
 
-    .btn-action-primary:hover {
-      opacity: 0.92;
+    .card-body {
+      padding: 16px;
     }
 
-    .btn-action-secondary {
-      flex: 1;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--text-main);
-      font-weight: 700;
-      font-size: 0.95rem;
-      padding: 1rem;
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      cursor: pointer;
-      transition: background 0.2s, border-color 0.2s;
+    .card-meta {
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 9px;
     }
 
-    .btn-action-secondary:hover {
-      background: var(--bg-card-hover);
-      border-color: var(--border-bright);
-    }
-
-    /* Explorador de Archivos */
-    .breadcrumbs-box {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      flex-wrap: wrap;
-      background: var(--bg-card);
-      padding: 1.1rem 1.5rem;
-      border-radius: 18px;
-      margin-bottom: 1.75rem;
-      border: 1px solid var(--border);
-      font-weight: 700;
-      font-size: 1.05rem;
-    }
-
-    .crumb-link {
-      color: var(--accent);
-      cursor: pointer;
-    }
-
-    .crumb-link:hover {
-      text-decoration: underline;
-    }
-
-    .crumb-divider {
-      color: var(--text-dim);
-    }
-
-    .files-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 1.35rem;
-    }
-
-    .file-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 1.35rem;
-      display: flex;
-      align-items: center;
-      gap: 1.1rem;
-      cursor: pointer;
-      box-shadow: var(--shadow-card);
-      transition: border-color 0.2s, background 0.2s;
-    }
-
-    .file-card:hover {
-      background: var(--bg-card-hover);
-      border-color: var(--border-bright);
-    }
-
-    .file-card-icon {
-      width: 48px;
-      height: 48px;
-      background: rgba(99, 102, 241, 0.12);
-      border-radius: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--accent);
-      flex-shrink: 0;
-    }
-
-    .file-card-meta {
+    .channel {
+      min-width: 0;
       overflow: hidden;
-      flex-grow: 1;
-    }
-
-    .file-card-name {
-      font-weight: 800;
-      font-size: 1rem;
-      white-space: nowrap;
-      overflow: hidden;
+      color: var(--mint);
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 11px;
       text-overflow: ellipsis;
+      text-transform: uppercase;
+      white-space: nowrap;
     }
 
-    .file-card-sub {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-top: 0.2rem;
+    .card-file {
+      overflow: hidden;
+      color: var(--dim);
+      font-size: 10px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
-    /* Visor de Logs */
-    .terminal-box {
-      background: #040711;
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 1.75rem;
-      font-family: 'Space Grotesk', monospace;
-      font-size: 0.95rem;
-      color: #38bdf8;
-      height: 520px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      box-shadow: inset 0 4px 20px rgba(0,0,0,0.6);
-      line-height: 1.6;
+    .clip-title {
+      margin: 0;
+      color: var(--text);
+      font-size: 20px;
+      line-height: 1.16;
     }
 
-    .btn-refresh {
-      margin-bottom: 1.25rem;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      color: var(--text-main);
-      padding: 0.9rem 1.4rem;
-      border-radius: 14px;
-      font-weight: 700;
-      font-size: 1rem;
-      cursor: pointer;
-      display: inline-flex;
+    .clip-reason {
+      display: -webkit-box;
+      min-height: 42px;
+      margin: 10px 0 0;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 13px;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+
+    .llm-panel {
+      margin-top: 14px;
+      padding: 11px;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--amber);
+    }
+
+    .llm-panel.publish {
+      border-left-color: var(--mint);
+    }
+
+    .llm-panel.discard {
+      border-left-color: var(--red);
+    }
+
+    .llm-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .llm-decision {
+      color: var(--amber);
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .llm-panel.publish .llm-decision {
+      color: var(--mint);
+    }
+
+    .llm-panel.discard .llm-decision {
+      color: var(--red);
+    }
+
+    .llm-score {
+      color: var(--muted);
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 11px;
+    }
+
+    .llm-reason {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .card-actions {
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .card-actions .button {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .text-link {
+      color: var(--muted);
+    }
+
+    .empty-state,
+    .error-state {
+      display: grid;
+      grid-column: 1 / -1;
+      place-items: center;
+      min-height: 260px;
+      padding: 30px;
+      text-align: center;
+      background: var(--surface);
+      border: 1px dashed var(--line-strong);
+    }
+
+    .empty-state .icon,
+    .error-state .icon {
+      width: 34px;
+      height: 34px;
+      margin-bottom: 13px;
+      color: var(--dim);
+    }
+
+    .empty-state h4,
+    .error-state h4 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .empty-state p,
+    .error-state p {
+      max-width: 480px;
+      margin: 8px 0 0;
+      color: var(--muted);
+    }
+
+    .error-state {
+      border-color: rgba(255, 139, 122, .5);
+    }
+
+    .error-state .icon {
+      color: var(--red);
+    }
+
+    .skeleton {
+      height: 380px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .review-summary {
+      display: flex;
       align-items: center;
-      gap: 0.6rem;
-      transition: background 0.2s;
+      gap: 14px;
+      margin-bottom: 20px;
+      padding: 14px 16px;
+      color: var(--muted);
+      background: var(--surface);
+      border-left: 3px solid var(--amber);
     }
 
-    .btn-refresh:hover {
-      background: var(--accent);
+    .review-summary strong {
+      color: var(--text);
+      font-family: "Barlow Condensed", Impact, sans-serif;
+      font-size: 28px;
     }
 
-    /* Modal Emergente de Previsualización */
+    .explorer-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 14px;
+    }
+
+    .breadcrumbs {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 44px;
+      overflow-x: auto;
+      color: var(--muted);
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 12px;
+    }
+
+    .breadcrumbs button {
+      min-height: 36px;
+      padding: 6px 9px;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 6px;
+    }
+
+    .breadcrumbs button:hover {
+      color: var(--mint);
+      border-color: var(--line);
+    }
+
+    .file-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-height: 76px;
+      padding: 12px;
+      overflow: hidden;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      text-decoration: none;
+    }
+
+    .file-item:hover {
+      border-color: var(--mint);
+    }
+
+    .file-item .icon {
+      color: var(--mint);
+    }
+
+    .file-copy {
+      min-width: 0;
+    }
+
+    .file-name {
+      display: block;
+      overflow: hidden;
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-size {
+      display: block;
+      margin-top: 3px;
+      color: var(--dim);
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 11px;
+    }
+
+    .file-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: auto;
+    }
+
+    .file-actions .icon-button {
+      min-width: 40px;
+      min-height: 40px;
+      padding: 8px;
+    }
+
+    .log-box {
+      min-height: 420px;
+      margin: 0;
+      padding: 18px;
+      overflow: auto;
+      color: #c5d7c9;
+      background: #050806;
+      border: 1px solid var(--line);
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 12px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+    }
+
     .modal-backdrop {
       position: fixed;
+      z-index: 10;
       inset: 0;
-      background: rgba(0, 0, 0, 0.85);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      z-index: 1000;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 1.5rem;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(3, 6, 5, .88);
     }
 
-    .modal-backdrop.active {
-      display: flex;
+    .modal {
+      width: min(900px, 100%);
+      max-height: calc(100vh - 40px);
+      overflow: auto;
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
     }
 
-    .modal-window {
-      background: var(--bg-card);
-      border: 1px solid var(--border-bright);
-      border-radius: 26px;
-      width: 100%;
-      max-width: 580px;
-      max-height: 90vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      box-shadow: 0 30px 60px rgba(0,0,0,0.8);
-    }
-
-    .modal-top {
-      padding: 1.35rem 1.6rem;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
+    .modal-head {
       justify-content: space-between;
-      gap: 1rem;
+      gap: 16px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
     }
 
-    .modal-title-text {
-      font-size: 1.15rem;
-      font-weight: 800;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    .modal-head h3 {
+      margin: 0;
+      font-size: 26px;
     }
 
-    .btn-close-modal {
-      background: rgba(255, 255, 255, 0.1);
-      border: none;
-      color: var(--text-main);
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s;
+    .modal-content {
+      padding: 18px;
     }
 
-    .btn-close-modal:hover {
-      background: var(--danger);
-    }
-
-    .modal-center {
-      padding: 1.5rem;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .video-player-modal {
+    .modal-content video,
+    .modal-content pre {
+      display: block;
       width: 100%;
-      max-height: 58vh;
-      border-radius: 18px;
-      background: #000;
-      object-fit: contain;
-      aspect-ratio: 9 / 16;
+      max-height: 70vh;
+      background: #050806;
     }
 
-    .modal-bottom {
-      padding: 1.35rem 1.6rem;
-      border-top: 1px solid var(--border);
+    .modal-content pre {
+      margin: 0;
+      padding: 14px;
+      overflow: auto;
+      color: #c5d7c9;
+      font: 12px/1.65 "IBM Plex Mono", ui-monospace, monospace;
+      white-space: pre-wrap;
     }
 
-    .empty-box {
-      text-align: center;
-      padding: 4.5rem 2rem;
-      background: var(--bg-card);
-      border-radius: 24px;
-      border: 1px dashed var(--border);
-      grid-column: 1 / -1;
+    .toast {
+      position: fixed;
+      z-index: 30;
+      right: 18px;
+      bottom: 18px;
+      max-width: min(420px, calc(100% - 36px));
+      padding: 12px 15px;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--line-strong);
+      border-left: 3px solid var(--mint);
+      box-shadow: var(--shadow);
     }
 
-    .empty-icon-svg {
-      margin-bottom: 1rem;
-      color: var(--text-muted);
+    @media (max-width: 1100px) {
+      .clip-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .file-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 760px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .topbar-meta {
+        width: 100%;
+        justify-content: space-between;
+      }
+
+      .shell {
+        width: min(100% - 24px, 680px);
+        padding-top: 26px;
+      }
+
+      .hero {
+        grid-template-columns: 1fr;
+        gap: 22px;
+        padding-bottom: 28px;
+      }
+
+      .hero h2 {
+        font-size: clamp(42px, 14vw, 62px);
+      }
+
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .section-heading {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .toolbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .search-wrap {
+        flex: 0 1 auto;
+        min-height: 44px;
+      }
+
+      .toolbar-actions {
+        justify-content: space-between;
+      }
+
+      .clip-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .file-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 420px) {
+      .topbar {
+        padding: 14px 12px;
+      }
+
+      .shell {
+        width: min(100% - 20px, 680px);
+      }
+
+      .brand-name {
+        font-size: 27px;
+      }
+
+      .status-pill {
+        flex: 1;
+      }
+
+      .stats {
+        gap: 7px;
+      }
+
+      .stat {
+        min-height: 98px;
+        padding: 13px;
+      }
+
+      .stat-value {
+        font-size: 35px;
+      }
+
+      .tab {
+        min-width: 116px;
+      }
+
+      .file-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .card-body {
+        padding: 14px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+      }
+
+      .clip-card:hover {
+        transform: none;
+      }
     }
   </style>
 </head>
 <body>
+  <svg class="icon-sprite" aria-hidden="true">
+    <symbol id="icon-activity" viewBox="0 0 24 24">
+      <path d="M3 12h4l2-6 4 12 2-6h6"></path>
+    </symbol>
+    <symbol id="icon-grid" viewBox="0 0 24 24">
+      <rect x="3" y="3" width="7" height="7"></rect>
+      <rect x="14" y="3" width="7" height="7"></rect>
+      <rect x="3" y="14" width="7" height="7"></rect>
+      <rect x="14" y="14" width="7" height="7"></rect>
+    </symbol>
+    <symbol id="icon-clock" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8.5"></circle>
+      <path d="M12 7v5l3 2"></path>
+    </symbol>
+    <symbol id="icon-folder" viewBox="0 0 24 24">
+      <path d="M3 7.5h6l2 2h10v9H3z"></path>
+      <path d="M3 7.5V5h6l2 2"></path>
+    </symbol>
+    <symbol id="icon-file" viewBox="0 0 24 24">
+      <path d="M6 3h8l4 4v14H6z"></path>
+      <path d="M14 3v5h5M9 13h6M9 17h6"></path>
+    </symbol>
+    <symbol id="icon-refresh" viewBox="0 0 24 24">
+      <path d="M20 11a8 8 0 0 0-14.5-4L4 9"></path>
+      <path d="M4 4v5h5M4 13a8 8 0 0 0 14.5 4L20 15"></path>
+      <path d="M20 20v-5h-5"></path>
+    </symbol>
+    <symbol id="icon-search" viewBox="0 0 24 24">
+      <circle cx="10.8" cy="10.8" r="6.2"></circle>
+      <path d="m16 16 4.5 4.5"></path>
+    </symbol>
+    <symbol id="icon-play" viewBox="0 0 24 24">
+      <path d="m9 6 9 6-9 6z"></path>
+    </symbol>
+    <symbol id="icon-external" viewBox="0 0 24 24">
+      <path d="M14 4h6v6M20 4l-9 9"></path>
+      <path d="M18 13v6H4V5h6"></path>
+    </symbol>
+    <symbol id="icon-download" viewBox="0 0 24 24">
+      <path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path>
+    </symbol>
+    <symbol id="icon-x" viewBox="0 0 24 24">
+      <path d="m6 6 12 12M18 6 6 18"></path>
+    </symbol>
+    <symbol id="icon-alert" viewBox="0 0 24 24">
+      <path d="M12 4 21 20H3z"></path>
+      <path d="M12 9v5M12 17h.01"></path>
+    </symbol>
+  </svg>
 
-  <div class="bg-glow"></div>
+  <a class="skip-link" href="#contenido">Saltar al contenido</a>
 
-  <!-- Header Navbar -->
-  <header>
-    <div class="header-container">
-      <div class="logo-area">
-        <div class="logo-badge">
-          <i data-lucide="film" style="width:24px;height:24px;"></i>
-        </div>
-        <div class="logo-text">
-          <h1>Clipper Studio</h1>
-          <p>Gestor de Vídeos y Archivos</p>
-        </div>
-      </div>
-      <div class="status-pill">
-        <span class="status-dot"></span>
-        <span>Servidor en Línea · /app/clips</span>
-      </div>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Clipper, volver al inicio">
+      <span class="brand-mark">
+        <svg class="icon" aria-hidden="true">
+          <use href="#icon-activity"></use>
+        </svg>
+      </span>
+      <span class="brand-copy">
+        <span class="brand-name">Clipper</span>
+        <span class="brand-subtitle">Consola editorial</span>
+      </span>
+    </a>
+
+    <div class="topbar-meta">
+      <span id="connectionBadge" class="status-pill">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="connectionText">CONECTANDO</span>
+        <span id="updatedAt">· --:--</span>
+      </span>
+      <button
+        id="refreshButton"
+        class="icon-button"
+        type="button"
+        aria-label="Actualizar clips ahora"
+        title="Actualizar clips ahora">
+        <svg class="icon" aria-hidden="true">
+          <use href="#icon-refresh"></use>
+        </svg>
+      </button>
     </div>
   </header>
 
-  <!-- Main Container -->
-  <main>
-    <!-- Navigation Tabs -->
-    <nav class="tabs-grid">
-      <button class="tab-card active" onclick="switchTab('listos', this)">
-        <i data-lucide="play-circle" style="width:24px;height:24px;"></i>
-        <span>Clips Listos</span>
-        <span class="tab-badge" id="count-listos">0</span>
+  <main id="contenido" class="shell">
+    <section class="hero" aria-labelledby="hero-title">
+      <div>
+        <p class="eyebrow">Mesa de selección / tiempo real</p>
+        <h2 id="hero-title">Elige el momento que merece salir.</h2>
+        <p class="hero-copy">
+          Revisa el pulso de tus directos, valida el criterio editorial de Luna
+          y deja cada corte listo para publicar.
+        </p>
+      </div>
+      <div class="signal-card">
+        <span class="signal-label">Estado del sistema</span>
+        <strong id="systemState">Sincronizando</strong>
+        <span id="systemDetail">Consultando LISTOS y REVISAR</span>
+      </div>
+    </section>
+
+    <section class="stats" aria-label="Resumen de la galería">
+      <article class="stat ready">
+        <div class="stat-head">
+          <span class="stat-label">Listos</span>
+          <svg class="icon" aria-hidden="true"><use href="#icon-grid"></use></svg>
+        </div>
+        <strong id="countListos" class="stat-value">0</strong>
+        <span id="countListosNote" class="stat-label">publicables</span>
+      </article>
+      <article class="stat review">
+        <div class="stat-head">
+          <span class="stat-label">Revisar</span>
+          <svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg>
+        </div>
+        <strong id="countRevisar" class="stat-value">0</strong>
+        <span id="countRevisarNote" class="stat-label">pendientes</span>
+      </article>
+      <article class="stat">
+        <div class="stat-head">
+          <span class="stat-label">Canales</span>
+          <svg class="icon" aria-hidden="true"><use href="#icon-activity"></use></svg>
+        </div>
+        <strong id="countCanales" class="stat-value">0</strong>
+        <span class="stat-label">con actividad</span>
+      </article>
+      <article class="stat warning">
+        <div class="stat-head">
+          <span class="stat-label">Último corte</span>
+          <svg class="icon" aria-hidden="true"><use href="#icon-activity"></use></svg>
+        </div>
+        <strong id="lastClipTime" class="stat-value">--:--</strong>
+        <span id="lastClipNote" class="stat-label">aún sin datos</span>
+      </article>
+    </section>
+
+    <nav class="workspace-nav" aria-label="Secciones de la galería" role="tablist">
+      <button
+        id="tab-listos"
+        class="tab"
+        type="button"
+        role="tab"
+        aria-selected="true"
+        aria-controls="panel-listos"
+        data-tab="listos">
+        <span class="nav-label">
+          <svg class="icon" aria-hidden="true"><use href="#icon-grid"></use></svg>
+          Listos
+        </span>
+        <span id="tabCountListos" class="tab-count">0</span>
       </button>
-      <button class="tab-card" onclick="switchTab('revisar', this)">
-        <i data-lucide="alert-triangle" style="width:24px;height:24px;"></i>
-        <span>En Revisión</span>
-        <span class="tab-badge" id="count-revisar">0</span>
+      <button
+        id="tab-revisar"
+        class="tab"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="panel-revisar"
+        data-tab="revisar">
+        <span class="nav-label">
+          <svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg>
+          Revisar
+        </span>
+        <span id="tabCountRevisar" class="tab-count">0</span>
       </button>
-      <button class="tab-card" onclick="switchTab('explorador', this)">
-        <i data-lucide="folder" style="width:24px;height:24px;"></i>
-        <span>Explorador /app/clips</span>
+      <button
+        id="tab-explorador"
+        class="tab"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="panel-explorador"
+        data-tab="explorador">
+        <span class="nav-label">
+          <svg class="icon" aria-hidden="true"><use href="#icon-folder"></use></svg>
+          Explorador
+        </span>
       </button>
-      <button class="tab-card" onclick="switchTab('logs', this)">
-        <i data-lucide="terminal" style="width:24px;height:24px;"></i>
-        <span>Logs del Servidor</span>
+      <button
+        id="tab-logs"
+        class="tab"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="panel-logs"
+        data-tab="logs">
+        <span class="nav-label">
+          <svg class="icon" aria-hidden="true"><use href="#icon-file"></use></svg>
+          Registros
+        </span>
       </button>
     </nav>
 
-    <!-- Search Input -->
-    <div class="search-container">
-      <i data-lucide="search" class="search-icon-svg" style="width:22px;height:22px;"></i>
-      <input type="text" id="searchInput" class="search-field" placeholder="Buscar clip por streamer o título del gancho..." onkeyup="filtrarClips()">
-    </div>
-
-    <!-- Tab 1: Clips Listos -->
-    <section id="tab-listos" class="view-pane active">
-      <div class="clips-grid" id="grid-listos"></div>
+    <section
+      id="panel-listos"
+      class="panel"
+      role="tabpanel"
+      aria-labelledby="tab-listos">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Salida validada</p>
+          <h3>Clips listos</h3>
+        </div>
+        <span id="listosNote" class="section-note">Cargando…</span>
+      </div>
+      <div class="toolbar">
+        <label class="search-wrap" for="searchListos">
+          <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+          <input
+            id="searchListos"
+            type="search"
+            placeholder="Buscar por canal, título o archivo"
+            autocomplete="off">
+        </label>
+        <div class="toolbar-actions">
+          <button
+            class="filter-chip active"
+            type="button"
+            data-filter="all"
+            data-scope="listos">
+            Todos
+          </button>
+          <button
+            class="filter-chip"
+            type="button"
+            data-filter="long"
+            data-scope="listos">
+            Más de 30 s
+          </button>
+        </div>
+      </div>
+      <div
+        id="listosGrid"
+        class="clip-grid"
+        aria-live="polite"
+        aria-busy="true">
+        <div class="skeleton" aria-hidden="true"></div>
+        <div class="skeleton" aria-hidden="true"></div>
+        <div class="skeleton" aria-hidden="true"></div>
+      </div>
     </section>
 
-    <!-- Tab 2: Clips en Revisión -->
-    <section id="tab-revisar" class="view-pane">
-      <div class="clips-grid" id="grid-revisar"></div>
+    <section
+      id="panel-revisar"
+      class="panel"
+      role="tabpanel"
+      aria-labelledby="tab-revisar"
+      hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Decisión humana obligatoria</p>
+          <h3>Candidatos a revisar</h3>
+        </div>
+        <span id="revisarNote" class="section-note">Cargando…</span>
+      </div>
+      <div class="review-summary">
+        <strong id="reviewTotal">0</strong>
+        <span>
+          candidatos esperan una lectura editorial. La recomendación de Luna
+          aparece en cada ficha; los subtítulos y tiempos siguen siendo los de
+          Whisper.
+        </span>
+      </div>
+      <div class="toolbar">
+        <label class="search-wrap" for="searchRevisar">
+          <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+          <input
+            id="searchRevisar"
+            type="search"
+            placeholder="Buscar en revisión"
+            autocomplete="off">
+        </label>
+        <div class="toolbar-actions">
+          <button
+            class="filter-chip active"
+            type="button"
+            data-filter="all"
+            data-scope="revisar">
+            Todos
+          </button>
+          <button
+            class="filter-chip"
+            type="button"
+            data-filter="high"
+            data-scope="revisar">
+            Puntuación ≥ 70
+          </button>
+        </div>
+      </div>
+      <div
+        id="revisarGrid"
+        class="clip-grid"
+        aria-live="polite"
+        aria-busy="true">
+        <div class="skeleton" aria-hidden="true"></div>
+        <div class="skeleton" aria-hidden="true"></div>
+      </div>
     </section>
 
-    <!-- Tab 3: Explorador de Archivos -->
-    <section id="tab-explorador" class="view-pane">
-      <div class="breadcrumbs-box" id="breadcrumbs"></div>
-      <div class="files-grid" id="files-grid"></div>
+    <section
+      id="panel-explorador"
+      class="panel"
+      role="tabpanel"
+      aria-labelledby="tab-explorador"
+      hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Archivos del servidor</p>
+          <h3>Explorador</h3>
+        </div>
+        <span id="explorerNote" class="section-note">
+          Navega sin salir de Clipper
+        </span>
+      </div>
+      <div class="explorer-layout">
+        <div id="breadcrumbs" class="breadcrumbs" aria-label="Ruta actual"></div>
+        <div id="fileGrid" class="file-grid" aria-live="polite"></div>
+      </div>
     </section>
 
-    <!-- Tab 4: Logs del Servidor -->
-    <section id="tab-logs" class="view-pane">
-      <button class="btn-refresh" onclick="cargarLogs()">
-        <i data-lucide="refresh-cw" style="width:20px;height:20px;"></i>
-        <span>Actualizar Registros</span>
-      </button>
-      <div class="terminal-box" id="logs-box">Cargando registros...</div>
+    <section
+      id="panel-logs"
+      class="panel"
+      role="tabpanel"
+      aria-labelledby="tab-logs"
+      hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Diagnóstico operativo</p>
+          <h3>Registros recientes</h3>
+        </div>
+        <span id="logsNote" class="section-note">
+          Últimas 60 líneas por archivo
+        </span>
+      </div>
+      <pre id="logsBox" class="log-box" tabindex="0">Cargando registros…</pre>
     </section>
   </main>
 
-  <!-- Modal Previsualizador de Vídeos y Archivos -->
-  <div class="modal-backdrop" id="previewModal" onclick="cerrarPrevisualizacion(event)">
-    <div class="modal-window" onclick="event.stopPropagation()">
-      <div class="modal-top">
-        <h3 class="modal-title-text" id="modalTitle">Previsualización</h3>
-        <button class="btn-close-modal" onclick="cerrarPrevisualizacion()">
-          <i data-lucide="x" style="width:20px;height:20px;"></i>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <div
+    id="previewModal"
+    class="modal-backdrop"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="previewTitle"
+    hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="previewTitle">Previsualización</h3>
+        <button
+          id="closePreview"
+          class="icon-button"
+          type="button"
+          aria-label="Cerrar previsualización">
+          <svg class="icon" aria-hidden="true"><use href="#icon-x"></use></svg>
         </button>
       </div>
-      <div class="modal-center" id="modalBody"></div>
-      <div class="modal-bottom">
-        <a id="modalDownloadBtn" href="#" download class="btn-action-primary">
-          <i data-lucide="download" style="width:20px;height:20px;"></i>
-          <span>DESCARGAR VÍDEO AHORA</span>
-        </a>
-      </div>
+      <div id="previewBody" class="modal-content"></div>
     </div>
   </div>
 
   <script>
-    let currentPath = '';
-    let firmaClips = '';
+    (function () {
+      "use strict";
 
-    document.addEventListener('DOMContentLoaded', () => {
-      lucide.createIcons();
-      animateHeader();
-      cargarClips();
-      cargarArchivosSeguro('');
-      cargarLogs();
-      setInterval(() => {
-        cargarClips();
-        cargarLogs();
-      }, 15000);
+      const state = {
+        tab: "listos",
+        path: "",
+        clips: {
+          listos: [],
+          revisar: []
+        },
+        signature: "",
+        modalFocus: null
+      };
 
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') cerrarPrevisualizacion();
-      });
-    });
+      const $ = (selector) => document.querySelector(selector);
+      const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+      const icon = (name) =>
+        '<svg class="icon" aria-hidden="true"><use href="#icon-' +
+        name +
+        '"></use></svg>';
 
-    function animateHeader() {
-      gsap.from('header', { y: -30, opacity: 0, duration: 0.6, ease: 'power3.out' });
-      gsap.from('.tab-card', { y: 20, opacity: 0, duration: 0.5, stagger: 0.08, ease: 'power2.out' });
-    }
-
-    function animateGrid(selector) {
-      gsap.from(selector, { y: 25, opacity: 0, duration: 0.4, stagger: 0.05, ease: 'power2.out' });
-    }
-
-    function switchTab(tabId, btn) {
-      document.querySelectorAll('.tab-card').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.view-pane').forEach(c => c.classList.remove('active'));
-
-      btn.classList.add('active');
-      const view = document.getElementById('tab-' + tabId);
-      view.classList.add('active');
-
-      if (tabId === 'listos') animateGrid('#grid-listos .clip-card');
-      if (tabId === 'revisar') animateGrid('#grid-revisar .clip-card');
-      if (tabId === 'explorador') animateGrid('#files-grid .file-card');
-    }
-
-    async function cargarClips() {
-      try {
-        const res = await fetch('/api/clips');
-        const data = await res.json();
-
-        document.getElementById('count-listos').textContent = data.listos.length;
-        document.getElementById('count-revisar').textContent = data.revisar.length;
-
-        const nuevaFirma = JSON.stringify(data);
-        if (nuevaFirma === firmaClips) return;
-        firmaClips = nuevaFirma;
-        renderGridSeguro('grid-listos', data.listos, false);
-        renderGridSeguro('grid-revisar', data.revisar, true);
-        lucide.createIcons();
-      } catch (e) {
-        console.error("Error cargando clips:", e);
-      }
-    }
-
-    function safeFileUrl(value) {
-      try {
-        const url = new URL(value, window.location.origin);
-        if (url.origin !== window.location.origin || !url.pathname.startsWith('/files/')) return '#';
-        return url.href;
-      } catch (_) {
-        return '#';
-      }
-    }
-
-    function textNode(tag, className, text) {
-      const node = document.createElement(tag);
-      if (className) node.className = className;
-      node.textContent = text || '';
-      return node;
-    }
-
-    function icon(name, size = 18) {
-      const node = document.createElement('i');
-      node.dataset.lucide = name;
-      node.style.width = `${size}px`;
-      node.style.height = `${size}px`;
-      return node;
-    }
-
-    function renderGridSeguro(containerId, clips, esRevisar) {
-      const container = document.getElementById(containerId);
-      container.replaceChildren();
-      if (!clips || clips.length === 0) {
-        const empty = document.createElement('div');
-        empty.className = 'empty-box';
-        empty.append(icon(esRevisar ? 'sparkles' : 'coffee', 48));
-        empty.append(textNode('h3', '', esRevisar ? 'No hay clips pendientes de revisión' : 'No hay clips listos para subir todavía'));
-        empty.append(textNode('p', '', esRevisar ? 'Todos los clips generados han superado el filtro de calidad.' : 'Los clips aparecerán aquí de forma automática en cuanto salten picos en los directos.'));
-        container.append(empty);
-        lucide.createIcons();
-        return;
-      }
-
-      clips.forEach((clip) => {
-        const url = safeFileUrl(clip.url);
-        const article = document.createElement('article');
-        article.className = 'clip-card';
-        article.dataset.search = `${clip.canal || ''} ${clip.gancho || ''}`.toLowerCase();
-
-        const thumb = document.createElement('div');
-        thumb.className = 'video-thumb-container';
-        const video = document.createElement('video');
-        video.src = url;
-        video.controls = true;
-        video.preload = 'none';
-        video.playsInline = true;
-        thumb.append(video);
-        thumb.addEventListener('click', () => abrirPrevisualizacionSeguro(url, clip.gancho || clip.nombre, 'video'));
-        article.append(thumb);
-
-        const body = document.createElement('div');
-        body.className = 'clip-body';
-        const tags = document.createElement('div');
-        tags.className = 'tags-row';
-        tags.append(textNode('span', 'streamer-pill', `#${clip.canal || 'desconocido'}`));
-        tags.append(textNode('span', 'dur-pill', `⏱️ ${clip.duracion || 0}s`));
-        body.append(tags, textNode('h2', 'clip-heading', clip.gancho || '(Sin título)'));
-        if (esRevisar && clip.motivo) body.append(textNode('div', 'clip-alert', `⚠️ ${clip.motivo}`));
-        if (esRevisar && clip.llm && typeof clip.llm === 'object') {
-          const decision = String(clip.llm.decision || 'revisar').toUpperCase();
-          const score = Number.isFinite(Number(clip.llm.score)) ? Number(clip.llm.score) : 0;
-          const confidence = Number.isFinite(Number(clip.llm.confidence))
-            ? ` · confianza ${(Number(clip.llm.confidence) * 100).toFixed(0)}%` : '';
-          const panel = document.createElement('div');
-          panel.className = 'clip-alert';
-          panel.append(
-            textNode('div', '', `🤖 LUNA · ${decision} · ${score}/100${confidence}`),
-            textNode('div', '', clip.llm.reason || 'Sin motivo registrado')
-          );
-          body.append(panel);
+      function text(tag, className, value) {
+        const node = document.createElement(tag);
+        if (className) {
+          node.className = className;
         }
-
-        const buttons = document.createElement('div');
-        buttons.className = 'btn-group';
-        const view = document.createElement('button');
-        view.className = 'btn-action-secondary';
-        view.type = 'button';
-        view.append(icon('eye'), textNode('span', '', 'Ver'));
-        view.addEventListener('click', () => abrirPrevisualizacionSeguro(url, clip.gancho || clip.nombre, 'video'));
-        const download = document.createElement('a');
-        download.className = 'btn-action-primary';
-        download.href = url;
-        download.download = '';
-        download.append(icon('download'), textNode('span', '', 'Descargar'));
-        buttons.append(view, download);
-        body.append(buttons);
-        article.append(body);
-        container.append(article);
-      });
-      lucide.createIcons();
-      animateGrid('#' + containerId + ' .clip-card');
-    }
-
-    function filtrarClips() {
-      const query = document.getElementById('searchInput').value.toLowerCase();
-      document.querySelectorAll('.clip-card').forEach(card => {
-        const text = card.getAttribute('data-search') || '';
-        card.style.display = text.includes(query) ? 'flex' : 'none';
-      });
-    }
-
-    async function cargarArchivosSeguro(subpath) {
-      currentPath = subpath;
-      try {
-        const res = await fetch('/api/browse?path=' + encodeURIComponent(subpath));
-        const data = await res.json();
-        const breadcrumbs = document.getElementById('breadcrumbs');
-        breadcrumbs.replaceChildren();
-        const home = textNode('span', 'crumb-link', '🏠 Inicio (/app/clips)');
-        home.addEventListener('click', () => cargarArchivosSeguro(''));
-        breadcrumbs.append(home);
-        let acc = '';
-        for (const part of (subpath ? subpath.split('/').filter(Boolean) : [])) {
-          acc += (acc ? '/' : '') + part;
-          breadcrumbs.append(textNode('span', 'crumb-divider', '/'));
-          const crumb = textNode('span', 'crumb-link', part);
-          const target = acc;
-          crumb.addEventListener('click', () => cargarArchivosSeguro(target));
-          breadcrumbs.append(crumb);
+        if (value !== undefined) {
+          node.textContent = value;
         }
+        return node;
+      }
 
-        const grid = document.getElementById('files-grid');
-        grid.replaceChildren();
-        if (!data.items || data.items.length === 0) {
-          grid.append(textNode('div', 'empty-box', 'Esta carpeta está vacía.'));
+      function iconNode(name) {
+        const node = document.createElement("span");
+        node.innerHTML = icon(name);
+        return node.firstElementChild;
+      }
+
+      function setText(selector, value) {
+        const node = $(selector);
+        if (node) {
+          node.textContent = value;
+        }
+      }
+
+      function notify(message, error) {
+        const node = $("#toast");
+        if (!node) {
           return;
         }
-        for (const item of data.items) {
-          const itemPath = subpath ? `${subpath}/${item.name}` : item.name;
-          const fileUrl = safeFileUrl('/files/' + itemPath.split('/').map(encodeURIComponent).join('/'));
-          const card = document.createElement('div');
-          card.className = 'file-card';
-          const isVideo = item.name.toLowerCase().endsWith('.mp4');
-          const isText = /[.](txt|log|csv|json)$/i.test(item.name);
-          card.append(icon(item.is_dir ? 'folder' : (isVideo ? 'film' : 'file-text'), 24));
-          const meta = document.createElement('div');
-          meta.className = 'file-card-meta';
-          meta.append(textNode('div', 'file-card-name', item.name), textNode('div', 'file-card-sub', item.is_dir ? 'Carpeta' : item.size));
-          card.append(meta);
-          if (item.is_dir) {
-            card.addEventListener('click', () => cargarArchivosSeguro(itemPath));
-          } else if (isVideo || isText) {
-            const preview = document.createElement('button');
-            preview.type = 'button';
-            preview.className = 'btn-action-secondary';
-            preview.append(icon('eye', 16));
-            preview.addEventListener('click', () => abrirPrevisualizacionSeguro(fileUrl, item.name, isVideo ? 'video' : 'text'));
-            const download = document.createElement('a');
-            download.className = 'btn-action-secondary';
-            download.href = fileUrl;
-            download.download = '';
-            download.append(icon('download', 16));
-            const actions = document.createElement('div');
-            actions.style.cssText = 'display:flex;gap:.4rem';
-            actions.append(preview, download);
-            card.append(actions);
-          }
-          grid.append(card);
-        }
-        lucide.createIcons();
-        animateGrid('#files-grid .file-card');
-      } catch (e) {
-        console.error('Error explorando archivos:', e);
+        node.textContent = message;
+        node.hidden = false;
+        node.style.borderLeftColor = error ? "var(--red)" : "var(--mint)";
+        clearTimeout(notify.timer);
+        notify.timer = setTimeout(() => {
+          node.hidden = true;
+        }, 4200);
       }
-    }
 
-    async function abrirPrevisualizacionSeguro(url, title, type) {
-      const modal = document.getElementById('previewModal');
-      const modalTitle = document.getElementById('modalTitle');
-      const modalBody = document.getElementById('modalBody');
-      const modalDownloadBtn = document.getElementById('modalDownloadBtn');
-      const safeUrl = safeFileUrl(url);
-      modalTitle.textContent = title || 'Previsualización';
-      modalDownloadBtn.href = safeUrl;
-      modalBody.replaceChildren();
-      if (type === 'video') {
-        const video = document.createElement('video');
-        video.className = 'video-player-modal';
-        video.src = safeUrl;
+      function connection(kind, label, detail) {
+        const badge = $("#connectionBadge");
+        if (badge) {
+          badge.className = "status-pill " + kind;
+        }
+        setText("#connectionText", label);
+        setText("#updatedAt", "· " + detail);
+      }
+
+      function safeFileUrl(value) {
+        const raw = String(value || "").replace(/^[/]files[/]/, "");
+        const parts = raw
+          .split("/")
+          .filter((part) => part && part !== "." && part !== "..");
+        return "/files/" + parts.map(encodeURIComponent).join("/");
+      }
+
+      function duration(value) {
+        const seconds = Math.max(0, Number(value) || 0);
+        return (
+          Math.floor(seconds / 60) +
+          ":" +
+          String(Math.floor(seconds % 60)).padStart(2, "0")
+        );
+      }
+
+      function clipTime(name, timestamp) {
+        const match = String(name || "").match(
+          /(?:^|-)(\d{2})(\d{2})(\d{2})(?:-\d+)?\.mp4$/i
+        );
+        if (match) {
+          return match[1] + ":" + match[2] + ":" + match[3];
+        }
+
+        const seconds = Number(timestamp);
+        if (!Number.isFinite(seconds) || seconds <= 0) {
+          return "--:--";
+        }
+        const date = new Date(seconds * 1000);
+        return Number.isFinite(date.getTime())
+          ? date.toLocaleTimeString("es-ES", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit"
+            })
+          : "--:--";
+      }
+
+      function decisionLabel(value) {
+        return {
+          publicar: "Publicar",
+          revisar: "Revisar",
+          descartar: "Descartar"
+        }[value] || "Sin decisión";
+      }
+
+      function llmPanel(clip) {
+        const llm =
+          clip.llm && typeof clip.llm === "object" ? clip.llm : null;
+        if (
+          !llm ||
+          (!llm.decision && llm.score === undefined && !llm.reason)
+        ) {
+          return null;
+        }
+
+        const decision = String(llm.decision || "revisar").toLowerCase();
+        const panel = text(
+          "div",
+          "llm-panel " +
+            (decision === "publicar"
+              ? "publish"
+              : decision === "descartar"
+                ? "discard"
+                : "")
+        );
+        const head = text("div", "llm-head");
+        head.append(
+          text("span", "llm-decision", "Luna · " + decisionLabel(decision)),
+          text(
+            "span",
+            "llm-score",
+            llm.score === undefined ? "—/100" : String(llm.score) + "/100"
+          )
+        );
+        panel.appendChild(head);
+        panel.appendChild(
+          text("p", "llm-reason", llm.reason || "Sin motivo registrado.")
+        );
+        if (llm.confidence !== undefined) {
+          panel.appendChild(
+            text(
+              "span",
+              "llm-kicker",
+              "Confianza " + Math.round(Number(llm.confidence) * 100) + "%"
+            )
+          );
+        }
+        return panel;
+      }
+
+      function makeCard(clip, kind) {
+        const article = text("article", "clip-card");
+        article.dataset.search = [
+          clip.canal,
+          clip.nombre,
+          clip.gancho,
+          clip.motivo
+        ]
+          .join(" ")
+          .toLowerCase();
+        article.dataset.duration = String(clip.duracion || 0);
+        article.dataset.score = String(
+          (clip.llm && clip.llm.score) || 0
+        );
+
+        const media = text("div", "clip-media");
+        const video = document.createElement("video");
+        video.src = safeFileUrl(clip.url);
+        video.preload = "none";
         video.controls = true;
-        video.autoplay = true;
         video.playsInline = true;
-        modalBody.append(video);
-      } else if (type === 'text') {
-        try {
-          const res = await fetch(safeUrl);
-          const text = await res.text();
-          modalBody.append(textNode('div', '', text || '(Archivo vacío)'));
-        } catch (_) {
-          modalBody.append(textNode('p', '', 'No se pudo cargar el contenido del archivo.'));
+        video.setAttribute(
+          "aria-label",
+          "Vídeo del clip " + (clip.gancho || clip.nombre)
+        );
+        video.addEventListener("error", () => {
+          notify("No se pudo cargar " + clip.nombre, true);
+        });
+        media.appendChild(video);
+        media.appendChild(
+          text(
+            "span",
+            "media-tag " + (kind === "revisar" ? "review" : ""),
+            kind === "revisar" ? "REVISAR" : "LISTO"
+          )
+        );
+        media.appendChild(
+          text("span", "duration-tag", duration(clip.duracion))
+        );
+        article.appendChild(media);
+
+        const body = text("div", "card-body");
+        const meta = text("div", "card-meta");
+        meta.append(
+          text("span", "channel", clip.canal || "CANAL DESCONOCIDO"),
+          text("span", "card-file", clipTime(clip.nombre))
+        );
+        body.appendChild(meta);
+        body.appendChild(
+          text(
+            "h4",
+            "clip-title",
+            clip.gancho || clip.nombre || "Clip sin título"
+          )
+        );
+        if (clip.motivo) {
+          body.appendChild(text("p", "clip-reason", clip.motivo));
+        }
+
+        const panel = llmPanel(clip);
+        if (panel) {
+          body.appendChild(panel);
+        }
+
+        const actions = text("div", "card-actions");
+        const preview = text("button", "button primary");
+        preview.type = "button";
+        preview.innerHTML = icon("play") + "<span>Previsualizar</span>";
+        preview.addEventListener("click", () => {
+          abrirPrevisualizacionSeguro(
+            clip.url,
+            clip.gancho || clip.nombre,
+            "video"
+          );
+        });
+        actions.appendChild(preview);
+
+        const download = document.createElement("a");
+        download.className = "text-link";
+        download.href = safeFileUrl(clip.url);
+        download.download = "";
+        download.setAttribute(
+          "aria-label",
+          "Descargar " + (clip.nombre || "vídeo")
+        );
+        download.innerHTML = icon("download") + "<span>Descargar</span>";
+        actions.appendChild(download);
+
+        body.appendChild(actions);
+        article.appendChild(body);
+        return article;
+      }
+
+      function emptyState(kind) {
+        const box = text("div", "empty-state");
+        box.appendChild(iconNode(kind === "revisar" ? "clock" : "grid"));
+
+        const copy = text("div");
+        copy.appendChild(
+          text(
+            "h4",
+            "",
+            kind === "revisar"
+              ? "La bandeja está despejada"
+              : "Todavía no hay clips listos"
+          )
+        );
+        copy.appendChild(
+          text(
+            "p",
+            "",
+            kind === "revisar"
+              ? "Cuando el pipeline encuentre un candidato aparecerá aquí con la lectura de Luna."
+              : "Los cortes promovidos desde REVISAR aparecerán aquí automáticamente."
+          )
+        );
+        box.appendChild(copy);
+        return box;
+      }
+
+      function errorState(message) {
+        const box = text("div", "error-state");
+        box.appendChild(iconNode("alert"));
+
+        const copy = text("div");
+        copy.appendChild(text("h4", "", "No se pudo actualizar"));
+        copy.appendChild(text("p", "", message));
+
+        const retry = text("button", "button quiet", "Reintentar");
+        retry.type = "button";
+        retry.addEventListener("click", () => cargarClips(true));
+        copy.appendChild(retry);
+
+        box.appendChild(copy);
+        return box;
+      }
+
+      function render(kind) {
+        const grid = kind === "listos" ? $("#listosGrid") : $("#revisarGrid");
+        if (!grid) {
+          return;
+        }
+
+        grid.replaceChildren();
+        grid.setAttribute("aria-busy", "false");
+
+        const clips = state.clips[kind] || [];
+        if (!clips.length) {
+          grid.appendChild(emptyState(kind));
+          return;
+        }
+
+        clips.forEach((clip) => {
+          grid.appendChild(makeCard(clip, kind));
+        });
+        filter(kind);
+      }
+
+      function filter(kind) {
+        const grid =
+          kind === "listos" ? $("#listosGrid") : $("#revisarGrid");
+        const input = $("#search" + kind[0].toUpperCase() + kind.slice(1));
+        const query = String(input?.value || "").trim().toLowerCase();
+        const active =
+          document.querySelector(
+            '.filter-chip.active[data-scope="' + kind + '"]'
+          )?.dataset.filter || "all";
+
+        if (!grid) {
+          return;
+        }
+
+        grid.querySelectorAll(".clip-card").forEach((card) => {
+          const matches =
+            !query || card.dataset.search.includes(query);
+          const seconds = Number(card.dataset.duration || 0);
+          const score = Number(card.dataset.score || 0);
+          card.hidden = !(
+            matches &&
+            (active === "all" ||
+              (active === "long" && seconds > 30) ||
+              (active === "high" && score >= 70))
+          );
+        });
+      }
+
+      function clipTimestamp(clip) {
+        const timestamp = Number(clip?.timestamp);
+        if (Number.isFinite(timestamp) && timestamp > 0) {
+          return timestamp;
+        }
+
+        const name = String(clip?.nombre || "");
+        const compact = name.match(
+          /(\d{8})-(\d{6})(?:-\d+)?(?:\.mp4)?$/i
+        );
+        if (compact) {
+          return Number(compact[1] + compact[2]);
+        }
+
+        const separated = name.match(
+          /(\d{4})-(\d{2})-(\d{2})-(\d{6})(?:-\d+)?(?:\.mp4)?$/i
+        );
+        return separated
+          ? Number(
+              separated[1] +
+                separated[2] +
+                separated[3] +
+                separated[4]
+            )
+          : 0;
+      }
+
+      function summary() {
+        const listos = state.clips.listos || [];
+        const revisar = state.clips.revisar || [];
+        const all = listos.concat(revisar);
+        const channels = new Set(
+          all.map((clip) => clip.canal).filter(Boolean)
+        );
+        const latest = all.reduce(
+          (current, clip) =>
+            !current || clipTimestamp(clip) > clipTimestamp(current)
+              ? clip
+              : current,
+          null
+        );
+
+        setText("#countListos", listos.length);
+        setText("#tabCountListos", listos.length);
+        setText("#countRevisar", revisar.length);
+        setText("#tabCountRevisar", revisar.length);
+        setText("#reviewTotal", revisar.length);
+        setText("#countCanales", channels.size);
+        setText(
+          "#lastClipTime",
+          latest ? clipTime(latest.nombre, latest.timestamp) : "--:--"
+        );
+        setText(
+          "#lastClipNote",
+          latest ? latest.canal || "último archivo" : "aún sin datos"
+        );
+        setText(
+          "#countListosNote",
+          listos.length === 1 ? "publicable" : "publicables"
+        );
+        setText(
+          "#countRevisarNote",
+          revisar.length === 1 ? "pendiente" : "pendientes"
+        );
+        setText("#systemState", all.length ? "Operativo" : "En espera");
+        setText(
+          "#systemDetail",
+          all.length
+            ? channels.size + " canales · " + all.length + " cortes disponibles"
+            : "Esperando el primer candidato"
+        );
+        setText(
+          "#listosNote",
+          listos.length + " archivos · actualización automática"
+        );
+        setText(
+          "#revisarNote",
+          revisar.length + " archivos · revisión humana"
+        );
+      }
+
+      function cargarClips(force) {
+        fetch("/api/clips", { cache: "no-store" })
+          .then((response) => {
+            if (!response.ok) {
+              throw Error("HTTP " + response.status);
+            }
+            return response.json();
+          })
+          .then((data) => {
+            const clean = {
+              listos: Array.isArray(data.listos) ? data.listos : [],
+              revisar: Array.isArray(data.revisar) ? data.revisar : []
+            };
+            const signature = JSON.stringify(clean);
+            const changed = force || signature !== state.signature;
+
+            state.clips = clean;
+            state.signature = signature;
+            summary();
+
+            if (changed) {
+              render("listos");
+              render("revisar");
+            }
+            connection(
+              "live",
+              "SINCRONIZADO",
+              new Date().toLocaleTimeString("es-ES", {
+                hour: "2-digit",
+                minute: "2-digit"
+              })
+            );
+          })
+          .catch((error) => {
+            state.signature = "";
+            connection("error", "SIN CONEXIÓN", "error");
+            setText("#systemState", "Revisar conexión");
+            setText("#systemDetail", "La galería no responde ahora");
+            $("#listosGrid").setAttribute("aria-busy", "false");
+            $("#revisarGrid").setAttribute("aria-busy", "false");
+            $("#listosGrid").replaceChildren(errorState(error.message));
+            $("#revisarGrid").replaceChildren(errorState(error.message));
+            notify("No se pudieron cargar los clips.", true);
+          });
+      }
+
+      function switchTab(tab) {
+        state.tab = tab;
+        $$(".tab").forEach((button) => {
+          button.setAttribute(
+            "aria-selected",
+            button.dataset.tab === tab ? "true" : "false"
+          );
+        });
+        $$(".panel").forEach((panel) => {
+          panel.hidden = panel.id !== "panel-" + tab;
+        });
+
+        if (tab === "explorador") {
+          cargarArchivosSeguro(state.path);
+        }
+        if (tab === "logs") {
+          cargarLogs();
         }
       }
-      modal.classList.add('active');
-      gsap.from('.modal-window', { scale: 0.9, opacity: 0, duration: 0.3, ease: 'back.out(1.5)' });
-      lucide.createIcons();
-    }
 
-    function cerrarPrevisualizacion(e) {
-      if (e && e.target !== document.getElementById('previewModal') && !e.target.classList.contains('btn-close-modal')) return;
-      const modal = document.getElementById('previewModal');
-      const modalBody = document.getElementById('modalBody');
-      gsap.to('.modal-window', { scale: 0.9, opacity: 0, duration: 0.2, onComplete: () => {
-        modal.classList.remove('active');
-        modalBody.replaceChildren();
-      }});
-    }
+      function breadcrumbs(path) {
+        const root = $("#breadcrumbs");
+        root.replaceChildren();
 
-    async function cargarLogs() {
-      const box = document.getElementById('logs-box');
-      box.textContent = "Cargando registros del servidor...";
-      try {
-        const res = await fetch('/api/logs');
-        const data = await res.text();
-        box.textContent = data || "No hay registros de actividad todavía.";
-        box.scrollTop = box.scrollHeight;
-      } catch (e) {
-        box.textContent = "Error obteniendo los logs del servidor.";
+        const add = (label, target) => {
+          const button = text("button", "", label);
+          button.type = "button";
+          button.addEventListener("click", () => {
+            cargarArchivosSeguro(target);
+          });
+          root.appendChild(button);
+        };
+
+        add("DATA", "");
+
+        let accumulated = "";
+        String(path || "")
+          .split("/")
+          .filter(Boolean)
+          .forEach((part) => {
+            root.appendChild(text("span", "", "/"));
+            accumulated = accumulated
+              ? accumulated + "/" + part
+              : part;
+            add(part, accumulated);
+          });
       }
-    }
+
+      function cargarArchivosSeguro(path) {
+        state.path = String(path || "").replace(/^[/]+|[/]+$/g, "");
+
+        fetch(
+          "/api/browse?path=" + encodeURIComponent(state.path),
+          { cache: "no-store" }
+        )
+          .then((response) => {
+            if (!response.ok) {
+              throw Error("HTTP " + response.status);
+            }
+            return response.json();
+          })
+          .then((data) => {
+            state.path = String(data.path || "").replace(
+              /^[/]+|[/]+$/g,
+              ""
+            );
+            breadcrumbs(state.path);
+
+            const grid = $("#fileGrid");
+            grid.replaceChildren();
+            const items = Array.isArray(data.items) ? data.items : [];
+
+            if (!items.length) {
+              grid.appendChild(emptyState("listos"));
+              setText("#explorerNote", "Esta carpeta está vacía");
+              return;
+            }
+
+            setText("#explorerNote", items.length + " elementos");
+            items.forEach((item) => {
+              const target = state.path
+                ? state.path + "/" + item.name
+                : item.name;
+
+              if (item.is_dir) {
+                const button = text("button", "file-item");
+                button.type = "button";
+                button.innerHTML = icon("folder");
+
+                const copy = text("span", "file-copy");
+                copy.append(
+                  text("span", "file-name", item.name),
+                  text("span", "file-size", "Carpeta")
+                );
+                button.appendChild(copy);
+                button.addEventListener("click", () => {
+                  cargarArchivosSeguro(target);
+                });
+                grid.appendChild(button);
+                return;
+              }
+
+              const isVideo = /[.]mp4$/i.test(item.name);
+              const isText = /[.](txt|log|csv|json)$/i.test(item.name);
+              const card = text("div", "file-item");
+
+              card.appendChild(iconNode(isVideo ? "activity" : "file"));
+
+              const copy = text("span", "file-copy");
+              copy.append(
+                text("span", "file-name", item.name),
+                text("span", "file-size", item.size || "Archivo")
+              );
+              card.appendChild(copy);
+
+              const actions = text("span", "file-actions");
+              if (isVideo || isText) {
+                const preview = text("button", "icon-button");
+                preview.type = "button";
+                preview.setAttribute(
+                  "aria-label",
+                  "Previsualizar " + item.name
+                );
+                preview.title = "Previsualizar";
+                preview.innerHTML = icon("play");
+                preview.addEventListener("click", () => {
+                  abrirPrevisualizacionSeguro(
+                    target,
+                    item.name,
+                    isVideo ? "video" : "text"
+                  );
+                });
+                actions.appendChild(preview);
+              }
+
+              const download = document.createElement("a");
+              download.className = "icon-button";
+              download.href = safeFileUrl(target);
+              download.download = "";
+              download.setAttribute(
+                "aria-label",
+                "Descargar " + item.name
+              );
+              download.title = "Descargar";
+              download.innerHTML = icon("download");
+              actions.appendChild(download);
+
+              card.appendChild(actions);
+              grid.appendChild(card);
+            });
+          })
+          .catch((error) => {
+            $("#fileGrid").replaceChildren(errorState(error.message));
+            notify("No se pudo abrir el explorador.", true);
+          });
+      }
+
+      function cargarLogs() {
+        fetch("/api/logs", { cache: "no-store" })
+          .then((response) => {
+            if (!response.ok) {
+              throw Error("HTTP " + response.status);
+            }
+            return response.text();
+          })
+          .then((body) => {
+            $("#logsBox").textContent = body;
+            setText(
+              "#logsNote",
+              "Actualizado " +
+                new Date().toLocaleTimeString("es-ES", {
+                  hour: "2-digit",
+                  minute: "2-digit"
+                })
+            );
+          })
+          .catch((error) => {
+            $("#logsBox").textContent =
+              "No se pudieron cargar los registros: " + error.message;
+            notify("No se pudieron cargar los registros.", true);
+          });
+      }
+
+      function abrirPrevisualizacionSeguro(url, title, type) {
+        state.modalFocus = document.activeElement;
+        $("#previewTitle").textContent = title || "Previsualización";
+
+        const body = $("#previewBody");
+        const safe = safeFileUrl(url);
+        body.replaceChildren();
+
+        if (type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = "Cargando archivo…";
+          body.appendChild(pre);
+
+          fetch(safe, { cache: "no-store" })
+            .then((response) => {
+              if (!response.ok) {
+                throw Error("HTTP " + response.status);
+              }
+              return response.text();
+            })
+            .then((value) => {
+              pre.textContent = value || "(Archivo vacío)";
+            })
+            .catch(() => {
+              pre.textContent = "No se pudo cargar el contenido del archivo.";
+            });
+        } else {
+          const video = document.createElement("video");
+          video.controls = true;
+          video.autoplay = true;
+          video.playsInline = true;
+          video.preload = "metadata";
+          video.src = safe;
+          video.setAttribute(
+            "aria-label",
+            "Previsualización de " + (title || "vídeo")
+          );
+          body.appendChild(video);
+        }
+
+        $("#previewModal").hidden = false;
+        document.body.style.overflow = "hidden";
+        $("#closePreview").focus();
+      }
+
+      function cerrarPrevisualizacion() {
+        const modal = $("#previewModal");
+        $("#previewBody").replaceChildren();
+        modal.hidden = true;
+        document.body.style.overflow = "";
+
+        if (
+          state.modalFocus &&
+          typeof state.modalFocus.focus === "function"
+        ) {
+          state.modalFocus.focus();
+        }
+      }
+
+      $$(".tab").forEach((button) => {
+        button.addEventListener("click", () => {
+          switchTab(button.dataset.tab);
+        });
+      });
+
+      $$(".filter-chip").forEach((button) => {
+        button.addEventListener("click", () => {
+          $$('.filter-chip[data-scope="' + button.dataset.scope + '"]')
+            .forEach((item) => {
+              item.classList.toggle("active", item === button);
+            });
+          filter(button.dataset.scope);
+        });
+      });
+
+      $("#searchListos").addEventListener("input", () => filter("listos"));
+      $("#searchRevisar").addEventListener("input", () => filter("revisar"));
+
+      $("#refreshButton").addEventListener("click", () => {
+        cargarClips(true);
+        if (state.tab === "explorador") {
+          cargarArchivosSeguro(state.path);
+        }
+        if (state.tab === "logs") {
+          cargarLogs();
+        }
+      });
+
+      $("#closePreview").addEventListener("click", cerrarPrevisualizacion);
+      $("#previewModal").addEventListener("click", (event) => {
+        if (event.target.id === "previewModal") {
+          cerrarPrevisualizacion();
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !$("#previewModal").hidden) {
+          cerrarPrevisualizacion();
+        }
+      });
+
+      window.abrirPrevisualizacionSeguro = abrirPrevisualizacionSeguro;
+      window.cerrarPrevisualizacion = cerrarPrevisualizacion;
+      window.filtrarClips = () => {
+        filter("listos");
+        filter("revisar");
+      };
+
+      summary();
+      cargarClips(true);
+      window.setInterval(() => {
+        if (document.visibilityState !== "hidden") {
+          cargarClips(false);
+        }
+      }, 15000);
+    }());
   </script>
 </body>
 </html>
 """
-
 
 class Handler(SimpleHTTPRequestHandler):
     usuario = ""
@@ -1210,6 +2437,11 @@ class Handler(SimpleHTTPRequestHandler):
         for mp4 in sorted(dir_path.glob("*.mp4"), reverse=True):
             canal = clipper.canal_desde_nombre(mp4.name)
 
+            try:
+                timestamp = mp4.stat().st_mtime
+            except OSError:
+                timestamp = 0
+
             gancho = ""
             motivo = ""
             llm = {}
@@ -1230,6 +2462,7 @@ class Handler(SimpleHTTPRequestHandler):
 
             clips.append({
                 "nombre": mp4.name,
+                "timestamp": timestamp,
                 "canal": canal,
                 "duracion": round(duracion),
                 "gancho": gancho or mp4.stem,
