@@ -20,7 +20,7 @@ def _volumen_medio(mp4: Path) -> float:
     p = subprocess.run(
         [clipper.FFMPEG, "-hide_banner", "-i", str(mp4), "-af", "volumedetect",
          "-f", "null", "-"],
-        capture_output=True, text=True, encoding="utf-8", errors="replace")
+        capture_output=True, text=True, encoding="utf-8", errors="replace", **clipper.SIN_VENTANA)
     m = re.search(r"mean_volume:\s*(-?\d+(?:\.\d+)?) dB", p.stderr or "")
     return float(m.group(1)) if m else -99.0
 
@@ -30,7 +30,7 @@ def _negro_segundos(mp4: Path) -> float:
     p = subprocess.run(
         [clipper.FFMPEG, "-hide_banner", "-i", str(mp4),
          "-vf", "blackdetect=d=0.5:pix_th=0.10", "-f", "null", "-"],
-        capture_output=True, text=True, encoding="utf-8", errors="replace")
+        capture_output=True, text=True, encoding="utf-8", errors="replace", **clipper.SIN_VENTANA)
     return sum(float(x) for x in re.findall(r"black_duration:(\d+(?:\.\d+)?)", p.stderr or ""))
 
 

@@ -79,7 +79,7 @@ def directos_twitch(canal: str) -> list:
     p = subprocess.run(
         [sys.executable, "-m", "yt_dlp", "--flat-playlist", "--playlist-end", "6",
          "--print", "%(duration)s|%(title)s", f"https://www.twitch.tv/{canal}/videos"],
-        capture_output=True, text=True, encoding="utf-8", errors="replace")
+        capture_output=True, text=True, encoding="utf-8", errors="replace", **clipper.SIN_VENTANA)
     salida = []
     for linea in (p.stdout or "").splitlines():
         if "|" in linea:

@@ -77,7 +77,8 @@ def canal_url(canal: str, plataforma: str) -> str:
 
 def esta_en_directo(url: str) -> bool:
     proc = subprocess.run([sys.executable, "-m", "streamlink", "--json", url],
-                          capture_output=True, text=True, encoding="utf-8", errors="replace")
+                          capture_output=True, text=True, encoding="utf-8",
+                          errors="replace", **clipper.SIN_VENTANA)
     try:
         data = json.loads(proc.stdout or "{}")
     except json.JSONDecodeError:
@@ -97,7 +98,8 @@ class Captura:
 
     def arrancar(self):
         # En POSIX cada captura va en su propio grupo para poder matarla entera.
-        self._grupo = {"start_new_session": True} if os.name != "nt" else {}
+        self._grupo = ({"start_new_session": True} if os.name != "nt"
+                       else dict(clipper.SIN_VENTANA))
         self.destino.mkdir(parents=True, exist_ok=True)
         for viejo in self.destino.glob("*.ts"):
             try:
@@ -135,7 +137,7 @@ class Captura:
             try:
                 if os.name == "nt":
                     subprocess.run(["taskkill", "/PID", str(p.pid), "/T", "/F"],
-                                   capture_output=True)
+                                   capture_output=True, **clipper.SIN_VENTANA)
                 else:
                     os.killpg(os.getpgid(p.pid), signal.SIGKILL)
             except (OSError, ProcessLookupError):
@@ -220,7 +222,7 @@ def rms_segmento(ruta: Path) -> float:
     proc = subprocess.run(
         [FFMPEG, "-hide_banner", "-loglevel", "error", "-i", str(ruta),
          "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", "pipe:1"],
-        capture_output=True)
+        capture_output=True, **clipper.SIN_VENTANA)
     import array
     m = array.array("h")
     try:

@@ -56,6 +56,10 @@ def _registrar_salida():
 REINTENTO_MIN_S = 15
 REINTENTO_MAX_S = 300
 
+# CREATE_NO_WINDOW. Se define aqui y no se importa de clipper para que el
+# supervisor no arrastre la configuracion ni el modelo solo para arrancar.
+SIN_VENTANA = {"creationflags": 0x08000000} if os.name == "nt" else {}
+
 
 class Vigilante:
     def __init__(self, ficha: dict):
@@ -74,7 +78,9 @@ class Vigilante:
             cmd.append("--solo-audio")
 
         entorno = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUNBUFFERED": "1"}
-        extra = {"start_new_session": True} if os.name != "nt" else {}
+        # CREATE_NO_WINDOW: sin esto cada vigilante abre su ventana de consola.
+        extra = ({"start_new_session": True} if os.name != "nt"
+                 else {"creationflags": 0x08000000})
         self.log = (LOGS / f"{self.canal}.log").open("a", encoding="utf-8")
         self.proc = subprocess.Popen(cmd, cwd=ROOT, stdout=self.log,
                                      stderr=subprocess.STDOUT, env=entorno, **extra)
@@ -90,7 +96,7 @@ class Vigilante:
         try:
             if os.name == "nt":
                 subprocess.run(["taskkill", "/PID", str(self.proc.pid), "/T", "/F"],
-                               capture_output=True)
+                               capture_output=True, **SIN_VENTANA)
             else:
                 os.killpg(os.getpgid(self.proc.pid), signal.SIGTERM)
         except (OSError, ProcessLookupError):
@@ -134,7 +140,7 @@ def cmd_estado():
         for exe in ("python.exe", "pythonw.exe"):
             out += subprocess.run(["wmic", "process", "where", f"name='{exe}'",
                                    "get", "ProcessId,CommandLine"],
-                                  capture_output=True, text=True).stdout or ""
+                                  capture_output=True, text=True, **SIN_VENTANA).stdout or ""
     else:
         out = subprocess.run(["ps", "-eo", "pid,args"], capture_output=True,
                              text=True).stdout

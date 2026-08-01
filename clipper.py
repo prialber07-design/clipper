@@ -136,8 +136,14 @@ def _cargar_dlls_cuda():
 _cargar_dlls_cuda()
 
 
+# Sin esto, cada llamada a ffmpeg o streamlink abre una ventana de consola en
+# Windows. Con 10 canales comprobandose cada 45s son ~13 parpadeos por minuto.
+SIN_VENTANA = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+
+
 def run(cmd, cwd=None):
-    proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", **SIN_VENTANA)
     if proc.returncode != 0:
         print(proc.stdout[-4000:])
         print(proc.stderr[-4000:])
