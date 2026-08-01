@@ -165,13 +165,45 @@ def main():
     signal.signal(signal.SIGINT, apagar)
     signal.signal(signal.SIGTERM, apagar)
 
+    vistos_clips = set(p.name for p in (OUT / "LISTOS").glob("*.mp4")) if (OUT / "LISTOS").exists() else set()
+    vistos_revisar = set(p.name for p in (OUT / "REVISAR").glob("*.mp4")) if (OUT / "REVISAR").exists() else set()
+
     try:
         while True:
             time.sleep(15)
             for v in vigilantes:
                 v.revisar()
 
-            # Heartbeat cada 15 segundos comprobando si hay grabación activa en buffer
+            # 1. Comprobar si se ha generado un NUEVO CLIP LISTO
+            listos_dir = OUT / "LISTOS"
+            if listos_dir.exists():
+                for mp4 in listos_dir.glob("*.mp4"):
+                    if mp4.name not in vistos_clips:
+                        vistos_clips.add(mp4.name)
+                        partes = mp4.stem.split("_")
+                        canal = partes[1] if len(partes) >= 2 else "clip"
+                        print("\n" + "=" * 60, flush=True)
+                        print(f"🎬 [¡NUEVO CLIP GENERADO EN VIVO - LISTO!]", flush=True)
+                        print(f"   👤 Streamer : {canal}", flush=True)
+                        print(f"   📁 Archivo  : {mp4.name}", flush=True)
+                        print(f"   🌐 Galería  : Disponible para ver y descargar en la web", flush=True)
+                        print("=" * 60 + "\n", flush=True)
+
+            # 2. Comprobar si se ha generado un CLIP EN REVISIÓN
+            revisar_dir = OUT / "REVISAR"
+            if revisar_dir.exists():
+                for mp4 in revisar_dir.glob("*.mp4"):
+                    if mp4.name not in vistos_revisar:
+                        vistos_revisar.add(mp4.name)
+                        partes = mp4.stem.split("_")
+                        canal = partes[1] if len(partes) >= 2 else "clip"
+                        print("\n" + "=" * 60, flush=True)
+                        print(f"⚠️ [NUEVO CLIP GENERADO - EN REVISIÓN]", flush=True)
+                        print(f"   👤 Streamer : {canal}", flush=True)
+                        print(f"   📁 Archivo  : {mp4.name}", flush=True)
+                        print("=" * 60 + "\n", flush=True)
+
+            # 3. Heartbeat cada 15 segundos comprobando si hay grabación activa en buffer
             buf_dir = DATA / "buffer"
             grabando = []
             if buf_dir.exists():
