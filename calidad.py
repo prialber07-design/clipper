@@ -118,6 +118,9 @@ def evaluar(mp4: Path, clip: dict, segmentos: list,
     if clip.get("hook_auto") and not q.get("publicar_con_gancho_automatico", False):
         fallos.append("gancho automatico: hay que escribirlo antes de publicar")
 
+    if (clip.get("llm") or {}).get("mode") == "prueba":
+        fallos.append("LLM en modo prueba: revision humana obligatoria")
+
     if not hook or hook.startswith("ESCRIBE"):
         fallos.append("sin gancho")
     elif len(hook) < q.get("hook_min_chars", 18):
@@ -147,6 +150,10 @@ def apartar(mp4: Path, motivos: list[str], meta: dict) -> Path:
         "NO PUBLICAR. Motivos:\n- " + "\n- ".join(motivos) +
         f"\n\ngancho: {meta.get('hook','')}\ncanal: {meta.get('canal','')}\n",
         encoding="utf-8")
+    if isinstance(meta.get("llm"), dict):
+        texto = destino.with_suffix(".motivos.txt").read_text(encoding="utf-8")
+        texto += "\nLLM:\n" + json.dumps(meta["llm"], ensure_ascii=False) + "\n"
+        destino.with_suffix(".motivos.txt").write_text(texto, encoding="utf-8")
 
     canal = meta.get("canal", "desconocido")
     dur = meta.get("duracion", "?")

@@ -429,6 +429,23 @@ def gancho_automatico(segs, t_pico: float, chat=None) -> str:
     return mejor
 
 
+def contexto_editorial(segmentos: list, inicio: float, fin: float,
+                        pico: float) -> tuple[list, float]:
+    """Copia el contexto para Luna al reloj relativo del candidato, acotado."""
+    duracion = max(0.0, float(fin) - float(inicio))
+
+    def relativo(valor):
+        return min(duracion, max(0.0, float(valor) - float(inicio)))
+
+    normalizados = []
+    for segmento in segmentos:
+        copia = dict(segmento)
+        copia["start"] = relativo(segmento["start"])
+        copia["end"] = relativo(segmento["end"])
+        normalizados.append(copia)
+    return normalizados, relativo(pico)
+
+
 def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str, chat=None):
     recargar()  # coge los ajustes de config.json sin reiniciar
     aplicar_ajustes_canal(canal)
@@ -447,7 +464,7 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
 
     _, t_pico = montar_ventana(cap, t_video, slug, antes=antes)
 
-    args = argparse.Namespace(slug=slug, n=1, device=device, func=None)
+    args = argparse.Namespace(slug=slug, n=1, device=device, func=None, defer_clips=True)
     # Una unica cola de Whisper entre todos los vigilantes del servidor.
     # El modelo se cachea por proceso; el cerrojo evita inferencias solapadas.
     with bloqueo.exclusivo(DATA / ".whisper.lock", etiqueta=f"transcripcion de {canal}"):
@@ -483,6 +500,17 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
 
     dentro = [s for s in segs if ini <= s["start"] < fin]
     gancho = gancho_automatico(dentro, t_pico, chat)
+    duracion = fin - ini
+    segmentos_llm, pico_llm = contexto_editorial(dentro, ini, fin, t_pico)
+    gancho, llm = clipper.evaluar_editorial(
+        canal=canal,
+        motivo=motivo,
+        segmentos=segmentos_llm,
+        chat=chat or [],
+        duracion=duracion,
+        pico=pico_llm,
+        fallback=gancho,
+    )
     clip = {
         "id": "01",
         "start": round(ini, 2),
@@ -492,6 +520,8 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
         "title": " ".join(s["text"] for s in dentro)[:90],
         "hashtags": [f"#{canal}", "#clips", "#envivo"],
     }
+    if llm:
+        clip["llm"] = llm
     (d / "clips.json").write_text(json.dumps({"clips": [clip]}, ensure_ascii=False, indent=2),
                                   encoding="utf-8")
 
@@ -505,7 +535,7 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
     mp4 = clipper.OUT / slug / f"{slug}-01.mp4"
     if mp4.exists():
         meta = {"canal": canal, "motivo": motivo, "hook": clip["hook"],
-                "duracion": round(clip["end"] - clip["start"])}
+                "duracion": round(clip["end"] - clip["start"]), "llm": clip.get("llm")}
         apto, fallos = calidad.evaluar(mp4, clip, segs, limites=(dur["min"], dur["max"]))
         if apto:
             destino = notify.publicar(mp4, meta)

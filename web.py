@@ -43,6 +43,28 @@ def _duracion_video(path: Path) -> int:
         return 0
     return _duracion_video_cache(path, stat.st_mtime_ns, stat.st_size)
 
+
+def _leer_motivos(path: Path) -> tuple[str, dict, str]:
+    if not path.exists():
+        return "", {}, ""
+    contenido = path.read_text(encoding="utf-8", errors="replace")
+    llm = {}
+    motivo = contenido
+    marcador = "\nLLM:\n"
+    if marcador in contenido:
+        motivo, bloque_llm = contenido.rsplit(marcador, 1)
+        try:
+            candidato = json.loads(bloque_llm.strip())
+            if isinstance(candidato, dict):
+                llm = candidato
+        except json.JSONDecodeError:
+            motivo = contenido
+    gancho = ""
+    encontrado = re.search(r"(?im)^gancho:\s*(.*)$", motivo)
+    if encontrado:
+        gancho = encontrado.group(1).strip()
+    return motivo.strip(), llm, gancho
+
 HTML_TEMPLATE = """<!doctype html>
 <html lang="es">
 <head>
@@ -902,6 +924,19 @@ HTML_TEMPLATE = """<!doctype html>
         tags.append(textNode('span', 'dur-pill', `⏱️ ${clip.duracion || 0}s`));
         body.append(tags, textNode('h2', 'clip-heading', clip.gancho || '(Sin título)'));
         if (esRevisar && clip.motivo) body.append(textNode('div', 'clip-alert', `⚠️ ${clip.motivo}`));
+        if (esRevisar && clip.llm && typeof clip.llm === 'object') {
+          const decision = String(clip.llm.decision || 'revisar').toUpperCase();
+          const score = Number.isFinite(Number(clip.llm.score)) ? Number(clip.llm.score) : 0;
+          const confidence = Number.isFinite(Number(clip.llm.confidence))
+            ? ` · confianza ${(Number(clip.llm.confidence) * 100).toFixed(0)}%` : '';
+          const panel = document.createElement('div');
+          panel.className = 'clip-alert';
+          panel.append(
+            textNode('div', '', `🤖 LUNA · ${decision} · ${score}/100${confidence}`),
+            textNode('div', '', clip.llm.reason || 'Sin motivo registrado')
+          );
+          body.append(panel);
+        }
 
         const buttons = document.createElement('div');
         buttons.className = 'btn-group';
@@ -1177,11 +1212,12 @@ class Handler(SimpleHTTPRequestHandler):
 
             gancho = ""
             motivo = ""
+            llm = {}
             txt_file = mp4.with_suffix(".txt")
             motivos_file = mp4.with_suffix(".motivos.txt")
 
             if motivos_file.exists():
-                motivo = motivos_file.read_text(encoding="utf-8", errors="replace").strip()
+                motivo, llm, gancho = _leer_motivos(motivos_file)
 
             if txt_file.exists():
                 contenido = txt_file.read_text(encoding="utf-8", errors="replace")
@@ -1198,6 +1234,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "duracion": round(duracion),
                 "gancho": gancho or mp4.stem,
                 "motivo": motivo,
+                "llm": llm,
                 "url": rel_url
             })
         return clips

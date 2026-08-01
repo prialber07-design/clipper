@@ -20,6 +20,9 @@ import re
 import shutil
 import subprocess
 import sys
+import time
+import urllib.error
+import urllib.request
 import wave
 from pathlib import Path
 
@@ -193,6 +196,203 @@ def cmd_fetch(args):
 
 _MODELO_CACHE = {}
 
+LLM_ENDPOINT = "https://api.openai.com/v1/responses"
+LLM_TITLE_MAX_CHARS = 66
+LLM_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "decision": {"type": "string", "enum": ["publicar", "revisar", "descartar"]},
+        "score": {"type": "integer"},
+        "confidence": {"type": "number"},
+        "reason": {"type": "string"},
+        "screen_title": {"type": "string"},
+    },
+    "required": ["decision", "score", "confidence", "reason", "screen_title"],
+}
+
+
+def _llm_config() -> tuple[bool, str, str, str]:
+    activo = os.environ.get("CLIPPER_LLM_ACTIVO", "0").strip().lower() in {
+        "1", "true", "si", "sí", "yes"
+    }
+    modelo = os.environ.get("CLIPPER_LLM_MODELO", "gpt-5.6-luna").strip() or "gpt-5.6-luna"
+    modo = os.environ.get("CLIPPER_LLM_MODO", "prueba").strip().lower() or "prueba"
+    if modo != "prueba":
+        LOG.warning("⚠️ LLM MODO NO SOPORTADO\n   SE USA: PRUEBA")
+        modo = "prueba"
+    clave = os.environ.get("OPENAI_API_KEY", "").strip()
+    return activo, modelo, modo, clave
+
+
+def _texto_llm(valor, maximo: int) -> str:
+    if not isinstance(valor, str):
+        return ""
+    valor = re.sub(r"[\x00-\x1f\x7f]", " ", valor)
+    return " ".join(valor.split())[:maximo].rstrip()
+
+
+def _ocultar_clave(valor: str, clave: str) -> str:
+    return valor.replace(clave, "[REDACTED]") if clave else valor
+
+
+def _llm_fallback(modelo: str, modo: str, motivo: str) -> dict:
+    return {
+        "model": modelo,
+        "mode": modo,
+        "decision": "revisar",
+        "score": 0,
+        "confidence": 0.0,
+        "reason": _texto_llm(motivo, 300) or "evaluación no disponible",
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "latency_ms": 0,
+    }
+
+
+def _llm_prompt(canal: str, motivo: str, segmentos: list, chat: list,
+                duracion: float, pico: float) -> str:
+    transcripcion = "\n".join(
+        f"- {float(s.get('start', 0)):.1f}s-{float(s.get('end', 0)):.1f}s: "
+        f"{_texto_llm(s.get('text', ''), 400)}"
+        for s in segmentos
+        if _texto_llm(s.get("text", ""), 400)
+    ) or "(sin transcripción)"
+    mensajes = "\n".join(
+        f"- {_texto_llm(m, 180)}"
+        for m in list(chat or [])[-20:]
+        if _texto_llm(m, 180)
+    ) or "(sin mensajes relevantes)"
+    return (
+        "Evalúa un candidato de clip en español. No inventes hechos ni uses clickbait "
+        "que la transcripción no sostenga. El título superior debe ser breve, fiel y "
+        "comprensible sin contexto adicional.\n\n"
+        f"CANAL: {canal}\n"
+        f"MOTIVO DEL PICO: {motivo}\n"
+        f"DURACIÓN DEL CANDIDATO: {duracion:.1f}s\n"
+        f"POSICIÓN DEL PICO: {pico:.1f}s\n\n"
+        f"TRANSCRIPCIÓN SEGMENTADA:\n{transcripcion}\n\n"
+        f"CHAT RELEVANTE:\n{mensajes}\n\n"
+        "Devuelve únicamente el objeto JSON solicitado. `publicar` significa que el "
+        "momento y el título son sólidos; `revisar` que necesita criterio humano; "
+        "`descartar` que no aporta un clip útil."
+    )
+
+
+def _responses_text(respuesta: dict) -> str:
+    directo = respuesta.get("output_text")
+    if isinstance(directo, str) and directo.strip():
+        return directo
+    for item in respuesta.get("output", []):
+        for contenido in item.get("content", []):
+            if contenido.get("type") == "output_text" and contenido.get("text"):
+                return contenido["text"]
+    return ""
+
+
+def evaluar_editorial(canal: str, motivo: str, segmentos: list, chat: list,
+                      duracion: float, pico: float, fallback: str) -> tuple[str, dict | None]:
+    """Evalúa un candidato una vez y devuelve (gancho, metadatos_llm).
+
+    En modo prueba la decisión se conserva como recomendación, pero el llamador
+    mantiene `hook_auto=True`, por lo que el filtro humano sigue siendo obligatorio.
+    """
+    activo, modelo, modo, clave = _llm_config()
+    if not activo:
+        return fallback, None
+    if not clave:
+        LOG.warning("⚠️ LLM EDITORIAL OMITIDO · API KEY AUSENTE\n   MODELO: %s", modelo)
+        return fallback, _llm_fallback(modelo, modo, "OPENAI_API_KEY ausente; se usa el gancho heurístico")
+
+    payload = {
+        "model": modelo,
+        "instructions": (
+            "Eres Luna, editora de clips. Responde con el esquema JSON exacto. "
+            "No cambies tiempos ni transcripción; solo evalúa y propone el título superior."
+        ),
+        "input": _ocultar_clave(
+            _llm_prompt(canal, motivo, segmentos, chat, duracion, pico), clave),
+        "reasoning": {"effort": "low"},
+        "max_output_tokens": 500,
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "name": "clip_editorial",
+                "strict": True,
+                "schema": LLM_SCHEMA,
+            }
+        },
+    }
+    req = urllib.request.Request(
+        LLM_ENDPOINT,
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {clave}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    inicio = time.monotonic()
+    try:
+        with urllib.request.urlopen(req, timeout=20) as respuesta_http:
+            respuesta = json.loads(respuesta_http.read().decode("utf-8"))
+        texto = _responses_text(respuesta)
+        resultado = json.loads(texto) if texto.strip() else None
+        if not isinstance(resultado, dict):
+            raise ValueError("respuesta JSON vacía")
+
+        decision = resultado.get("decision")
+        score = resultado.get("score")
+        confidence = resultado.get("confidence")
+        reason = _ocultar_clave(_texto_llm(resultado.get("reason"), 300), clave)
+        title = _texto_llm(resultado.get("screen_title"), LLM_TITLE_MAX_CHARS)
+        title = _ocultar_clave(re.sub(r"[\\{}]", " ", title), clave)
+        title = _texto_llm(title, LLM_TITLE_MAX_CHARS)
+        if decision not in {"publicar", "revisar", "descartar"}:
+            raise ValueError("decision inválida")
+        if isinstance(score, bool) or not isinstance(score, int) or not 0 <= score <= 100:
+            raise ValueError("score inválido")
+        if (isinstance(confidence, bool) or not isinstance(confidence, (int, float))
+                or not 0 <= confidence <= 1):
+            raise ValueError("confidence inválida")
+        if not reason:
+            raise ValueError("reason vacío")
+
+        uso = respuesta.get("usage") or {}
+        meta = {
+            "model": modelo,
+            "mode": modo,
+            "decision": decision,
+            "score": score,
+            "confidence": round(float(confidence), 3),
+            "reason": reason,
+            "input_tokens": max(0, int(uso.get("input_tokens", 0) or 0)),
+            "output_tokens": max(0, int(uso.get("output_tokens", 0) or 0)),
+            "latency_ms": round((time.monotonic() - inicio) * 1000),
+        }
+        if not title:
+            meta["reason"] = f"{reason} · título vacío; se usa el gancho heurístico"
+            LOG.warning("⚠️ LLM EDITORIAL SIN TÍTULO\n   MODELO: %s\n   FALLBACK: GANCHO HEURÍSTICO",
+                        modelo)
+            return fallback, meta
+        return title, meta
+    except urllib.error.HTTPError as e:
+        LOG.warning("⚠️ LLM EDITORIAL NO DISPONIBLE\n   MODELO: %s\n   MOTIVO: HTTP_%s",
+                    modelo, e.code)
+        return fallback, _llm_fallback(modelo, modo, f"error HTTP {e.code}; se usa el gancho heurístico")
+    except (TimeoutError, urllib.error.URLError, OSError):
+        LOG.warning("⚠️ LLM EDITORIAL NO DISPONIBLE\n   MODELO: %s\n   MOTIVO: TIMEOUT_O_RED",
+                    modelo)
+        return fallback, _llm_fallback(modelo, modo, "timeout o error de red; se usa el gancho heurístico")
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError):
+        LOG.warning("⚠️ LLM EDITORIAL INVÁLIDO\n   MODELO: %s\n   MOTIVO: JSON O CAMPOS NO VÁLIDOS",
+                    modelo)
+        return fallback, _llm_fallback(modelo, modo, "respuesta JSON inválida; se usa el gancho heurístico")
+    except Exception:
+        LOG.warning("⚠️ LLM EDITORIAL FALLIDO\n   MODELO: %s\n   MOTIVO: ERROR INESPERADO",
+                    modelo)
+        return fallback, _llm_fallback(modelo, modo, "error inesperado; se usa el gancho heurístico")
+
 
 def liberar_whisper_model():
     """Libera el modelo del proceso al terminar una transcripcion."""
@@ -294,12 +494,15 @@ def cmd_transcribe(args):
     (d / "energy.json").write_text(json.dumps(energy), encoding="utf-8")
 
     clips = _auto_candidates(segs, energy, args.n)
-    (d / "clips.json").write_text(json.dumps({"clips": clips}, ensure_ascii=False, indent=2), encoding="utf-8")
+    if not getattr(args, "defer_clips", False):
+        (d / "clips.json").write_text(
+            json.dumps({"clips": clips}, ensure_ascii=False, indent=2), encoding="utf-8")
 
     LOG.info("✅ TRANSCRIPCIÓN COMPLETADA\n   SEGMENTOS: %d\n   PALABRAS: %d\n   ARCHIVO: %s",
              len(segs), len(words), d / "transcript.txt")
-    LOG.info("💡 CANDIDATOS GENERADOS\n   TOTAL: %d\n   ARCHIVO: %s",
-             len(clips), d / "clips.json")
+    LOG.info("💡 CANDIDATOS GENERADOS\n   TOTAL: %d\n   DESTINO: %s",
+             len(clips), "PENDIENTE DE EVALUACIÓN EDITORIAL"
+             if getattr(args, "defer_clips", False) else d / "clips.json")
 
 
 def _energy_curve(audio: Path, hop=0.5):
