@@ -37,7 +37,7 @@ def listar():
     print(f"\nMira el mosaico y luego:  python pendientes.py <slug> \"tu gancho\"")
 
 
-def resolver(slug: str, gancho: str, descripcion: str = ""):
+def resolver(slug: str, gancho: str, descripcion: str = "", etiquetas=None):
     cj = clipper.WORK / slug / "clips.json"
     if not cj.exists():
         sys.exit(f"[x] No existe {cj}")
@@ -47,7 +47,11 @@ def resolver(slug: str, gancho: str, descripcion: str = ""):
     clip["descripcion"] = descripcion
     clip["hook_auto"] = False
     canal = re.split(r"-\d{6}$", slug)[0]
-    clip["hashtags"] = clipper.hashtags_para(canal)
+
+    # Los hashtags de contexto salen de lo que se dice en el clip, no del canal.
+    tr = clipper.WORK / slug / "transcript.txt"
+    texto = tr.read_text(encoding="utf-8") if tr.exists() else ""
+    clip["hashtags"] = clipper.hashtags_para(canal, extra=etiquetas, texto=texto)
     cj.write_text(json.dumps(datos, ensure_ascii=False, indent=2), encoding="utf-8")
 
     clipper.cmd_render(argparse.Namespace(slug=slug, only=None, layout=None, func=None))
@@ -66,12 +70,14 @@ def main():
     if len(sys.argv) < 2:
         return listar()
     if len(sys.argv) < 3:
-        sys.exit('Uso: python pendientes.py <slug> "gancho" "descripcion"\n'
+        sys.exit('Uso: python pendientes.py <slug> "gancho" "descripcion" [tag1,tag2]\n'
                  'La descripcion NO puede ser el gancho repetido: ver ESTILO.md')
     if len(sys.argv) < 4:
         print("[!] Sin descripcion. Se publica igual, pero el .txt quedara "
               "incompleto: la descripcion es lo que te encuentra en la busqueda.")
-    resolver(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "")
+    etiquetas = [t.strip() for t in sys.argv[4].split(",")] if len(sys.argv) > 4 else None
+    resolver(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "",
+             etiquetas)
 
 
 if __name__ == "__main__":

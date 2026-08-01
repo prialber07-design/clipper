@@ -26,7 +26,17 @@
         "aguinaldo",
         "leo"
       ],
-      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
+      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)",
+      "etiquetas": [
+        "boca",
+        "river",
+        "mundial",
+        "argentina",
+        "messi",
+        "lacobra",
+        "sevilla",
+        "penal"
+      ]
     },
     {
       "nombre": "La Cobra",
@@ -54,7 +64,19 @@
         "eliminatoria",
         "partido"
       ],
-      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
+      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)",
+      "etiquetas": [
+        "argentina",
+        "mundial",
+        "boca",
+        "davoo",
+        "messi",
+        "caboverde",
+        "enzofernandez",
+        "inglaterra",
+        "seleccion",
+        "golazo"
+      ]
     },
     {
       "nombre": "RdJavi",
@@ -79,7 +101,14 @@
         "hueso",
         "banco"
       ],
-      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
+      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)",
+      "etiquetas": [
+        "gta",
+        "gtarol",
+        "damian",
+        "policia",
+        "atraco"
+      ]
     },
     {
       "nombre": "Rey de la city",
@@ -97,6 +126,16 @@
         "partida",
         "foto",
         "chat"
+      ],
+      "etiquetas": [
+        "samway",
+        "jade",
+        "teamjade",
+        "nuevayork",
+        "samuel",
+        "zombies",
+        "callofduty",
+        "republicadominicana"
       ]
     },
     {
@@ -119,7 +158,15 @@
         "trafico",
         "visage"
       ],
-      "fuente": "Emite en twitch.tv/mariotaxi. El handle de Kick existe (6.030 seguidores) pero esta inactivo: resolverlo por existencia del handle fue un error."
+      "fuente": "Emite en twitch.tv/mariotaxi. El handle de Kick existe (6.030 seguidores) pero esta inactivo: resolverlo por existencia del handle fue un error.",
+      "etiquetas": [
+        "taxi",
+        "vtc",
+        "visage",
+        "cliente",
+        "madrid",
+        "semaforo"
+      ]
     },
     {
       "nombre": "Viviendo en la calle",
@@ -137,6 +184,12 @@
         "citroen",
         "caida",
         "policia"
+      ],
+      "etiquetas": [
+        "yony",
+        "furgoneta",
+        "citroen",
+        "calle"
       ]
     },
     {
@@ -165,7 +218,17 @@
         "share",
         "calvo"
       ],
-      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
+      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)",
+      "etiquetas": [
+        "iratxe",
+        "gael",
+        "barcelona",
+        "madrid",
+        "roblox",
+        "sharefestival",
+        "elcalvo",
+        "serie"
+      ]
     },
     {
       "nombre": "El Calvo",
@@ -209,7 +272,24 @@
         "toni",
         "huevo"
       ],
-      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
+      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)",
+      "etiquetas": [
+        "ibai",
+        "velada",
+        "arenal",
+        "juseph",
+        "omarmontes",
+        "danirep",
+        "mykestowers",
+        "paula",
+        "iratxe",
+        "franbeuve",
+        "toni",
+        "festival",
+        "sevilla",
+        "barcelona",
+        "valencia"
+      ]
     },
     {
       "nombre": "Franbuve",
@@ -238,7 +318,15 @@
         "cama",
         "caida"
       ],
-      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
+      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)",
+      "etiquetas": [
+        "elcalvo",
+        "velada",
+        "fifa",
+        "ometv",
+        "pueblo",
+        "sevilla"
+      ]
     },
     {
       "nombre": "Jose Nogales",
@@ -275,7 +363,19 @@
         "te gusta",
         "aitana"
       ],
-      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
+      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)",
+      "etiquetas": [
+        "cortisol",
+        "looksmaxxing",
+        "psl",
+        "gemelo",
+        "reality",
+        "magaluf",
+        "cadiz",
+        "aitana",
+        "vinicius",
+        "testosterona"
+      ]
     }
   ],
   "render": {
@@ -399,12 +499,7 @@
   },
   "hashtags": {
     "base": [
-      "#clips",
-      "#viral",
-      "#parati",
-      "#fyp",
-      "#twitch",
-      "#directo"
+      "#viral"
     ],
     "por_canal": {
       "elcalvolol": [
@@ -412,35 +507,45 @@
         "#elcalvo"
       ],
       "lopezfnx": [
-        "#lopezfnx"
+        "#lopezfnx",
+        "#lopez"
+      ],
+      "franbeuve": [
+        "#franbeuve",
+        "#beuve"
+      ],
+      "josenogales1": [
+        "#josenogales",
+        "#nogales"
       ],
       "davooxeneize": [
         "#davooxeneize",
         "#davoo"
       ],
       "lacobraaa": [
-        "#lacobra"
+        "#lacobra",
+        "#cobra"
       ],
       "rdjavi": [
-        "#rdjavi"
+        "#rdjavi",
+        "#javi"
       ],
       "reydelacity": [
-        "#reydelacity"
+        "#reydelacity",
+        "#reydelacityy"
       ],
       "mariotaxi": [
-        "#mariotaxi"
+        "#mariotaxi",
+        "#taxi"
       ],
       "viviendoenlacalle": [
-        "#viviendoenlacalle"
-      ],
-      "franbeuve": [
-        "#franbeuve"
-      ],
-      "josenogales1": [
-        "#josenogales"
+        "#viviendoenlacalle",
+        "#yony"
       ]
     },
-    "maximo": 8
+    "maximo": 5,
+    "_nota": "Exactamente 5, como los canales de clips con traccion: 2 del creador, 2 del contexto de ESE clip y 1 generico. Los de contexto salen de los temas que se nombran en la transcripcion y son los que hacen que te encuentren. Llenarlo de #parati #fyp #clips no descubre a nadie: los pone todo el mundo.",
+    "_nota_etiquetas": "Las etiquetas de contexto salen del campo `etiquetas` de cada canal, no de `temas`: temas incluye verbos que detectan bien el gancho pero como hashtag no los busca nadie."
   },
   "cpu": {
     "una_tarea_pesada_a_la_vez": true,

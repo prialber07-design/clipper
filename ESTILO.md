@@ -57,6 +57,45 @@ Son dos piezas distintas y cumplen funciones distintas:
 - Descripción: *El Calvo se entera en directo de lo que opinan sus amigos sobre
   su vida amorosa · #elcalvolol #elcalvo #irl #clips #parati*
 
+## Los hashtags: exactamente 5, con estructura fija
+
+De 18 publicaciones analizadas, **todas llevan 5 hashtags**, siempre repartidos
+igual:
+
+```
+#elxokas #xokas   #ceuta #migracion   #viral
+└─ 2 del creador ─┘ └─ 2 del contexto ─┘ └ 1 genérico
+```
+
+Y **los del contexto cambian en cada clip**: `#italia`, `#pedrosanchez`,
+`#anuj`, `#clers`, `#bukele`, `#omarmontes`, `#geroarias`. Etiquetan a la gente
+y los temas que salen en *ese* clip concreto.
+
+| Hashtag | Veces en 18 clips |
+|---|---|
+| #viral | 17 |
+| #elxokas / #xokas | 13 cada uno |
+| #ceuta | 12 |
+| #migracion | 8 |
+| #salseo | 6 |
+| El resto (nombres propios) | 1–3 cada uno |
+
+**Por qué funciona:** los del creador te ponen en su nicho, los de contexto te
+hacen aparecer cuando alguien busca ese tema, y el genérico da alcance. Llenar
+la descripción de `#parati #fyp #clips #shorts` no descubre a nada: los pone
+todo el mundo, así que no distinguen.
+
+### Cómo lo hace el sistema
+
+Cada canal tiene dos listas separadas en `config.json`:
+
+- **`temas`** — para puntuar el gancho. Incluye verbos (`colar`, `ligar`) que
+  detectan bien el momento.
+- **`etiquetas`** — solo nombres propios, eventos y lugares. Un hashtag lo
+  busca gente: `#ibai` sí, `#colar` no.
+
+Los de contexto se sacan de `etiquetas` cruzando con lo que se dice en el clip.
+
 ## Lo que NO hay que hacer
 
 - **Copiar una frase literal del directo.** Suena a transcripción, no a título.

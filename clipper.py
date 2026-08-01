@@ -588,17 +588,37 @@ def cmd_rejilla(args):
     print(f"     cam_rect = [x, y, ancho, alto] en pixeles del original.")
 
 
-def hashtags_para(canal: str, extra=None) -> list:
-    """Etiquetas del canal + las generales, sin repetir y en orden estable."""
+def hashtags_para(canal: str, extra=None, texto: str = "") -> list:
+    """Etiquetas del clip, no del canal.
+
+    Los canales de clips con traccion usan exactamente 5, siempre con la misma
+    estructura: 2 del creador, 2 del contexto de ESE clip y 1 generico. Los del
+    contexto son los que hacen que te encuentren; llenarlo de #viral #parati
+    #fyp no descubre a nadie porque los pone todo el mundo.
+    """
     h = CONFIG.get("hashtags", {})
+    tope = int(h.get("maximo", 5))
+    canal_tags = (h.get("por_canal") or {}).get(canal, [])[:2]
+
+    # Contexto: lo que se nombra en el clip. Se usa `etiquetas`, no `temas`:
+    # los temas incluyen verbos ("colar", "ligar") que detectan bien el gancho
+    # pero como hashtag no los busca nadie. Aqui solo van nombres y eventos.
+    contexto = list(extra or [])
+    if texto:
+        bajo = texto.lower()
+        ficha = next((c for c in CONFIG.get("canales", []) if c.get("canal") == canal), {})
+        for t in ficha.get("etiquetas", []):
+            if t.lower() in bajo:
+                contexto.append(re.sub(r"[^\wáéíóúñ]", "", t.lower()))
+
     salida, vistos = [], set()
-    for grupo in ((h.get("por_canal") or {}).get(canal, []), extra or [], h.get("base", [])):
+    for grupo in (canal_tags, contexto, h.get("base", [])):
         for t in grupo:
-            t = t if t.startswith("#") else f"#{t}"
-            if t.lower() not in vistos:
+            t = t if str(t).startswith("#") else f"#{t}"
+            if t.lower() not in vistos and len(t) > 2:
                 vistos.add(t.lower())
                 salida.append(t)
-    return salida[:int(h.get("maximo", 8))]
+    return salida[:tope]
 
 
 def _ficha_texto(slug: str, c: dict) -> str:
