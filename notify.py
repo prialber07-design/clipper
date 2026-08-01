@@ -135,11 +135,12 @@ def registrar_listo(mp4: Path, meta: dict) -> Path:
     with INDEX_CSV.open("a", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         if nuevo:
-            w.writerow(["n", "fecha", "canal", "archivo", "duracion_s", "motivo",
-                        "gancho", "subido"])
+            w.writerow(["n", "fecha", "canal", "archivo", "duracion_s", "slug",
+                        "motivo", "gancho", "subido"])
         w.writerow([f"{meta.get('n', 0):03d}", f"{ts:%Y-%m-%d %H:%M:%S}",
                     meta.get("canal", ""), destino.name, meta.get("duracion", ""),
-                    meta.get("motivo", ""), meta.get("hook", ""), "NO"])
+                    meta.get("slug", meta.get("motivo", "")), meta.get("motivo", ""),
+                    meta.get("hook", ""), "NO"])
 
     _regenerar_html()
     return destino

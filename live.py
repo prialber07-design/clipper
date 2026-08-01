@@ -486,7 +486,9 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
 
     mp4 = clipper.OUT / slug / f"{slug}-01.mp4"
     if mp4.exists():
-        meta = {"canal": canal, "motivo": motivo, "hook": clip["hook"],
+        # El slug enlaza el clip publicado con su material en work/: sin el no
+        # hay forma de volver al original para reescribir el gancho.
+        meta = {"canal": canal, "slug": slug, "motivo": motivo, "hook": clip["hook"],
                 "duracion": round(clip["end"] - clip["start"])}
         apto, fallos = calidad.evaluar(mp4, clip, segs, limites=(dur["min"], dur["max"]))
         if apto:
