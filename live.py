@@ -16,6 +16,7 @@ plantilla: extrae, no inventa. Revisalo antes de publicar.
 """
 
 import argparse
+import asyncio
 import collections
 import json
 import math
@@ -35,9 +36,11 @@ import calidad
 import clipper
 import notify
 from clipper import CONFIG, DATA, FFMPEG, ROOT, WORK
+from registro import obtener
 
 LIVE = CONFIG["live"]
 BUF = Path(os.environ.get("CLIPPER_BUFFER_DIR", str(DATA / "buffer")))
+LOG = obtener("live")
 
 
 def aplicar_ajustes_canal(canal: str):
@@ -53,7 +56,7 @@ def aplicar_ajustes_canal(canal: str):
         rc.setdefault("reaccion", {})["cam_rect"] = ficha["cam_rect"]
     # Cualquier ajuste de render puede fijarse por canal, no solo el montaje.
     rc.update(ficha.get("render") or {})
-    print(f"[>] Montaje '{rc['layout']}' para {canal}")
+    LOG.info("Montaje canal=%s layout=%s", canal, rc["layout"])
 
 
 def recargar():
@@ -75,14 +78,21 @@ def canal_url(canal: str, plataforma: str) -> str:
     return f"https://kick.com/{canal}" if plataforma == "kick" else f"https://www.twitch.tv/{canal}"
 
 
-def esta_en_directo(url: str) -> bool:
+def estado_directo(url: str) -> tuple[bool, str | None]:
     proc = subprocess.run([sys.executable, "-m", "streamlink", "--json", url],
                           capture_output=True, text=True, encoding="utf-8", errors="replace")
     try:
         data = json.loads(proc.stdout or "{}")
-    except json.JSONDecodeError:
-        return False
-    return bool(data.get("streams"))
+    except json.JSONDecodeError as e:
+        detalle = (proc.stderr or proc.stdout or "sin detalle").strip().splitlines()
+        return False, f"streamlink exit={proc.returncode}: {detalle[-1][:200]}"
+    return bool(data.get("streams")), None
+
+
+def esta_en_directo(url: str) -> bool:
+    """Compatibilidad para llamadas externas; el vigilante usa estado_directo."""
+    online, _ = estado_directo(url)
+    return online
 
 
 # --- captura a buffer rodante -------------------------------------------------
@@ -117,6 +127,10 @@ class Captura:
              "-reset_timestamps", "1", str(self.destino / "%06d.ts")],
             stdin=self.sl.stdout, stderr=subprocess.DEVNULL, **self._grupo)
         self.sl.stdout.close()
+        time.sleep(0.5)
+        if self.sl.poll() is not None or self.ff.poll() is not None:
+            self.parar()
+            raise RuntimeError("streamlink/ffmpeg terminó al iniciar la captura")
         self.t0 = time.time()
 
     def vivo(self) -> bool:
@@ -184,14 +198,18 @@ class ChatTwitch(threading.Thread):
     def __init__(self, canal: str, eventos: queue.Queue):
         super().__init__()
         self.canal, self.eventos, self.parar_flag = canal.lower(), eventos, threading.Event()
+        self.conectado = threading.Event()
 
     def run(self):
         while not self.parar_flag.is_set():
+            s = None
             try:
                 s = socket.create_connection(("irc.chat.twitch.tv", 6667), timeout=20)
                 s.settimeout(1.0)
                 s.send(f"NICK justinfan{int(time.time()) % 100000}\r\n".encode())
                 s.send(f"JOIN #{self.canal}\r\n".encode())
+                self.conectado.set()
+                LOG.info("Chat Twitch conectado canal=%s", self.canal)
                 resto = ""
                 while not self.parar_flag.is_set():
                     try:
@@ -209,9 +227,18 @@ class ChatTwitch(threading.Thread):
                             m = RE_PRIVMSG.match(ln)
                             texto = m.group(1) if m else ""
                             self.eventos.put((time.time(), peso_mensaje(texto), texto))
-                s.close()
-            except OSError:
-                time.sleep(5)
+            except OSError as e:
+                if not self.parar_flag.is_set():
+                    LOG.warning("Chat Twitch no disponible canal=%s (%s); reintento en 5s",
+                                self.canal, e)
+            finally:
+                if self.conectado.is_set():
+                    LOG.warning("Chat Twitch desconectado canal=%s", self.canal)
+                self.conectado.clear()
+                if s:
+                    s.close()
+                if not self.parar_flag.is_set():
+                    self.parar_flag.wait(5)
 
 
 # --- energia de audio por segmento --------------------------------------------
@@ -381,7 +408,7 @@ def gancho_automatico(segs, t_pico: float, chat=None) -> str:
     # escribe a mano, en vez de publicar algo vago como "¿Y tú sabes por qué?".
     minimo = float(CONFIG.get("calidad", {}).get("gancho_puntuacion_minima", 3))
     if punt < minimo:
-        print(f"[.] Mejor gancho posible demasiado flojo ({punt:.1f}): {mejor[:50]}")
+        LOG.info("Gancho descartado por puntuación baja puntuacion=%.1f texto=%r", punt, mejor[:50])
         return ""
     return mejor
 
@@ -390,7 +417,7 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
     recargar()  # coge los ajustes de config.json sin reiniciar
     aplicar_ajustes_canal(canal)
     slug = f"{canal}-{time.strftime('%H%M%S')}"
-    print(f"\n[!] PICO ({motivo}) en t={t_video:.0f}s -> {slug}")
+    LOG.info("Pico detectado canal=%s motivo=%s t_video=%.0fs job=%s", canal, motivo, t_video, slug)
     t_ini = time.time()
 
     modo, dur = elegir_duracion(canal)
@@ -398,7 +425,8 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
     rc["duracion_min_s"], rc["duracion_max_s"] = dur["min"], dur["max"]
     # Un clip largo necesita mas margen hacia atras del que trae la ventana corta.
     antes = LIVE["ventana_antes_s"] if modo == "corto" else LIVE.get("ventana_antes_largo_s", 115)
-    print(f"[>] Clip {modo} ({dur['min']}-{dur['max']}s), ventana de {antes:.0f}s hacia atras")
+    LOG.info("Ventana preparada job=%s modo=%s rango=%s-%ss antes=%.0fs",
+             slug, modo, dur["min"], dur["max"], antes)
 
     _, t_pico = montar_ventana(cap, t_video, slug, antes=antes)
 
@@ -412,7 +440,7 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
     datos = json.loads((d / "transcript.json").read_text(encoding="utf-8"))
     segs = datos["segments"]
     if not segs:
-        print("[x] Sin voz detectada, descarto")
+        LOG.warning("Job descartado job=%s motivo=sin_voz", slug)
         return
 
     # El clip se centra en el pico: termina justo despues de la reaccion y
@@ -428,8 +456,8 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
     # ahorra el render entero (y la GPU) en vez de fabricar algo que el filtro
     # de calidad va a tirar de todas formas.
     if fin - ini < rc["duracion_min_s"]:
-        print(f"[x] Solo {fin - ini:.0f}s de dialogo aprovechable "
-              f"(minimo {rc['duracion_min_s']}s), descarto sin renderizar")
+        LOG.warning("Job descartado job=%s motivo=dialogo_insuficiente disponible=%.0fs minimo=%ss",
+                    slug, fin - ini, rc["duracion_min_s"])
         return
 
     dentro = [s for s in segs if ini <= s["start"] < fin]
@@ -460,38 +488,57 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
         apto, fallos = calidad.evaluar(mp4, clip, segs, limites=(dur["min"], dur["max"]))
         if apto:
             destino = notify.publicar(mp4, meta)
-            print(f"[ok] bandeja: {destino}")
+            resultado = "listo"
+            LOG.info("Job terminado job=%s estado=listo archivo=%s", slug, destino)
         else:
             destino = calidad.apartar(mp4, fallos, meta)
-            print(f"[!] NO publicado. Motivos: {'; '.join(fallos)}")
-            print(f"    apartado en {destino}")
-    print(f"[ok] {slug} listo en {time.time()-t_ini:.0f}s desde el pico")
-    print(f"     gancho: {clip['hook']}")
+            resultado = "revisar"
+            LOG.warning("Job terminado job=%s estado=revisar motivos=%s archivo=%s",
+                        slug, "; ".join(fallos), destino)
+    else:
+        resultado = "sin_archivo"
+        LOG.error("Job terminado job=%s estado=sin_archivo; render no produjo %s", slug, mp4)
+    LOG.info("Procesamiento finalizado job=%s estado=%s duracion_proceso=%.0fs gancho=%r",
+             slug, resultado, time.time() - t_ini, clip["hook"])
 
 
 # --- bucle principal ----------------------------------------------------------
 
 def cmd_watch(args):
     url = canal_url(args.canal, args.plataforma)
-    print(f"[>] Vigilando {url} (Ctrl+C para parar)")
+    LOG.info("Vigilante iniciado canal=%s plataforma=%s url=%s", args.canal, args.plataforma, url)
 
     while True:
-        if not esta_en_directo(url):
-            print(f"\r[.] offline, reintento en {LIVE['poll_online_s']}s   ", end="", flush=True)
+        online, error = estado_directo(url)
+        if not online:
+            if error:
+                LOG.warning("Comprobación fallida canal=%s plataforma=%s (%s); reintento en %ss",
+                            args.canal, args.plataforma, error, LIVE["poll_online_s"])
+            else:
+                LOG.info("Estado canal=%s plataforma=%s estado=offline siguiente_comprobacion=%ss",
+                         args.canal, args.plataforma, LIVE["poll_online_s"])
             time.sleep(LIVE["poll_online_s"])
             continue
 
-        print(f"\n[>] EN DIRECTO. Arrancando captura.")
-        notify.avisar_inicio_directo(args.canal, args.plataforma, url)
+        LOG.info("Directo detectado canal=%s plataforma=%s url=%s", args.canal, args.plataforma, url)
         cap = Captura(url, BUF / args.canal)
-        cap.arrancar()
+        try:
+            cap.arrancar()
+        except Exception:
+            LOG.exception("Captura no iniciada canal=%s", args.canal)
+            time.sleep(LIVE["poll_online_s"])
+            continue
+        LOG.info("Captura iniciada canal=%s buffer=%s", args.canal, BUF / args.canal)
+        notify.avisar_inicio_directo(args.canal, args.plataforma, url)
 
         eventos = queue.Queue()
         chat = None
         if args.plataforma == "twitch" and not args.solo_audio:
             chat = ChatTwitch(args.canal, eventos)
             chat.start()
-            print("[>] Chat IRC Twitch conectado")
+            if not chat.conectado.wait(5):
+                LOG.warning("Chat Twitch no confirmado canal=%s; la captura continúa sin chat por ahora",
+                            args.canal)
         elif args.plataforma == "kick" and not args.solo_audio:
             import kick
             class ChatKickThread(threading.Thread):
@@ -499,13 +546,17 @@ def cmd_watch(args):
                 def __init__(self, canal: str, data_dir: Path, queue_eventos: queue.Queue):
                     super().__init__()
                     self.canal, self.data_dir, self.queue_eventos = canal, data_dir, queue_eventos
+                    self.parar_flag = threading.Event()
+                    self.conectado = threading.Event()
                 def run(self):
                     listener = kick.KickChatListener(self.canal, self.data_dir)
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     async def poll():
                         await listener.start()
-                        while True:
+                        self.conectado.set()
+                        LOG.info("Chat Kick conectado canal=%s", self.canal)
+                        while not self.parar_flag.is_set():
                             await asyncio.sleep(2)
                             c = listener.poll_and_reset()
                             if c > 0:
@@ -514,15 +565,22 @@ def cmd_watch(args):
                     try:
                         loop.run_until_complete(poll())
                     except Exception:
-                        pass
+                        LOG.exception("Chat Kick no disponible canal=%s", self.canal)
+                    finally:
+                        self.conectado.clear()
+                        loop.close()
             chat_kick = ChatKickThread(args.canal, DATA, eventos)
+            chat = chat_kick
             chat_kick.start()
-            print("[>] Chat WebSocket Kick conectado")
+            if not chat_kick.conectado.wait(5):
+                LOG.warning("Chat Kick no confirmado canal=%s; la captura continúa sin chat por ahora",
+                            args.canal)
         else:
-            print("[>] Solo audio (sin lectura de chat)")
+            LOG.info("Captura en modo solo_audio canal=%s", args.canal)
 
         hist_chat, hist_audio = collections.deque(maxlen=40), collections.deque(maxlen=40)
         marcas, vistos, ultimo_clip = [], set(), 0.0
+        ultimo_estado_log = 0.0
 
         try:
             while cap.vivo():
@@ -550,9 +608,14 @@ def cmd_watch(args):
                         z_audio = zscore(r, hist_audio)
                         hist_audio.append(r)
 
-                print(f"\r[.] {transcurrido/60:5.1f} min | {n_msgs:3d} msg | reaccion {reaccion:4d} "
-                      f"(z {z_chat:+.1f}) | 'clip' x{n_clip} | audio z {z_audio:+.1f}   ",
-                      end="", flush=True)
+                estado = (f"Captura canal={args.canal} transcurrido_min={transcurrido / 60:.1f} "
+                          f"mensajes={n_msgs} reaccion={reaccion} z_chat={z_chat:+.1f} "
+                          f"peticiones_clip={n_clip} z_audio={z_audio:+.1f}")
+                if sys.stdout.isatty():
+                    print("\r" + estado, end="", flush=True)
+                elif ahora - ultimo_estado_log >= 60:
+                    LOG.info(estado)
+                    ultimo_estado_log = ahora
 
                 # Que dos o mas espectadores pidan clip a la vez dispara solo:
                 # es la señal mas fiable que existe y no necesita linea base.
@@ -572,12 +635,12 @@ def cmd_watch(args):
                     try:
                         procesar(cap, t_video, args.canal, motivo, args.device,
                                  chat=chat_pico)
-                    except Exception as e:
-                        print(f"\n[x] Fallo procesando: {e}")
+                    except Exception:
+                        LOG.exception("Fallo procesando canal=%s motivo=%s", args.canal, motivo)
 
                 cap.podar()
         except KeyboardInterrupt:
-            print("\n[>] Parando.")
+            LOG.info("Parando vigilante canal=%s", args.canal)
             cap.parar()
             if chat:
                 chat.parar_flag.set()
@@ -587,7 +650,7 @@ def cmd_watch(args):
             if chat:
                 chat.parar_flag.set()
 
-        print("\n[>] Directo terminado.")
+        LOG.info("Directo terminado canal=%s", args.canal)
 
 
 class BufferExistente:
@@ -613,7 +676,8 @@ def cmd_now(args):
 
     seg = LIVE["segmento_s"]
     ultimo = int(segs[-1].stem)
-    print(f"[>] Buffer: {len(segs)} segmentos (~{len(segs)*seg/60:.1f} min)")
+    LOG.info("Buffer existente canal=%s segmentos=%d duracion_aprox_min=%.1f",
+             args.canal, len(segs), len(segs) * seg / 60)
 
     if args.en is not None:
         t_video = args.en

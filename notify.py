@@ -21,6 +21,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 import clipper
+from registro import obtener
 
 ROOT = clipper.ROOT
 LISTOS = clipper.OUT / "LISTOS"
@@ -31,6 +32,7 @@ NOTIF = CONFIG.get("notificaciones", {})
 
 
 CONTADOR = LISTOS / ".contador"
+LOG = obtener("notify")
 
 
 def _siguiente_numero() -> int:
@@ -60,9 +62,9 @@ def _sincronizar(destino: Path, txt: Path | None):
         shutil.copy2(destino, carpeta / destino.name)
         if txt and txt.exists():
             shutil.copy2(txt, carpeta / txt.name)
-        print(f"[>] Sincronizado a {carpeta}")
+        LOG.info("Clip sincronizado carpeta=%s archivo=%s", carpeta, destino.name)
     except OSError as e:
-        print(f"[!] No se pudo sincronizar ({e}). El clip esta en out/LISTOS igual.")
+        LOG.warning("No se pudo sincronizar carpeta=%s (%s); el clip sigue en LISTOS", carpeta, e)
 
 
 def registrar_listo(mp4: Path, meta: dict) -> Path:
@@ -169,11 +171,11 @@ def _preparar_adjunto(mp4: Path) -> Path | None:
     # 8% de margen para el contenedor y el audio
     bitrate = int((limite * 8 * 0.92) / segundos) - 128_000
     if bitrate < 600_000:
-        print(f"[!] No cabe en {limite/1024/1024:.0f}MB con calidad publicable. "
-              f"Aviso solo con texto; el video va por la carpeta sincronizada.")
+        LOG.warning("El adjunto no cabe en %.0fMB con calidad publicable; aviso solo con texto",
+                    limite / 1024 / 1024)
         return None
 
-    print(f"[>] Clip de {mp4.stat().st_size/1024/1024:.1f}MB: recomprimo para el movil")
+    LOG.info("Recomprimiendo adjunto para móvil tamaño_mb=%.1f", mp4.stat().st_size / 1024 / 1024)
     try:
         clipper.run([clipper.FFMPEG, "-y", "-hide_banner", "-loglevel", "error", "-i", str(mp4),
                      "-c:v", "libx264", "-preset", "veryfast",
@@ -199,9 +201,11 @@ def avisar(titulo: str, mensaje: str, adjunto: Path | None = None,
            enlace: str | None = None):
     """Manda el aviso a ntfy. Nunca revienta el pipeline si falla la red."""
     if not NOTIF.get("activo"):
+        LOG.info("Aviso ntfy omitido titulo=%s motivo=desactivado", titulo)
         return
     topic = NOTIF.get("ntfy_topic", "").strip()
     if not topic:
+        LOG.warning("Aviso ntfy no enviado titulo=%s motivo=topic_vacio", titulo)
         return
 
     url = f"https://ntfy.sh/{topic}"
@@ -229,9 +233,9 @@ def avisar(titulo: str, mensaje: str, adjunto: Path | None = None,
                                      headers={k: v for k, v in cabeceras.items()},
                                      method="POST")
         urllib.request.urlopen(req, timeout=15)
-        print("[>] Aviso enviado al movil")
+        LOG.info("Aviso ntfy enviado titulo=%s adjunto=%s", titulo, envio.name if envio else "no")
     except (urllib.error.URLError, OSError) as e:
-        print(f"[!] No se pudo avisar al movil ({e}). El clip esta guardado igual.")
+        LOG.warning("No se pudo enviar aviso ntfy (%s); el clip sigue guardado", e)
 
 
 def publicar(mp4: Path, meta: dict) -> Path:
@@ -240,13 +244,8 @@ def publicar(mp4: Path, meta: dict) -> Path:
     dur = meta.get("duracion", "?")
     canal = meta.get("canal", "desconocido")
 
-    print("\n" + "=" * 60, flush=True)
-    print(f"🎬 [NUEVO CLIP GENERADO - LISTO]", flush=True)
-    print(f"   👤 Streamer : {canal}", flush=True)
-    print(f"   📁 Archivo  : {destino.name}", flush=True)
-    print(f"   ⏱️  Duración : {dur} segundos", flush=True)
-    print(f"   📌 Gancho   : {gancho}", flush=True)
-    print("=" * 60 + "\n", flush=True)
+    LOG.info("Clip listo canal=%s archivo=%s duracion_s=%s gancho=%r",
+             canal, destino.name, dur, gancho)
 
     aviso = f"{gancho}\n\n{dur}s"
     if isinstance(dur, int):

@@ -14,10 +14,15 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
+from registro import obtener
+
 if os.name == "nt":
     import msvcrt
 else:
     import fcntl
+
+
+LOG = obtener("bloqueo")
 
 
 @contextmanager
@@ -38,11 +43,12 @@ def exclusivo(ruta: Path, etiqueta: str = "", aviso_tras: float = 5.0):
                 break
             except OSError:
                 if not avisado and time.time() - inicio > aviso_tras:
-                    print(f"[.] Esperando turno de CPU{' para ' + etiqueta if etiqueta else ''}...")
+                    LOG.info("Esperando turno de CPU%s...",
+                             f" para {etiqueta}" if etiqueta else "")
                     avisado = True
                 time.sleep(0.5)
         if avisado:
-            print(f"[.] Turno conseguido tras {time.time() - inicio:.0f}s")
+            LOG.info("Turno conseguido tras %.0fs", time.time() - inicio)
         yield
     finally:
         try:
