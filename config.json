@@ -311,7 +311,7 @@
     "color_resaltado": "&H0000FFFF&",
     "escala_palabra_activa": 112,
     "hook_y": 520,
-    "hook_size": 58,
+    "hook_size": 60,
     "hook_persistente": true,
     "hook_duracion_s": 3.0,
     "_nota": "layout completo: el video entra entero, sin recortar nada. El bloque gancho-video-subtitulos queda centrado en la pantalla y por encima de la interfaz de TikTok/Reels. 'zoom' amplia y recorta los lados; 'crop' recorta a saco.",
@@ -325,7 +325,12 @@
     "silencio_corta_bloque_s": 0.6,
     "sub_max_hold_s": 0.4,
     "emoji_gancho": true,
-    "_nota_emoji": "Un emoji al final del gancho solo si el contexto lo pide (gol, susto, dinero, ligoteo...). libass los dibuja en MONOCROMO, no a color: quedan como iconos blancos integrados con la tipografia. Ponlo a false para quitarlos."
+    "_nota_emoji": "Un emoji al final del gancho solo si el contexto lo pide (gol, susto, dinero, ligoteo...). libass los dibuja en MONOCROMO, no a color: quedan como iconos blancos integrados con la tipografia. Ponlo a false para quitarlos.",
+    "hook_fuente": "Franklin Gothic Medium",
+    "hook_titulo": true,
+    "marca_fuente": "Corbel",
+    "marca_bajo_gancho": true,
+    "_nota_gancho": "Estilo tomado de los canales de clips: caja blanca con texto negro y capitalizacion de titulo, no mayusculas. Sobre metraje de directo, oscuro y ruidoso, un bloque blanco destaca mas. La marca va justo debajo para formar un solo bloque."
   },
   "notificaciones": {
     "activo": true,

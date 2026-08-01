@@ -317,6 +317,12 @@ def _ts(t: float) -> str:
     return f"{int(h)}:{int(m):02d}:{s:05.2f}"
 
 
+def _titulo(txt: str) -> str:
+    """Capitaliza cada palabra. `str.title()` no vale: rompe las contracciones
+    y los acentos ("D'Or", "AÑo")."""
+    return " ".join(p[:1].upper() + p[1:] if p else p for p in txt.split(" "))
+
+
 def _partir_hook(txt: str, max_linea: int = 22) -> str:
     """Reparte el gancho en lineas cortas: en movil una linea larga no se lee de un vistazo."""
     lineas, actual = [], ""
@@ -346,8 +352,8 @@ ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Sub,Arial Black,{rc['sub_size']},&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,7,4,5,40,40,40,1
-Style: Hook,Arial Black,{rc['hook_size']},&H00FFFFFF,&H00FFFFFF,&H00000000,&HC8000000,0,0,0,0,100,100,0,0,3,6,0,5,50,50,50,1
-Style: Marca,Arial Black,{rc.get('marca_size', 40)},&H0060C0FF,&H0060C0FF,&H00000000,&H00000000,0,1,0,0,100,100,0,0,1,3,0,5,40,40,40,1
+Style: Hook,{rc.get('hook_fuente', 'Franklin Gothic Medium')},{rc['hook_size']},&H00101010,&H00101010,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,14,0,5,60,60,60,1
+Style: Marca,{rc.get('marca_fuente', 'Corbel')},{rc.get('marca_size', 40)},&H004FA8E8,&H004FA8E8,&H00202020,&H00000000,-1,1,0,0,100,100,0,0,1,3,0,5,40,40,40,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -355,8 +361,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     ev = []
 
     hook = clip.get("hook", "").strip()
+    lineas_hook = 0
     if hook and not hook.startswith("ESCRIBE"):
-        txt = _partir_hook(hook.upper())
+        # Capitalizacion de titulo, no mayusculas: el todo-alta grita, y el
+        # titulo se lee como una noticia. Es lo que hacen los canales de clips.
+        txt = _partir_hook(_titulo(hook) if rc.get("hook_titulo", True) else hook.upper())
+        lineas_hook = txt.count(r"\N") + 1
         # Persistente: el gancho es lo que sostiene la retencion, no solo el arranque.
         fin_hook = (end - start) if rc.get("hook_persistente") else rc["hook_duracion_s"]
         ev.append(f"Dialogue: 1,{_ts(0)},{_ts(fin_hook)},Hook,,0,0,0,,"
@@ -364,8 +374,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     marca = (rc.get("marca") or "").strip()
     if marca:
+        # Justo debajo del gancho forman un bloque; suelta por ahi parece un
+        # elemento mas del montaje.
+        if lineas_hook and rc.get("marca_bajo_gancho", True):
+            alto = rc["hook_size"] * 1.25
+            marca_y = int(rc["hook_y"] + (lineas_hook * alto) / 2 + rc.get("marca_size", 40))
+        else:
+            marca_y = rc.get("marca_y", 1560)
         ev.append(f"Dialogue: 1,{_ts(0)},{_ts(end - start)},Marca,,0,0,0,,"
-                  f"{{\\pos(540,{rc.get('marca_y', 1560)})\\alpha&H40&}}{marca}")
+                  f"{{\\pos(540,{marca_y})}}{marca}")
 
     inside = [w for w in words if w["start"] >= start - 0.05 and w["end"] <= end + 0.05]
     per = rc["palabras_por_bloque"]
