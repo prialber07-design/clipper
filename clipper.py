@@ -602,21 +602,27 @@ def hashtags_para(canal: str, extra=None) -> list:
 
 
 def _ficha_texto(slug: str, c: dict) -> str:
-    """Lo que copias y pegas al subir: titulo, descripcion y etiquetas."""
+    """Lo que copias y pegas al subir.
+
+    El gancho de pantalla y la descripcion son piezas distintas: el gancho gana
+    los 3 primeros segundos, la descripcion te encuentra en la busqueda. Ver
+    ESTILO.md.
+    """
     canal = re.split(r"-\d{6}$", slug)[0]
     hook = (c.get("hook") or "").strip()
-    titulo = hook if hook and not hook.startswith("ESCRIBE") else c.get("title", "").strip()
+    desc = (c.get("descripcion") or "").strip()
     tags = " ".join(c.get("hashtags") or hashtags_para(canal))
     dur = c["end"] - c["start"]
+
+    if not desc:
+        desc = "(FALTA: escribe una descripcion distinta del gancho, "
+        desc += "con nombre propio y verbo con carga. Ver ESTILO.md)"
+
     return "\n".join([
-        "TITULO / PRIMERA LINEA",
-        titulo,
+        "DESCRIPCION PARA EL POST",
+        f"{desc}",
         "",
-        "HASHTAGS",
         tags,
-        "",
-        "DESCRIPCION SUGERIDA",
-        f"{titulo}\n\n{tags}",
         "",
         "---",
         f"gancho en pantalla: {hook}",

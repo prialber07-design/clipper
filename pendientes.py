@@ -37,13 +37,14 @@ def listar():
     print(f"\nMira el mosaico y luego:  python pendientes.py <slug> \"tu gancho\"")
 
 
-def resolver(slug: str, gancho: str):
+def resolver(slug: str, gancho: str, descripcion: str = ""):
     cj = clipper.WORK / slug / "clips.json"
     if not cj.exists():
         sys.exit(f"[x] No existe {cj}")
     datos = json.loads(cj.read_text(encoding="utf-8"))
     clip = datos["clips"][0]
     clip["hook"] = gancho
+    clip["descripcion"] = descripcion
     clip["hook_auto"] = False
     canal = re.split(r"-\d{6}$", slug)[0]
     clip["hashtags"] = clipper.hashtags_para(canal)
@@ -65,8 +66,12 @@ def main():
     if len(sys.argv) < 2:
         return listar()
     if len(sys.argv) < 3:
-        sys.exit('Uso: python pendientes.py <slug> "el gancho"')
-    resolver(sys.argv[1], sys.argv[2])
+        sys.exit('Uso: python pendientes.py <slug> "gancho" "descripcion"\n'
+                 'La descripcion NO puede ser el gancho repetido: ver ESTILO.md')
+    if len(sys.argv) < 4:
+        print("[!] Sin descripcion. Se publica igual, pero el .txt quedara "
+              "incompleto: la descripcion es lo que te encuentra en la busqueda.")
+    resolver(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "")
 
 
 if __name__ == "__main__":
