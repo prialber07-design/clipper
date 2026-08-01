@@ -43,6 +43,9 @@ def _titulo_para_archivo(hook: str | None, tope: int = 70) -> str:
     texto = (hook or "").strip()
     if not texto or texto.startswith("ESCRIBE"):
         return "sin-gancho"
+    # Los emojis se van del nombre del fichero: enredan al buscar y algunos
+    # sistemas de sincronizacion los rechazan. En el video si aparecen.
+    texto = re.sub("[\U0001F300-\U0001FAFF☀-➿⬀-⯿️]", "", texto)
     texto = re.sub(r'[<>:"/\\|?*¿¡,;.…]', "", texto)
     texto = re.sub(r"[\s_]+", "-", texto).strip("-.")
     texto = re.sub(r"-{2,}", "-", texto)

@@ -336,6 +336,38 @@ def montar_ventana(cap: Captura, t_video: float, slug: str, antes: float = None)
 
 FIN_DE_FRASE = re.compile(r"[.!?…]\s*$")
 
+# Un emoji al final del gancho, y solo si el contexto lo pide. El primero que
+# encaje gana: mas de uno satura y resta credibilidad al titular.
+EMOJIS = [
+    (r"\bgol(azo|es)?\b|\bpenal\b|\barbitro\b|\bmundial\b", "⚽"),
+    (r"\bsusto\b|\bmiedo\b|\bterror\b|\bvisage\b|\bzombie", "😱"),
+    (r"\beuros?\b|\bd[oó]lares\b|\bmill[oó]n\b|\bmil\b|\bpasta\b|\bgana\b", "💸"),
+    (r"\bbeso\b|\bnovia\b|\bamor\b|\bligar\b|\bcucharita\b|\biratxe\b", "❤️"),
+    (r"\bpelea\b|\bbronca\b|\bdenunci|\bexpulsan\b|\bharto\b", "😤"),
+    (r"\bpolic[ií]a\b|\bmulta\b|\bdetien|\batraco\b", "🚨"),
+    (r"\bca[ií]da\b|\bse cae\b|\btropieza\b|\bmuere\b|\bmatan\b", "💀"),
+    (r"\btaxi\b|\bvtc\b|\bcarrera\b|\bcoche\b|\bbici\b", "🚕"),
+    (r"\bincre[ií]ble\b|\bbrutal\b|\br[eé]cord\b|\bmejor\b|\bhist[oó]ric", "🔥"),
+]
+TIENE_EMOJI = re.compile(
+    "[\U0001F300-\U0001FAFF☀-➿⬀-⯿️]")
+
+
+def emoji_para(hook: str, tono: str = "neutro") -> str:
+    """Devuelve el gancho con un emoji si encaja, o tal cual si no."""
+    if not hook or TIENE_EMOJI.search(hook):
+        return hook
+    bajo = hook.lower()
+    for patron, emoji in EMOJIS:
+        if re.search(patron, bajo):
+            return f"{hook} {emoji}"
+    # Sin tema claro, el tono del chat todavia puede justificarlo.
+    if tono == "risa":
+        return f"{hook} 😂"
+    if tono == "sorpresa":
+        return f"{hook} 😮"
+    return hook
+
 
 def bordes_limpios(segs, t_pico: float, dur_min: float, dur_max: float,
                    despues: float) -> tuple:
@@ -556,6 +588,8 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
     dentro = [s for s in segs if ini <= s["start"] < fin]
     ficha = next((c for c in CONFIG.get("canales", []) if c.get("canal") == canal), {})
     gancho = gancho_automatico(dentro, t_pico, chat, ficha.get("temas"))
+    if gancho and CONFIG.get("render", {}).get("emoji_gancho", True):
+        gancho = emoji_para(gancho, tono_del_chat(list(chat or [])))
 
     # En un IRL el momento es visual y la transcripcion no da para gancho casi
     # nunca. En vez de tirar el clip, se guarda con su contact sheet para
