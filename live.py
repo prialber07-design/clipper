@@ -403,10 +403,9 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
     _, t_pico = montar_ventana(cap, t_video, slug, antes=antes)
 
     args = argparse.Namespace(slug=slug, n=1, device=device, func=None)
-    if CONFIG.get("cpu", {}).get("una_tarea_pesada_a_la_vez", True):
-        with bloqueo.exclusivo(DATA / ".cpu.lock", etiqueta=canal):
-            clipper.cmd_transcribe(args)
-    else:
+    # Una unica cola de Whisper entre todos los vigilantes del servidor.
+    # El modelo se cachea por proceso; el cerrojo evita inferencias solapadas.
+    with bloqueo.exclusivo(DATA / ".whisper.lock", etiqueta=f"transcripcion de {canal}"):
         clipper.cmd_transcribe(args)
 
     d = WORK / slug

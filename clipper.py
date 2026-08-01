@@ -178,17 +178,11 @@ def cmd_fetch(args):
 
 # --- 2. transcribe ------------------------------------------------------------
 
-def cmd_transcribe(args):
-    d = WORK / args.slug
-    audio = d / "audio.wav"
-    if not audio.exists():
-        sys.exit(f"[x] No existe {audio}. Ejecuta 'fetch' primero.")
-
-    from faster_whisper import WhisperModel
-
 _MODELO_CACHE = {}
 
 def get_whisper_model(modelo_name, device, compute_type):
+    from faster_whisper import WhisperModel
+
     key = (modelo_name, device, compute_type)
     if key not in _MODELO_CACHE:
         cpu_threads = int(os.environ.get("CLIPPER_CPU_THREADS", 8))
