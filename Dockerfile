@@ -38,6 +38,6 @@ ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # Sin vigilantes vivos el contenedor no sirve de nada: que el orquestador lo sepa.
 HEALTHCHECK --interval=2m --timeout=20s --start-period=90s --retries=3 \
-    CMD python servidor.py --estado | grep -q VIVO || exit 1
+    CMD python servidor.py --estado 2>&1 | grep -q "vigilante=activo" || exit 1
 
 CMD ["python", "servidor.py"]

@@ -231,8 +231,8 @@ def main():
                 for mp4 in listos_dir.glob("*.mp4"):
                     if mp4.name not in vistos_clips:
                         vistos_clips.add(mp4.name)
-                        partes = mp4.stem.split("_")
-                        canal = partes[1] if len(partes) >= 2 else "clip"
+                        partes = mp4.stem.rsplit("-", 2)
+                        canal = partes[0] if len(partes) == 3 else "desconocido"
                         LOG.info("Nuevo clip detectado estado=listo canal=%s archivo=%s galeria=disponible",
                                  canal, mp4.name)
 
@@ -242,8 +242,8 @@ def main():
                 for mp4 in revisar_dir.glob("*.mp4"):
                     if mp4.name not in vistos_revisar:
                         vistos_revisar.add(mp4.name)
-                        partes = mp4.stem.split("_")
-                        canal = partes[1] if len(partes) >= 2 else "clip"
+                        partes = mp4.stem.rsplit("-", 2)
+                        canal = partes[0] if len(partes) == 3 else "desconocido"
                         LOG.warning("Nuevo clip detectado estado=revisar canal=%s archivo=%s",
                                     canal, mp4.name)
 
