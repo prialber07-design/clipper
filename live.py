@@ -37,7 +37,7 @@ import notify
 from clipper import CONFIG, DATA, FFMPEG, ROOT, WORK
 
 LIVE = CONFIG["live"]
-BUF = Path("/dev/shm/clipper_buffer") if Path("/dev/shm").exists() else (DATA / "buffer")
+BUF = Path(os.environ.get("CLIPPER_BUFFER_DIR", str(DATA / "buffer")))
 
 
 def aplicar_ajustes_canal(canal: str):
