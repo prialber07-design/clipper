@@ -1,5 +1,8 @@
 # Sincronización automática de clips en Windows
 
+> Sustituido por `2026-08-02-editorial-y-entrega-v2-design.md`. La versión V2
+> descarga únicamente LISTOS y entrega MP4+TXT directamente en la carpeta elegida.
+
 ## Objetivo
 
 Entregar a otro usuario un paquete pequeño que instale, sin Python ni dependencias externas, una sincronización de todos los clips de `LISTOS` y `REVISAR` desde Clipper hacia una carpeta elegida por él. Windows ejecutará la sincronización cada diez minutos.
