@@ -1,444 +1,446 @@
 {
-  "_nota": "permiso_clips: PENDIENTE hasta que verifiques su politica oficial de clips. No monetices ningun canal marcado PENDIENTE. Handles resueltos y verificados contra la API de Kick el 2026-07-31.",
-  "canales": [
-    {
-      "nombre": "Davoo Xeneize",
-      "plataforma": "kick",
-      "canal": "davooxeneize",
-      "seguidores": 2030263,
-      "verificado": true,
-      "detector": "solo_audio",
-      "permiso_clips": "PENDIENTE",
-      "layout": "reaccion",
-      "temas": [
-        "boca",
-        "river",
-        "gol",
-        "penal",
-        "arbitro",
-        "robo",
-        "mundial",
-        "argentina",
-        "cobra",
-        "messi",
-        "sevilla",
-        "españa",
-        "aguinaldo",
-        "leo"
-      ],
-      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
-    },
-    {
-      "nombre": "La Cobra",
-      "plataforma": "kick",
-      "canal": "lacobraaa",
-      "seguidores": 1830408,
-      "verificado": true,
-      "detector": "solo_audio",
-      "permiso_clips": "PENDIENTE",
-      "layout": "reaccion",
-      "temas": [
-        "gol",
-        "golazo",
-        "argentina",
-        "mundial",
-        "boca",
-        "penal",
-        "arbitro",
-        "davo",
-        "davoo",
-        "seleccion",
-        "cabo verde",
-        "enzo",
-        "inglaterra",
-        "eliminatoria",
-        "partido"
-      ],
-      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
-    },
-    {
-      "nombre": "RdJavi",
-      "plataforma": "kick",
-      "canal": "rdjavi",
-      "seguidores": 967634,
-      "verificado": true,
-      "detector": "solo_audio",
-      "permiso_clips": "PENDIENTE",
-      "layout": "reaccion",
-      "temas": [
-        "gta",
-        "susto",
-        "policia",
-        "carro",
-        "damian",
-        "muerto",
-        "atraco",
-        "persecucion",
-        "rol",
-        "detonacion",
-        "hueso",
-        "banco"
-      ],
-      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
-    },
-    {
-      "nombre": "Rey de la city",
-      "plataforma": "kick",
-      "canal": "reydelacity",
-      "seguidores": 158772,
-      "verificado": true,
-      "detector": "solo_audio",
-      "permiso_clips": "PENDIENTE",
-      "layout": "irl",
-      "temas": [
-        "samuel",
-        "sami",
-        "zombies",
-        "partida",
-        "foto",
-        "chat"
-      ]
-    },
-    {
-      "nombre": "Mario Taxi",
-      "plataforma": "twitch",
-      "canal": "mariotaxi",
-      "seguidores": null,
-      "verificado": true,
-      "detector": "reaccion",
-      "permiso_clips": "PENDIENTE",
-      "layout": "irl",
-      "temas": [
-        "vtc",
-        "taxi",
-        "cliente",
-        "carrera",
-        "bici",
-        "semaforo",
-        "multa",
-        "trafico",
-        "visage"
-      ],
-      "fuente": "Emite en twitch.tv/mariotaxi. El handle de Kick existe (6.030 seguidores) pero esta inactivo: resolverlo por existencia del handle fue un error."
-    },
-    {
-      "nombre": "Viviendo en la calle",
-      "plataforma": "kick",
-      "canal": "viviendoenlacalle",
-      "seguidores": 5280,
-      "verificado": true,
-      "detector": "solo_audio",
-      "permiso_clips": "PENDIENTE",
-      "layout": "irl",
-      "temas": [
-        "yony",
-        "calle",
-        "furgoneta",
-        "citroen",
-        "caida",
-        "policia"
-      ]
-    },
-    {
-      "nombre": "Lopezfnx",
-      "plataforma": "twitch",
-      "canal": "lopezfnx",
-      "verificado": true,
-      "detector": "reaccion",
-      "permiso_clips": "PENDIENTE",
-      "seguidores": null,
-      "fuente": "URL facilitada por el usuario, existencia verificada en twitch.tv",
-      "layout": "reaccion",
-      "temas": [
-        "iratxe",
-        "gael",
-        "cucharita",
-        "beso",
-        "mirada",
-        "amor",
-        "novia",
-        "pareja",
-        "tension",
-        "serie",
-        "roblox",
-        "barcelona",
-        "share",
-        "calvo"
-      ],
-      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
-    },
-    {
-      "nombre": "El Calvo",
-      "plataforma": "twitch",
-      "canal": "elcalvolol",
-      "verificado": true,
-      "detector": "reaccion",
-      "permiso_clips": "PENDIENTE",
-      "seguidores": null,
-      "fuente": "URL facilitada por el usuario, existencia verificada en twitch.tv",
-      "layout": "irl",
-      "render": {
-        "silencio_corta_bloque_s": 0.6,
-        "sub_max_hold_s": 0.4
-      },
-      "_nota_render": "sin subtitulos mientras nadie habla: el bloque se corta si hay mas de 0.6s de pausa y ninguna palabra se sostiene mas de 0.4s tras pronunciarse",
-      "temas": [
-        "calvo",
-        "franbeuve",
-        "fran",
-        "beso",
-        "cobrilla",
-        "ligar",
-        "incomodo",
-        "verguenza",
-        "paula",
-        "iratxe",
-        "velada",
-        "ibai",
-        "colar",
-        "expulsan",
-        "denuncia",
-        "juseph",
-        "omar montes",
-        "danirep",
-        "myke towers",
-        "yeremi",
-        "artista",
-        "festival",
-        "arenal",
-        "toni",
-        "huevo"
-      ],
-      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
-    },
-    {
-      "nombre": "Franbuve",
-      "plataforma": "twitch",
-      "canal": "franbeuve",
-      "verificado": true,
-      "detector": "reaccion",
-      "permiso_clips": "PENDIENTE",
-      "seguidores": null,
-      "fuente": "URL facilitada por el usuario, existencia verificada en twitch.tv",
-      "layout": "reaccion",
-      "temas": [
-        "calvo",
-        "elcalvolol",
-        "beso",
-        "tias",
-        "ligar",
-        "pelea",
-        "incomodo",
-        "velada",
-        "pueblo",
-        "fifa",
-        "ometv",
-        "heaters",
-        "sevilla",
-        "cama",
-        "caida"
-      ],
-      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
-    },
-    {
-      "nombre": "Jose Nogales",
-      "plataforma": "twitch",
-      "canal": "josenogales1",
-      "verificado": true,
-      "detector": "reaccion",
-      "permiso_clips": "PENDIENTE",
-      "seguidores": null,
-      "fuente": "URL facilitada por el usuario, existencia verificada en twitch.tv",
-      "layout": "reaccion",
-      "temas": [
-        "cortisol",
-        "psl",
-        "looksmax",
-        "mandibula",
-        "craneo",
-        "testosterona",
-        "mogging",
-        "moquea",
-        "medicado",
-        "reality",
-        "gemelo",
-        "casa",
-        "magaluf",
-        "dj",
-        "cadiz",
-        "liada",
-        "beso",
-        "ligar",
-        "chicas",
-        "trio",
-        "cadera",
-        "te gusta",
-        "aitana"
-      ],
-      "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
-    }
-  ],
-  "render": {
-    "layout": "irl",
-    "fps": 30,
-    "crf": 20,
-    "duracion_min_s": 8,
-    "duracion_max_s": 120,
-    "zoom": 1.6,
-    "video_y": 700,
-    "reaccion": {
-      "cam_rect": [
-        1470,
-        528,
-        452,
-        254
-      ],
-      "cam_y": 175,
-      "cam_altura": 480,
-      "contenido_y": 885,
-      "separacion_px": 6,
-      "_nota": "cam_rect es [x,y,w,h] de la webcam DENTRO del frame original. Sacalo con: clip.ps1 rejilla <slug>. Si es null, la banda de arriba usa el frame entero.",
-      "margen_px": 30,
-      "borde_color": "white@0.22",
-      "borde_px": 3
-    },
-    "marca": "@TuCanal",
-    "marca_y": 130,
-    "marca_size": 34,
-    "sub_y": 1430,
-    "sub_size": 92,
-    "palabras_por_bloque": 3,
-    "color_resaltado": "&H0000FFFF&",
-    "escala_palabra_activa": 112,
-    "hook_y": 520,
-    "hook_size": 58,
-    "hook_persistente": true,
-    "hook_duracion_s": 3.0,
-    "_nota": "layout completo: el video entra entero, sin recortar nada. El bloque gancho-video-subtitulos queda centrado en la pantalla y por encima de la interfaz de TikTok/Reels. 'zoom' amplia y recorta los lados; 'crop' recorta a saco.",
-    "irl": {
-      "margen_px": 24,
-      "video_y": 720,
-      "borde_color": "white@0.22",
-      "borde_px": 3,
-      "_nota": "Una sola camara: sin banda de webcam. video 1032x581 en y=680, gancho encima, subtitulos debajo. Bloque centrado en la pantalla."
-    },
-    "silencio_corta_bloque_s": 0.6,
-    "sub_max_hold_s": 0.4
-  },
-  "notificaciones": {
-    "activo": true,
-    "ntfy_topic": "cambia-esto-por-un-topic-aleatorio",
-    "prioridad": "high",
-    "adjuntar_video": true,
-    "limite_adjunto_mb": 2,
-    "carpeta_sincronizada": "",
-    "_nota": "ntfy.sh anonimo solo admite 2MB por adjunto (comprobado en su API), asi que un clip vertical de 30s NO cabe con calidad decente: el aviso cae a texto solo. El video llega al movil por carpeta_sincronizada (OneDrive), no por ntfy.",
-    "avisar_directo": true,
-    "cooldown_directo_min": 45
-  },
-  "live": {
-    "segmento_s": 10,
-    "buffer_max_s": 900,
-    "poll_online_s": 45,
-    "chat_lag_s": 8,
-    "ventana_antes_s": 40,
-    "ventana_despues_s": 12,
-    "cooldown_s": 120,
-    "umbral_reaccion_z": 2.4,
-    "umbral_audio_z": 2.4,
-    "peso_risa": 2,
-    "peso_pide_clip": 5,
-    "peso_sorpresa": 2,
-    "ventana_antes_largo_s": 115,
-    "ventana_antes_corto_s": 30
-  },
-  "whisper": {
-    "modelo": "large-v3-turbo",
-    "idioma": "es",
-    "compute_type": "int8"
-  },
-  "calidad": {
-    "palabras_por_segundo_min": 1.2,
-    "hook_min_chars": 18,
-    "volumen_min_db": -40,
-    "negro_max_s": 2,
-    "publicar_con_gancho_automatico": true,
-    "gancho_puntuacion_minima": 3
-  },
-  "duraciones": {
-    "corto": {
-      "min": 10,
-      "max": 20
-    },
-    "medio": {
-      "min": 26,
-      "max": 34
-    },
-    "largo": {
-      "min": 64,
-      "max": 95
-    },
-    "patron": [
-      "corto",
-      "largo",
-      "corto",
-      "medio",
-      "largo",
-      "corto"
-    ],
-    "_nota": "Los clips que circulan en estas comunidades duran 4-30s (los top de Lopezfnx son de 9s y 4s), pero TikTok solo monetiza a partir del minuto. El patron garantiza 2 largos de cada 6 sin depender de la suerte."
-  },
-  "hashtags": {
-    "base": [
-      "#clips",
-      "#viral",
-      "#parati",
-      "#fyp",
-      "#twitch",
-      "#directo"
-    ],
-    "por_canal": {
-      "elcalvolol": [
-        "#elcalvolol",
-        "#elcalvo"
-      ],
-      "lopezfnx": [
-        "#lopezfnx"
-      ],
-      "davooxeneize": [
-        "#davooxeneize",
-        "#davoo"
-      ],
-      "lacobraaa": [
-        "#lacobra"
-      ],
-      "rdjavi": [
-        "#rdjavi"
-      ],
-      "reydelacity": [
-        "#reydelacity"
-      ],
-      "mariotaxi": [
-        "#mariotaxi"
-      ],
-      "viviendoenlacalle": [
-        "#viviendoenlacalle"
-      ],
-      "franbeuve": [
-        "#franbeuve"
-      ],
-      "josenogales1": [
-        "#josenogales"
-      ]
-    },
-    "maximo": 8
-  },
-  "cpu": {
-    "una_tarea_pesada_a_la_vez": true,
-    "_nota": "Sin GPU, dos transcripciones a la vez se pelean por los nucleos y las dos van lentas. En fila, cada una usa la maquina entera y el total sale antes. Con GPU, ponlo a false."
-  },
-  "visual": {
-    "activo": true,
-    "_nota": "En canales irl, si el audio no da gancho, el clip no se tira: se guarda en out/PENDIENTE_GANCHO con su contact sheet para escribirle el gancho mirandolo."
-  }
+    "_nota":  "permiso_clips: PENDIENTE hasta que verifiques su politica oficial de clips. No monetices ningun canal marcado PENDIENTE. Handles resueltos y verificados contra la API de Kick el 2026-07-31.",
+    "canales":  [
+                    {
+                        "nombre":  "Davoo Xeneize",
+                        "plataforma":  "kick",
+                        "canal":  "davooxeneize",
+                        "seguidores":  2030263,
+                        "verificado":  true,
+                        "detector":  "solo_audio",
+                        "permiso_clips":  "PENDIENTE",
+                        "layout":  "reaccion",
+                        "temas":  [
+                                      "boca",
+                                      "river",
+                                      "gol",
+                                      "penal",
+                                      "arbitro",
+                                      "robo",
+                                      "mundial",
+                                      "argentina",
+                                      "cobra",
+                                      "messi",
+                                      "sevilla",
+                                      "espaÃ±a",
+                                      "aguinaldo",
+                                      "leo"
+                                  ],
+                        "_temas_nota":  "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
+                    },
+                    {
+                        "nombre":  "La Cobra",
+                        "plataforma":  "kick",
+                        "canal":  "lacobraaa",
+                        "seguidores":  1830408,
+                        "verificado":  true,
+                        "detector":  "solo_audio",
+                        "permiso_clips":  "PENDIENTE",
+                        "layout":  "reaccion",
+                        "temas":  [
+                                      "gol",
+                                      "golazo",
+                                      "argentina",
+                                      "mundial",
+                                      "boca",
+                                      "penal",
+                                      "arbitro",
+                                      "davo",
+                                      "davoo",
+                                      "seleccion",
+                                      "cabo verde",
+                                      "enzo",
+                                      "inglaterra",
+                                      "eliminatoria",
+                                      "partido"
+                                  ],
+                        "_temas_nota":  "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
+                    },
+                    {
+                        "nombre":  "RdJavi",
+                        "plataforma":  "kick",
+                        "canal":  "rdjavi",
+                        "seguidores":  967634,
+                        "verificado":  true,
+                        "detector":  "solo_audio",
+                        "permiso_clips":  "PENDIENTE",
+                        "layout":  "reaccion",
+                        "temas":  [
+                                      "gta",
+                                      "susto",
+                                      "policia",
+                                      "carro",
+                                      "damian",
+                                      "muerto",
+                                      "atraco",
+                                      "persecucion",
+                                      "rol",
+                                      "detonacion",
+                                      "hueso",
+                                      "banco"
+                                  ],
+                        "_temas_nota":  "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
+                    },
+                    {
+                        "nombre":  "Rey de la city",
+                        "plataforma":  "kick",
+                        "canal":  "reydelacity",
+                        "seguidores":  158772,
+                        "verificado":  true,
+                        "detector":  "solo_audio",
+                        "permiso_clips":  "PENDIENTE",
+                        "layout":  "irl",
+                        "temas":  [
+                                      "samuel",
+                                      "sami",
+                                      "zombies",
+                                      "partida",
+                                      "foto",
+                                      "chat"
+                                  ]
+                    },
+                    {
+                        "nombre":  "Mario Taxi",
+                        "plataforma":  "twitch",
+                        "canal":  "mariotaxi",
+                        "seguidores":  null,
+                        "verificado":  true,
+                        "detector":  "reaccion",
+                        "permiso_clips":  "PENDIENTE",
+                        "layout":  "irl",
+                        "temas":  [
+                                      "vtc",
+                                      "taxi",
+                                      "cliente",
+                                      "carrera",
+                                      "bici",
+                                      "semaforo",
+                                      "multa",
+                                      "trafico",
+                                      "visage"
+                                  ],
+                        "fuente":  "Emite en twitch.tv/mariotaxi. El handle de Kick existe (6.030 seguidores) pero esta inactivo: resolverlo por existencia del handle fue un error."
+                    },
+                    {
+                        "nombre":  "Viviendo en la calle",
+                        "plataforma":  "kick",
+                        "canal":  "viviendoenlacalle",
+                        "seguidores":  5280,
+                        "verificado":  true,
+                        "detector":  "solo_audio",
+                        "permiso_clips":  "PENDIENTE",
+                        "layout":  "irl",
+                        "temas":  [
+                                      "yony",
+                                      "calle",
+                                      "furgoneta",
+                                      "citroen",
+                                      "caida",
+                                      "policia"
+                                  ]
+                    },
+                    {
+                        "nombre":  "Lopezfnx",
+                        "plataforma":  "twitch",
+                        "canal":  "lopezfnx",
+                        "verificado":  true,
+                        "detector":  "reaccion",
+                        "permiso_clips":  "PENDIENTE",
+                        "seguidores":  null,
+                        "fuente":  "URL facilitada por el usuario, existencia verificada en twitch.tv",
+                        "layout":  "reaccion",
+                        "temas":  [
+                                      "iratxe",
+                                      "gael",
+                                      "cucharita",
+                                      "beso",
+                                      "mirada",
+                                      "amor",
+                                      "novia",
+                                      "pareja",
+                                      "tension",
+                                      "serie",
+                                      "roblox",
+                                      "barcelona",
+                                      "share",
+                                      "calvo"
+                                  ],
+                        "_temas_nota":  "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
+                    },
+                    {
+                        "nombre":  "El Calvo",
+                        "plataforma":  "twitch",
+                        "canal":  "elcalvolol",
+                        "verificado":  true,
+                        "detector":  "reaccion",
+                        "permiso_clips":  "PENDIENTE",
+                        "seguidores":  null,
+                        "fuente":  "URL facilitada por el usuario, existencia verificada en twitch.tv",
+                        "layout":  "irl",
+                        "render":  {
+                                       "silencio_corta_bloque_s":  0.6,
+                                       "sub_max_hold_s":  0.4
+                                   },
+                        "_nota_render":  "sin subtitulos mientras nadie habla: el bloque se corta si hay mas de 0.6s de pausa y ninguna palabra se sostiene mas de 0.4s tras pronunciarse",
+                        "temas":  [
+                                      "calvo",
+                                      "franbeuve",
+                                      "fran",
+                                      "beso",
+                                      "cobrilla",
+                                      "ligar",
+                                      "incomodo",
+                                      "verguenza",
+                                      "paula",
+                                      "iratxe",
+                                      "velada",
+                                      "ibai",
+                                      "colar",
+                                      "expulsan",
+                                      "denuncia",
+                                      "juseph",
+                                      "omar montes",
+                                      "danirep",
+                                      "myke towers",
+                                      "yeremi",
+                                      "artista",
+                                      "festival",
+                                      "arenal",
+                                      "toni",
+                                      "huevo"
+                                  ],
+                        "_temas_nota":  "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
+                    },
+                    {
+                        "nombre":  "Franbuve",
+                        "plataforma":  "twitch",
+                        "canal":  "franbeuve",
+                        "verificado":  true,
+                        "detector":  "reaccion",
+                        "permiso_clips":  "PENDIENTE",
+                        "seguidores":  null,
+                        "fuente":  "URL facilitada por el usuario, existencia verificada en twitch.tv",
+                        "layout":  "reaccion",
+                        "temas":  [
+                                      "calvo",
+                                      "elcalvolol",
+                                      "beso",
+                                      "tias",
+                                      "ligar",
+                                      "pelea",
+                                      "incomodo",
+                                      "velada",
+                                      "pueblo",
+                                      "fifa",
+                                      "ometv",
+                                      "heaters",
+                                      "sevilla",
+                                      "cama",
+                                      "caida"
+                                  ],
+                        "_temas_nota":  "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
+                    },
+                    {
+                        "nombre":  "Jose Nogales",
+                        "plataforma":  "twitch",
+                        "canal":  "josenogales1",
+                        "verificado":  true,
+                        "detector":  "reaccion",
+                        "permiso_clips":  "PENDIENTE",
+                        "seguidores":  null,
+                        "fuente":  "URL facilitada por el usuario, existencia verificada en twitch.tv",
+                        "layout":  "reaccion",
+                        "temas":  [
+                                      "cortisol",
+                                      "psl",
+                                      "looksmax",
+                                      "mandibula",
+                                      "craneo",
+                                      "testosterona",
+                                      "mogging",
+                                      "moquea",
+                                      "medicado",
+                                      "reality",
+                                      "gemelo",
+                                      "casa",
+                                      "magaluf",
+                                      "dj",
+                                      "cadiz",
+                                      "liada",
+                                      "beso",
+                                      "ligar",
+                                      "chicas",
+                                      "trio",
+                                      "cadera",
+                                      "te gusta",
+                                      "aitana"
+                                  ],
+                        "_temas_nota":  "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
+                    }
+                ],
+    "render":  {
+                   "layout":  "irl",
+                   "fps":  30,
+                   "crf":  20,
+                   "duracion_min_s":  8,
+                   "duracion_max_s":  120,
+                   "zoom":  1.6,
+                   "video_y":  700,
+                   "reaccion":  {
+                                    "cam_rect":  [
+                                                     1470,
+                                                     528,
+                                                     452,
+                                                     254
+                                                 ],
+                                    "cam_y":  175,
+                                    "cam_altura":  480,
+                                    "contenido_y":  885,
+                                    "separacion_px":  6,
+                                    "_nota":  "cam_rect es [x,y,w,h] de la webcam DENTRO del frame original. Sacalo con: clip.ps1 rejilla \u003cslug\u003e. Si es null, la banda de arriba usa el frame entero.",
+                                    "margen_px":  30,
+                                    "borde_color":  "white@0.22",
+                                    "borde_px":  3
+                                },
+                   "marca":  "@TuCanal",
+                   "marca_y":  130,
+                   "marca_size":  34,
+                   "sub_y":  1430,
+                   "sub_size":  92,
+                   "palabras_por_bloque":  3,
+                   "color_resaltado":  "\u0026H0000FFFF\u0026",
+                   "escala_palabra_activa":  112,
+                   "hook_y":  520,
+                   "hook_size":  58,
+                   "hook_persistente":  true,
+                   "hook_duracion_s":  3.0,
+                   "_nota":  "layout completo: el video entra entero, sin recortar nada. El bloque gancho-video-subtitulos queda centrado en la pantalla y por encima de la interfaz de TikTok/Reels. \u0027zoom\u0027 amplia y recorta los lados; \u0027crop\u0027 recorta a saco.",
+                   "irl":  {
+                               "margen_px":  24,
+                               "video_y":  720,
+                               "borde_color":  "white@0.22",
+                               "borde_px":  3,
+                               "_nota":  "Una sola camara: sin banda de webcam. video 1032x581 en y=680, gancho encima, subtitulos debajo. Bloque centrado en la pantalla."
+                           },
+                   "silencio_corta_bloque_s":  0.6,
+                   "sub_max_hold_s":  0.4
+               },
+    "notificaciones":  {
+                           "activo":  true,
+                           "ntfy_topic":  "cambia-esto-por-un-topic-aleatorio",
+                           "prioridad":  "high",
+                           "adjuntar_video":  true,
+                           "limite_adjunto_mb":  2,
+                           "carpeta_sincronizada":  "",
+                           "_nota":  "ntfy.sh anonimo solo admite 2MB por adjunto (comprobado en su API), asi que un clip vertical de 30s NO cabe con calidad decente: el aviso cae a texto solo. El video llega al movil por carpeta_sincronizada (OneDrive), no por ntfy.",
+                           "avisar_directo":  true,
+                           "cooldown_directo_min":  45
+                       },
+    "live":  {
+                 "segmento_s":  10,
+                 "buffer_max_s":  900,
+                 "poll_online_s":  45,
+                 "chat_lag_s":  8,
+                 "ventana_antes_s":  40,
+                 "ventana_despues_s":  12,
+                 "cooldown_s":  120,
+                 "umbral_reaccion_z":  2.4,
+                 "umbral_audio_z":  2.4,
+                 "peso_risa":  2,
+                 "peso_pide_clip":  5,
+                 "peso_sorpresa":  2,
+                 "ventana_antes_largo_s":  115,
+                 "ventana_antes_corto_s":  30,
+                 "reaccion_minima_absoluta":  12,
+                 "_nota_reaccion":  "El z-score solo no vale en canales tranquilos: con media de 2 mensajes por ventana, pasar a 9 da z +3 y son tres personas escribiendo, no una reaccion. Se exige ademas reaccion \u003e= reaccion_minima_absoluta (puntuacion ponderada, no numero de mensajes). Subelo en canales grandes, bajalo si un canal pequeno se queda sin clips."
+             },
+    "whisper":  {
+                    "modelo":  "large-v3-turbo",
+                    "idioma":  "es",
+                    "compute_type":  "int8"
+                },
+    "calidad":  {
+                    "palabras_por_segundo_min":  1.2,
+                    "hook_min_chars":  18,
+                    "volumen_min_db":  -40,
+                    "negro_max_s":  2,
+                    "publicar_con_gancho_automatico":  true,
+                    "gancho_puntuacion_minima":  3
+                },
+    "duraciones":  {
+                       "corto":  {
+                                     "min":  10,
+                                     "max":  20
+                                 },
+                       "medio":  {
+                                     "min":  26,
+                                     "max":  34
+                                 },
+                       "largo":  {
+                                     "min":  64,
+                                     "max":  95
+                                 },
+                       "patron":  [
+                                      "corto",
+                                      "largo",
+                                      "corto",
+                                      "medio",
+                                      "largo",
+                                      "corto"
+                                  ],
+                       "_nota":  "Los clips que circulan en estas comunidades duran 4-30s (los top de Lopezfnx son de 9s y 4s), pero TikTok solo monetiza a partir del minuto. El patron garantiza 2 largos de cada 6 sin depender de la suerte."
+                   },
+    "hashtags":  {
+                     "base":  [
+                                  "#clips",
+                                  "#viral",
+                                  "#parati",
+                                  "#fyp",
+                                  "#twitch",
+                                  "#directo"
+                              ],
+                     "por_canal":  {
+                                       "elcalvolol":  [
+                                                          "#elcalvolol",
+                                                          "#elcalvo"
+                                                      ],
+                                       "lopezfnx":  [
+                                                        "#lopezfnx"
+                                                    ],
+                                       "davooxeneize":  [
+                                                            "#davooxeneize",
+                                                            "#davoo"
+                                                        ],
+                                       "lacobraaa":  [
+                                                         "#lacobra"
+                                                     ],
+                                       "rdjavi":  [
+                                                      "#rdjavi"
+                                                  ],
+                                       "reydelacity":  [
+                                                           "#reydelacity"
+                                                       ],
+                                       "mariotaxi":  [
+                                                         "#mariotaxi"
+                                                     ],
+                                       "viviendoenlacalle":  [
+                                                                 "#viviendoenlacalle"
+                                                             ],
+                                       "franbeuve":  [
+                                                         "#franbeuve"
+                                                     ],
+                                       "josenogales1":  [
+                                                            "#josenogales"
+                                                        ]
+                                   },
+                     "maximo":  8
+                 },
+    "cpu":  {
+                "una_tarea_pesada_a_la_vez":  true,
+                "_nota":  "Sin GPU, dos transcripciones a la vez se pelean por los nucleos y las dos van lentas. En fila, cada una usa la maquina entera y el total sale antes. Con GPU, ponlo a false."
+            },
+    "visual":  {
+                   "activo":  true,
+                   "_nota":  "En canales irl, si el audio no da gancho, el clip no se tira: se guarda en out/PENDIENTE_GANCHO con su contact sheet para escribirle el gancho mirandolo."
+               }
 }

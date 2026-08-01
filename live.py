@@ -610,19 +610,27 @@ def cmd_watch(args):
                         z_audio = zscore(r, hist_audio)
                         hist_audio.append(r)
 
-                print(f"\r[.] {transcurrido/60:5.1f} min | {n_msgs:3d} msg | reaccion {reaccion:4d} "
-                      f"(z {z_chat:+.1f}) | 'clip' x{n_clip} | audio z {z_audio:+.1f}   ",
-                      end="", flush=True)
+                minimo_vis = int(LIVE.get("reaccion_minima_absoluta", 12))
+                print(f"\r[.] {transcurrido/60:5.1f} min | {n_msgs:3d} msg | reaccion "
+                      f"{reaccion:4d}/{minimo_vis} (z {z_chat:+.1f}) | 'clip' x{n_clip} "
+                      f"| audio z {z_audio:+.1f}   ", end="", flush=True)
 
                 # Que dos o mas espectadores pidan clip a la vez dispara solo:
                 # es la señal mas fiable que existe y no necesita linea base.
                 piden_clip = n_clip >= 2
-                disparo = (piden_clip or z_chat >= LIVE["umbral_reaccion_z"]
+
+                # El z-score por si solo miente en canales tranquilos: con una
+                # media de 2 mensajes por ventana, pasar a 9 da z +3 y no es una
+                # reaccion, son tres personas escribiendo. Hace falta ademas un
+                # minimo absoluto de mensajes.
+                minimo = int(LIVE.get("reaccion_minima_absoluta", 12))
+                hay_reaccion = z_chat >= LIVE["umbral_reaccion_z"] and reaccion >= minimo
+                disparo = (piden_clip or hay_reaccion
                            or z_audio >= LIVE["umbral_audio_z"])
                 if disparo and ahora - ultimo_clip > LIVE["cooldown_s"] \
                         and transcurrido > LIVE["ventana_antes_s"] + 30:
                     motivo = ("el chat pide clip" if piden_clip
-                              else "reaccion" if z_chat >= LIVE["umbral_reaccion_z"] else "audio")
+                              else "reaccion" if hay_reaccion else "audio")
                     t_video = transcurrido - (0 if motivo == "audio" else LIVE["chat_lag_s"])
                     # Lo que dijo el chat alrededor del pico: es la pista de que
                     # le llamo la atencion, y con eso se elige el gancho.
