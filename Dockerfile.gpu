@@ -16,16 +16,16 @@ RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt \
 COPY *.py config.json ./
 
 RUN useradd --system --uid 10001 clipper \
-    && mkdir -p /data/modelos && chown -R clipper:clipper /data
+    && mkdir -p /app/clips/modelos && chown -R clipper:clipper /app/clips
 
-ENV CLIPPER_DATA=/data \
-    HF_HOME=/data/modelos \
+ENV CLIPPER_DATA=/app/clips \
+    HF_HOME=/app/clips/modelos \
     CLIPPER_COMPUTE=float16 \
     PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8
 
 USER clipper
-VOLUME ["/data"]
+VOLUME ["/app/clips"]
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 HEALTHCHECK --interval=2m --timeout=20s --start-period=180s --retries=3 \

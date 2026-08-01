@@ -13,11 +13,11 @@ services:
       CLIPPER_CARPETA_SINCRONIZADA: ""
       CLIPPER_WEB_PUERTO: "8080"
     volumes:
-      - clipper-data:/data
+      - clipper-data:/app/clips
     # El buffer rodante son ~1 GB por canal y es material que se descarta:
     # en tmpfs no desgasta el disco.
     tmpfs:
-      - /data/buffer:size=16g
+      - /app/clips/buffer:size=16g
     stop_grace_period: 30s
     logging:
       driver: json-file

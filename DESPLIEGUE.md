@@ -108,7 +108,7 @@ certificado automático, así que **no necesitas Caddy ni el docker-compose**.
    CLIPPER_COMPUTE=int8
    ```
 
-4. **Volumes**: volumen persistente montado en **`/data`**. Sin esto pierdes
+4. **Volumes**: volumen persistente montado en **`/app/clips`**. Sin esto pierdes
    los clips y el modelo en cada despliegue.
 5. **Domains**: tu dominio, puerto **8080**, HTTPS activado.
 6. **Deploy**.
@@ -147,7 +147,7 @@ docker compose --profile proxy up -d --build
 
 ### Qué hace la imagen
 
-- **Datos fuera del código**: `CLIPPER_DATA=/data`, montado como volumen. La
+- **Datos fuera del código**: `CLIPPER_DATA=/app/clips`, montado como volumen. La
   imagen no guarda nada; borrarla y reconstruirla no pierde clips.
 - **Buffer en tmpfs** (16 GB): el buffer rodante escribe sin parar y en disco lo
   desgasta para nada, porque es material que se descarta.
