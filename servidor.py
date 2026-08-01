@@ -179,13 +179,14 @@ def main():
                     if cdir.is_dir():
                         num_segs = len(list(cdir.glob("*.ts")))
                         if num_segs > 0:
-                            grabando.append(f"{cdir.name} ({num_segs} segs)")
+                            mins = (num_segs * 10) / 60.0
+                            grabando.append(f"{cdir.name} ({mins:.1f} min en memoria)")
 
             ts = datetime.now().strftime("%H:%M:%S")
             if grabando:
-                print(f"[📡 ESTADO {ts}] 🔴 GRABANDO DIRECTO EN VIVO: {', '.join(grabando)}", flush=True)
+                print(f"[📡 ESTADO Madrid {ts}] 🔴 GRABANDO DIRECTO EN VIVO: {', '.join(grabando)}", flush=True)
             else:
-                print(f"[📡 ESTADO {ts}] ⚪ Vigilando {len(vigilantes)} canales (sin directos activos)", flush=True)
+                print(f"[📡 ESTADO Madrid {ts}] ⚪ Vigilando {len(vigilantes)} canales (sin directos activos)", flush=True)
 
     except KeyboardInterrupt:
         apagar()

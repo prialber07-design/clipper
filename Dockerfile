@@ -2,7 +2,7 @@
 FROM python:3.12-slim AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        ffmpeg ca-certificates tini procps \
+        ffmpeg ca-certificates tini procps tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -23,6 +23,7 @@ ENV CLIPPER_DATA=/app/clips \
     HF_HOME=/app/clips/modelos \
     PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8 \
+    TZ=Europe/Madrid \
     OMP_NUM_THREADS=8 \
     MKL_NUM_THREADS=8 \
     OPENBLAS_NUM_THREADS=8 \
