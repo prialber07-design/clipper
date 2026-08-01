@@ -119,6 +119,39 @@ Igual: máximo 1.580 visitas. `ah!` · `yo flipo tio` · `Se cae yony pobrecito`
 
 ---
 
+## Qué están haciendo ahora (agosto 2026)
+
+Esto caduca rápido: revisar cada pocas semanas.
+
+**Los cuatro de Twitch están en el mismo circuito.** Tour IRL por España, La
+Velada del Año en Sevilla y festivales de verano (Arenal Sound, Share
+Festival). Se cruzan constantemente: El Calvo y Lopezfnx coinciden en el Share
+Festival de Barcelona, Franbeuve y El Calvo van juntos a la Velada.
+
+- **El Calvo** — Tour IRL España. Su titular más reciente lo dice todo:
+  *"ME EXPULSAN POR COLARME · ME HA DENUNCIADO IBAI"*. Conoce artistas
+  (Juseph, Omar Montes, Danirep, Myke Towers) y futbolistas (Yeremi Pino).
+  Directos de 4–6 h.
+- **Lopezfnx** — Todo con **Iratxe**. Barcelona, Madrid, Roblox juntos, y el
+  anuncio de una serie. Clips de esta semana: *"y esa mirada iratxe???"* (7 s),
+  *"AMORRRR????"* (6 s). Directos de 3–4,5 h.
+- **Franbeuve** — Vuelta tras la Velada, días en su pueblo, FIFA y OmeTV.
+  Clips recientes: *"cama"*, *"como se cae"*, *"#para los heaters"*.
+- **José Nogales** — Entró a un reality (*La casa del gemelo*). Directos
+  cortos e irregulares, muchos de madrugada (*"4am"*, *"muy nocturno"*).
+
+**Kick, último mes:**
+
+- **La Cobra** — Vive del **fútbol**. Todos sus clips del mes son goles:
+  *"GOLAZO CABO VERDE"*, *"GOL DE ENZO FERNANDEZ ARGENTINA VS INGLATERRA"*.
+  Contexto de Mundial 2026. Un gol es un pico de audio y chat enorme.
+- **Davoo** — Just Chatting. Estuvo en España (*"ULTIMO STREAM EN SEVILLA"*).
+- **RdJavi** — Se ha pasado a **GTA V**. Sus clips históricos eran sustos en
+  Just Chatting; los recientes son todos GTA.
+- **Mario Taxi y Viviendo en la calle** — **cero clips este mes**. Dormidos.
+
+---
+
 ## Qué hacer con esto
 
 **Prioridad por rendimiento esperado:** RdJavi y Davoo (viralidad por clip muy
