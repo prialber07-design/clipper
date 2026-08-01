@@ -139,6 +139,11 @@ Festival de Barcelona, Franbeuve y El Calvo van juntos a la Velada.
   Clips recientes: *"cama"*, *"como se cae"*, *"#para los heaters"*.
 - **José Nogales** — Entró a un reality (*La casa del gemelo*). Directos
   cortos e irregulares, muchos de madrugada (*"4am"*, *"muy nocturno"*).
+  **Ojo con este:** el looksmaxxing es su discurso, pero **no es lo que su
+  comunidad clipea**. Sus clips del último mes son todos sociales: *"liada
+  historica"* (14.282), *"el trio"*, *"beso queda mal"*, *"asi se demuestra
+  cual te gusta"*, *"cadera de muñeka"*. Es decir: lo mismo que El Calvo y
+  Franbeuve — que ligue y que salga bien o mal.
 
 **Kick, último mes:**
 
