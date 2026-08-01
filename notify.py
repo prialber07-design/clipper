@@ -268,3 +268,13 @@ def publicar(mp4: Path, meta: dict) -> Path:
         enlace=enlace,
     )
     return destino
+
+
+def avisar_inicio_directo(canal: str, plataforma: str, url: str):
+    """Envía una notificación vía ntfy al teléfono cuando un streamer inicia directo."""
+    avisar(
+        titulo=f"🔴 EN DIRECTO: {canal.upper()}",
+        mensaje=f"¡{canal} ha iniciado directo en {plataforma.capitalize()}!\nCapturando audio y chat en vivo.",
+        enlace=url,
+    )
+

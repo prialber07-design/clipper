@@ -483,6 +483,7 @@ def cmd_watch(args):
             continue
 
         print(f"\n[>] EN DIRECTO. Arrancando captura.")
+        notify.avisar_inicio_directo(args.canal, args.plataforma, url)
         cap = Captura(url, BUF / args.canal)
         cap.arrancar()
 
