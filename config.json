@@ -165,7 +165,9 @@
                            "adjuntar_video":  true,
                            "limite_adjunto_mb":  2,
                            "carpeta_sincronizada":  "",
-                           "_nota":  "ntfy.sh anonimo solo admite 2MB por adjunto (comprobado en su API), asi que un clip vertical de 30s NO cabe con calidad decente: el aviso cae a texto solo. El video llega al movil por carpeta_sincronizada (OneDrive), no por ntfy."
+                           "_nota":  "ntfy.sh anonimo solo admite 2MB por adjunto (comprobado en su API), asi que un clip vertical de 30s NO cabe con calidad decente: el aviso cae a texto solo. El video llega al movil por carpeta_sincronizada (OneDrive), no por ntfy.",
+                           "avisar_directo":  true,
+                           "cooldown_directo_min":  45
                        },
     "live":  {
                  "segmento_s":  10,

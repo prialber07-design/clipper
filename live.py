@@ -243,6 +243,38 @@ def zscore(valor: float, historial) -> float:
 # --- montaje de la ventana ----------------------------------------------------
 
 CONTADORES = ROOT / "work" / "_contadores.json"
+DIRECTOS = DATA / "work" / "_directos.json"
+
+
+def avisar_directo(canal: str, url: str):
+    """Aviso al movil cuando un canal arranca directo.
+
+    Con memoria de cuando se aviso: un directo que se corta y vuelve no debe
+    mandar tres notificaciones seguidas.
+    """
+    n = CONFIG.get("notificaciones", {})
+    if not n.get("avisar_directo", True):
+        return
+    espera = float(n.get("cooldown_directo_min", 45)) * 60
+
+    try:
+        visto = json.loads(DIRECTOS.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        visto = {}
+    ahora = time.time()
+    if ahora - visto.get(canal, 0) < espera:
+        print(f"[.] {canal} ya avisado hace poco, no repito")
+        return
+    visto[canal] = ahora
+    DIRECTOS.parent.mkdir(parents=True, exist_ok=True)
+    DIRECTOS.write_text(json.dumps(visto), encoding="utf-8")
+
+    ficha = next((c for c in CONFIG.get("canales", []) if c.get("canal") == canal), {})
+    notify.avisar(
+        titulo=f"{ficha.get('nombre', canal)} está en directo",
+        mensaje=f"{url}\n\nEl vigilante ya está capturando.",
+        enlace=url,
+    )
 
 
 def elegir_duracion(canal: str) -> tuple[str, dict]:
@@ -519,6 +551,7 @@ def cmd_watch(args):
             continue
 
         print(f"\n[>] EN DIRECTO. Arrancando captura.")
+        avisar_directo(args.canal, url)
         cap = Captura(url, BUF / args.canal)
         cap.arrancar()
 
