@@ -1,7 +1,8 @@
 """
-Motor Híbrido de Chat para Kick:
-1. Descubrimiento vía Playwright / caché JSON de chatroom_id y pusher_key.
-2. Conexión WebSocket pura con asyncio / aiohttp a wss://ws-us2.pusher.com/app/<key>.
+Motor Ultraligero de Chat para Kick (100% Python Nativo sin Playwright):
+1. Obtiene chatroom_id mediante HTTP GET a la API pública de Kick (https://kick.com/api/v2/channels/{canal}).
+2. Conecta por WebSocket nativo (aiohttp) a wss://ws-us2.pusher.com/app/eb1fd122312b2d88b72d.
+3. Suscribe el canal 'chatrooms.<chatroom_id>.v2', responde pings y cuenta risas en tiempo real.
 """
 
 from __future__ import annotations
@@ -9,31 +10,44 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import re
 import time
 from pathlib import Path
+from urllib.request import Request, urlopen
 import aiohttp
 
 LOG = logging.getLogger(__name__)
 
 HYPE_WORDS = {"jaja", "jajaja", "kekw", "wtf", "lmao", "lol", "pog", "clip", "xd", "omg", "base"}
-DEFAULT_PUSHER_KEY = "eb1fd122312b2d88b72d"
+PUSHER_KEY = "eb1fd122312b2d88b72d"
 
 
 class KickDiscovery:
     def __init__(self, data_dir: Path):
         self.cache_file = data_dir / "kick_cache.json"
 
-    def get_cached(self, channel: str) -> dict | None:
+    def get_chatroom_id(self, channel: str) -> str | None:
+        channel_lower = channel.lower()
         if self.cache_file.exists():
             try:
                 data = json.loads(self.cache_file.read_text(encoding="utf-8"))
-                return data.get(channel.lower())
+                if channel_lower in data:
+                    return data[channel_lower].get("chatroom_id")
             except Exception:
                 pass
-        return None
 
-    def save_cache(self, channel: str, chatroom_id: int | str, pusher_key: str):
+        try:
+            url = f"https://kick.com/api/v2/channels/{channel_lower}"
+            req = Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/125.0.0.0 Safari/537.36"})
+            with urlopen(req, timeout=10) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+                chatroom_id = str(payload["chatroom"]["id"])
+                self.save_cache(channel_lower, chatroom_id)
+                return chatroom_id
+        except Exception as exc:
+            LOG.debug("Error obteniendo chatroom_id directo para Kick %s: %s", channel, exc)
+            return None
+
+    def save_cache(self, channel: str, chatroom_id: str):
         current = {}
         if self.cache_file.exists():
             try:
@@ -41,50 +55,11 @@ class KickDiscovery:
             except Exception:
                 pass
         current[channel.lower()] = {
-            "chatroom_id": str(chatroom_id),
-            "pusher_key": pusher_key,
+            "chatroom_id": chatroom_id,
             "updated_at": time.time(),
         }
         self.cache_file.parent.mkdir(parents=True, exist_ok=True)
         self.cache_file.write_text(json.dumps(current, indent=2), encoding="utf-8")
-
-    async def discover_playwright(self, channel: str) -> tuple[str, str] | None:
-        try:
-            from playwright.async_api import async_playwright
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True)
-                page = await browser.new_page()
-                chatroom_id = None
-                pusher_key = DEFAULT_PUSHER_KEY
-
-                def handle_ws(ws):
-                    nonlocal chatroom_id, pusher_key
-                    if "pusher" in ws.url:
-                        m_key = re.search(r"/app/([a-zA-Z0-9]+)", ws.url)
-                        if m_key:
-                            pusher_key = m_key.group(1)
-
-                    def handle_frame(payload):
-                        nonlocal chatroom_id
-                        if isinstance(payload, str) and "chatrooms." in payload:
-                            m_room = re.search(r"chatrooms\.(\d+)", payload)
-                            if m_room:
-                                chatroom_id = m_room.group(1)
-
-                    ws.on("framereceived", handle_frame)
-
-                page.on("websocket", handle_ws)
-                await page.goto(f"https://kick.com/{channel}", wait_until="commit", timeout=15000)
-                await asyncio.sleep(4)
-                await browser.close()
-
-                if chatroom_id:
-                    self.save_cache(channel, chatroom_id, pusher_key)
-                    return str(chatroom_id), pusher_key
-        except Exception as exc:
-            LOG.debug("Playwright discovery no disponible para %s: %s", channel, exc)
-
-        return None
 
 
 class KickChatListener:
@@ -111,23 +86,12 @@ class KickChatListener:
 
     async def _listen_loop(self):
         while self._running:
-            cached = self.discovery.get_cached(self.channel)
-            chatroom_id, pusher_key = None, DEFAULT_PUSHER_KEY
-
-            if cached:
-                chatroom_id = cached.get("chatroom_id")
-                pusher_key = cached.get("pusher_key", DEFAULT_PUSHER_KEY)
-
+            chatroom_id = await asyncio.to_thread(self.discovery.get_chatroom_id, self.channel)
             if not chatroom_id:
-                disc = await self.discovery.discover_playwright(self.channel)
-                if disc:
-                    chatroom_id, pusher_key = disc
-
-            if not chatroom_id:
-                await asyncio.sleep(30)
+                await asyncio.sleep(20)
                 continue
 
-            ws_url = f"wss://ws-us2.pusher.com/app/{pusher_key}?protocol=7&client=js&version=7.4.0&flash=false"
+            ws_url = f"wss://ws-us2.pusher.com/app/{PUSHER_KEY}?protocol=7&client=js&version=7.4.0&flash=false"
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.ws_connect(ws_url, timeout=15) as ws:
