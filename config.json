@@ -7,7 +7,7 @@
                         "canal":  "davooxeneize",
                         "seguidores":  2030263,
                         "verificado":  true,
-                        "detector":  "solo_audio",
+                        "detector":  "reaccion",
                         "permiso_clips":  "PENDIENTE",
                         "layout":  "reaccion"
                     },
@@ -17,7 +17,7 @@
                         "canal":  "lacobraaa",
                         "seguidores":  1830408,
                         "verificado":  true,
-                        "detector":  "solo_audio",
+                        "detector":  "reaccion",
                         "permiso_clips":  "PENDIENTE",
                         "layout":  "reaccion"
                     },
@@ -27,7 +27,7 @@
                         "canal":  "rdjavi",
                         "seguidores":  967634,
                         "verificado":  true,
-                        "detector":  "solo_audio",
+                        "detector":  "reaccion",
                         "permiso_clips":  "PENDIENTE",
                         "layout":  "reaccion"
                     },
@@ -37,7 +37,7 @@
                         "canal":  "reydelacity",
                         "seguidores":  158772,
                         "verificado":  true,
-                        "detector":  "solo_audio",
+                        "detector":  "reaccion",
                         "permiso_clips":  "PENDIENTE",
                         "layout":  "irl"
                     },
@@ -47,7 +47,7 @@
                         "canal":  "mariotaxi",
                         "seguidores":  6029,
                         "verificado":  true,
-                        "detector":  "solo_audio",
+                        "detector":  "reaccion",
                         "permiso_clips":  "PENDIENTE",
                         "layout":  "irl"
                     },
@@ -57,7 +57,7 @@
                         "canal":  "viviendoenlacalle",
                         "seguidores":  5280,
                         "verificado":  true,
-                        "detector":  "solo_audio",
+                        "detector":  "reaccion",
                         "permiso_clips":  "PENDIENTE",
                         "layout":  "irl"
                     },

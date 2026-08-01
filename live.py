@@ -491,7 +491,33 @@ def cmd_watch(args):
         if args.plataforma == "twitch" and not args.solo_audio:
             chat = ChatTwitch(args.canal, eventos)
             chat.start()
-            print("[>] Chat IRC conectado")
+            print("[>] Chat IRC Twitch conectado")
+        elif args.plataforma == "kick" and not args.solo_audio:
+            import kick
+            class ChatKickThread(threading.Thread):
+                daemon = True
+                def __init__(self, canal: str, data_dir: Path, queue_eventos: queue.Queue):
+                    super().__init__()
+                    self.canal, self.data_dir, self.queue_eventos = canal, data_dir, queue_eventos
+                def run(self):
+                    listener = kick.KickChatListener(self.canal, self.data_dir)
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    async def poll():
+                        await listener.start()
+                        while True:
+                            await asyncio.sleep(2)
+                            c = listener.poll_and_reset()
+                            if c > 0:
+                                for _ in range(int(c)):
+                                    self.queue_eventos.put((time.time(), 2, "jaja clip"))
+                    try:
+                        loop.run_until_complete(poll())
+                    except Exception:
+                        pass
+            chat_kick = ChatKickThread(args.canal, DATA, eventos)
+            chat_kick.start()
+            print("[>] Chat WebSocket Kick conectado")
         else:
             print("[>] Solo audio (sin lectura de chat)")
 
