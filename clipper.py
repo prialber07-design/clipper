@@ -186,8 +186,30 @@ def cmd_transcribe(args):
 
     from faster_whisper import WhisperModel
 
+_MODELO_CACHE = {}
+
+def get_whisper_model(modelo_name, device, compute_type):
+    key = (modelo_name, device, compute_type)
+    if key not in _MODELO_CACHE:
+        cpu_threads = int(os.environ.get("CLIPPER_CPU_THREADS", 8))
+        print(f"[>] Cargando modelo Whisper '{modelo_name}' en memoria ({device}/{compute_type}, {cpu_threads} hilos CPU)...")
+        _MODELO_CACHE[key] = WhisperModel(
+            modelo_name,
+            device=device,
+            compute_type=compute_type,
+            cpu_threads=cpu_threads,
+            num_workers=2
+        )
+    return _MODELO_CACHE[key]
+
+
+def cmd_transcribe(args):
+    d = WORK / args.slug
+    audio = d / "audio.wav"
+    if not audio.exists():
+        sys.exit(f"[x] No existe {audio}. Ejecuta 'fetch' primero.")
+
     wcfg = CONFIG["whisper"]
-    print(f"[>] Cargando modelo {wcfg['modelo']} (la primera vez descarga ~1.6GB)")
     device = args.device
     if device == "auto":
         try:
@@ -197,23 +219,20 @@ def cmd_transcribe(args):
             device = "cpu"
 
     def _intento(dev, comp):
-        """Carga + inferencia completa. CUDA puede petar en cualquiera de las dos."""
-        model = WhisperModel(wcfg["modelo"], device=dev, compute_type=comp)
+        model = get_whisper_model(wcfg["modelo"], dev, comp)
         print(f"[>] Transcribiendo en {dev}/{comp}...")
         segments, _ = model.transcribe(
             str(audio), language=wcfg["idioma"], word_timestamps=True,
-            vad_filter=True, vad_parameters={"min_silence_duration_ms": 400},
+            vad_filter=True, vad_parameters={"min_silence_duration_ms": 300},
         )
         segs, words = [], []
         try:
-            for s in segments:  # el generador es perezoso: aqui es donde peta CUDA
+            for s in segments:
                 segs.append({"start": s.start, "end": s.end, "text": s.text.strip()})
                 for w in (s.words or []):
                     words.append({"start": w.start, "end": w.end, "word": w.word.strip()})
                 print(f"\r    {s.end/60:5.1f} min transcritos", end="", flush=True)
         except IndexError:
-            # Bug de faster-whisper al alinear palabras cuando el tramo no tiene
-            # habla (musica, hype, ruido). Se trata como "sin voz", no como error.
             print("\n[!] Tramo sin habla alineable, lo doy por vacio")
             return [], []
         print()
@@ -593,11 +612,11 @@ def cmd_render(args):
         print(f"[>] Clip {c['id']}  {c['start']:.1f}s -> {c['end']:.1f}s  ({c['end']-c['start']:.0f}s)")
         _build_ass(words, c, tmp / "subs.ass")
         target = outdir / f"{args.slug}-{c['id']}.mp4"
-        run([FFMPEG, "-y",
+        run([FFMPEG, "-y", "-threads", "8",
              "-ss", str(c["start"]), "-to", str(c["end"]), "-i", str(d / "source.mp4"),
              "-filter_complex", _vf(args.layout or rc["layout"]),
              "-map", "[v]", "-map", "0:a",
-             "-c:v", "libx264", "-preset", "veryfast", "-crf", str(rc["crf"]),
+             "-c:v", "libx264", "-preset", "superfast", "-crf", str(rc["crf"]),
              "-pix_fmt", "yuv420p", "-r", str(rc["fps"]),
              "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
              str(target)], cwd=tmp)
