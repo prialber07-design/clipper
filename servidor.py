@@ -128,6 +128,43 @@ def cmd_estado():
         print(f"{canal:22s} VIVO   {listos} clips")
 
 
+def limpiar_archivos_antiguos(dias: int = 7):
+    """Elimina automáticamente vídeos, transcripciones y logs de /app/clips con más de 7 días de antigüedad."""
+    limite_segundos = dias * 86400
+    ahora = time.time()
+    borrados = 0
+
+    carpetas_a_revisar = [
+        OUT / "LISTOS",
+        OUT / "REVISAR",
+        DATA / "logs",
+        DATA / "work"
+    ]
+
+    for carpeta in carpetas_a_revisar:
+        if not carpeta.exists():
+            continue
+        for item in list(carpeta.rglob("*")):
+            if item.is_file():
+                try:
+                    mtime = item.stat().st_mtime
+                    if (ahora - mtime) > limite_segundos:
+                        item.unlink(missing_ok=True)
+                        borrados += 1
+                        print(f"[🧹 LIMPIEZA] Borrado archivo antiguo (>7 días): {item.relative_to(DATA)}", flush=True)
+                except Exception:
+                    pass
+            elif item.is_dir():
+                try:
+                    mtime = item.stat().st_mtime
+                    if (ahora - mtime) > limite_segundos and not any(item.iterdir()):
+                        shutil.rmtree(item, ignore_errors=True)
+                except Exception:
+                    pass
+    if borrados > 0:
+        print(f"[🧹 LIMPIEZA] Se han eliminado {borrados} archivos antiguos de más de {dias} días para liberar disco.", flush=True)
+
+
 def main():
     p = argparse.ArgumentParser(description="supervisor de vigilantes")
     p.add_argument("--canales", help="lista separada por comas; por defecto, todos")
@@ -165,12 +202,17 @@ def main():
     signal.signal(signal.SIGINT, apagar)
     signal.signal(signal.SIGTERM, apagar)
 
-    vistos_clips = set(p.name for p in (OUT / "LISTOS").glob("*.mp4")) if (OUT / "LISTOS").exists() else set()
-    vistos_revisar = set(p.name for p in (OUT / "REVISAR").glob("*.mp4")) if (OUT / "REVISAR").exists() else set()
+    # Limpieza automática inicial al arrancar
+    limpiar_archivos_antiguos(dias=7)
 
+    ciclos = 0
     try:
         while True:
             time.sleep(15)
+            ciclos += 1
+            if ciclos % 240 == 0:  # Cada 1 hora (240 * 15s)
+                limpiar_archivos_antiguos(dias=7)
+
             for v in vigilantes:
                 v.revisar()
 
