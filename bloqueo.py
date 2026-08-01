@@ -43,12 +43,12 @@ def exclusivo(ruta: Path, etiqueta: str = "", aviso_tras: float = 5.0):
                 break
             except OSError:
                 if not avisado and time.time() - inicio > aviso_tras:
-                    LOG.info("Esperando turno de CPU%s...",
-                             f" para {etiqueta}" if etiqueta else "")
+                    LOG.info("⏳ ESPERANDO TURNO DE CPU%s",
+                             f" · TAREA: {etiqueta}" if etiqueta else "")
                     avisado = True
                 time.sleep(0.5)
         if avisado:
-            LOG.info("Turno conseguido tras %.0fs", time.time() - inicio)
+            LOG.info("🔓 TURNO DE CPU CONSEGUIDO\n   ESPERA: %.0fs", time.time() - inicio)
         yield
     finally:
         try:

@@ -68,13 +68,25 @@ class KickChatListener:
         self.messages = collections.deque(maxlen=1000)
         self._running = False
         self._task: asyncio.Task | None = None
+        self._conectado: asyncio.Event | None = None
 
-    async def start(self):
+    async def start(self, timeout: float = 15) -> bool:
         self._running = True
+        self._conectado = asyncio.Event()
         self._task = asyncio.create_task(self._listen_loop())
+        try:
+            await asyncio.wait_for(self._conectado.wait(), timeout=timeout)
+        except asyncio.TimeoutError:
+            return False
+        return True
+
+    def esta_conectado(self) -> bool:
+        return self._conectado is not None and self._conectado.is_set()
 
     async def stop(self):
         self._running = False
+        if self._conectado:
+            self._conectado.clear()
         if self._task:
             self._task.cancel()
             await asyncio.gather(self._task, return_exceptions=True)
@@ -97,6 +109,8 @@ class KickChatListener:
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.ws_connect(ws_url, timeout=15) as ws:
+                        if self._conectado:
+                            self._conectado.clear()
                         sub_msg = {
                             "event": "pusher:subscribe",
                             "data": {"auth": "", "channel": f"chatrooms.{chatroom_id}.v2"}
@@ -111,6 +125,9 @@ class KickChatListener:
                                 event = payload.get("event", "")
                                 if event == "pusher:ping":
                                     await ws.send_str(json.dumps({"event": "pusher:pong", "data": {}}))
+                                elif event == "pusher_internal:subscription_succeeded":
+                                    if self._conectado:
+                                        self._conectado.set()
                                 elif "ChatMessage" in event or "message" in event.lower():
                                     texto = _texto_mensaje(payload.get("data", ""))
                                     if texto:
@@ -120,7 +137,12 @@ class KickChatListener:
             except asyncio.CancelledError:
                 break
             except Exception:
+                if self._conectado:
+                    self._conectado.clear()
                 await asyncio.sleep(5)
+            finally:
+                if self._conectado:
+                    self._conectado.clear()
 
 
 def _texto_mensaje(data) -> str:

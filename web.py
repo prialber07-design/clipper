@@ -13,7 +13,7 @@ import os
 import re
 import subprocess
 import threading
-from functools import partial
+from functools import lru_cache, partial
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -23,6 +23,25 @@ import clipper
 
 DATA = clipper.DATA
 OUT = clipper.OUT
+
+
+@lru_cache(maxsize=512)
+def _duracion_video_cache(path: Path, mtime_ns: int, size: int) -> int:
+    try:
+        duracion = round(float(clipper.run([
+            clipper.FFPROBE, "-v", "error", "-show_entries", "format=duration",
+            "-of", "default=nw=1:nk=1", str(path)]).stdout.strip()))
+    except (ValueError, OSError, subprocess.CalledProcessError):
+        return 0
+    return duracion
+
+
+def _duracion_video(path: Path) -> int:
+    try:
+        stat = path.stat()
+    except OSError:
+        return 0
+    return _duracion_video_cache(path, stat.st_mtime_ns, stat.st_size)
 
 HTML_TEMPLATE = """<!doctype html>
 <html lang="es">
@@ -760,6 +779,7 @@ HTML_TEMPLATE = """<!doctype html>
 
   <script>
     let currentPath = '';
+    let firmaClips = '';
 
     document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
@@ -807,6 +827,9 @@ HTML_TEMPLATE = """<!doctype html>
         document.getElementById('count-listos').textContent = data.listos.length;
         document.getElementById('count-revisar').textContent = data.revisar.length;
 
+        const nuevaFirma = JSON.stringify(data);
+        if (nuevaFirma === firmaClips) return;
+        firmaClips = nuevaFirma;
         renderGridSeguro('grid-listos', data.listos, false);
         renderGridSeguro('grid-revisar', data.revisar, true);
         lucide.createIcons();
@@ -865,7 +888,7 @@ HTML_TEMPLATE = """<!doctype html>
         const video = document.createElement('video');
         video.src = url;
         video.controls = true;
-        video.preload = 'metadata';
+        video.preload = 'none';
         video.playsInline = true;
         thumb.append(video);
         thumb.addEventListener('click', () => abrirPrevisualizacionSeguro(url, clip.gancho || clip.nombre, 'video'));
@@ -901,135 +924,12 @@ HTML_TEMPLATE = """<!doctype html>
       animateGrid('#' + containerId + ' .clip-card');
     }
 
-    function renderGridLegacy(containerId, clips, esRevisar) {
-      return renderGridSeguro(containerId, clips, esRevisar); /*
-      const container = document.getElementById(containerId);
-      if (!clips || clips.length === 0) {
-        container.innerHTML = `
-          <div class="empty-box">
-            <i data-lucide="${esRevisar ? 'sparkles' : 'coffee'}" style="width:48px;height:48px;" class="empty-icon-svg"></i>
-            <h3>${esRevisar ? 'No hay clips pendientes de revisión' : 'No hay clips listos para subir todavía'}</h3>
-            <p style="color:var(--text-muted);">${esRevisar ? 'Todos los clips generados han superado el filtro de calidad.' : 'Los clips aparecerán aquí de forma automática en cuanto salten picos en los directos.'}</p>
-          </div>`;
-        return;
-      }
-
-      container.innerHTML = clips.map(c => `
-        <article class="clip-card" data-search="${(c.canal + ' ' + c.gancho).toLowerCase()}">
-          <div class="video-thumb-container" onclick="abrirPrevisualizacion('${c.url}', '${c.gancho || c.nombre}', 'video')">
-            <video src="${c.url}" controls preload="metadata" playsinline></video>
-            <div class="thumb-play-overlay">
-              <div class="play-circle-icon">
-                <i data-lucide="play" style="width:32px;height:32px;fill:#fff;"></i>
-              </div>
-            </div>
-          </div>
-          <div class="clip-body">
-            <div class="tags-row">
-              <span class="streamer-pill">#${c.canal}</span>
-              <span class="dur-pill">⏱️ ${c.duracion}s</span>
-            </div>
-            <h2 class="clip-heading">${c.gancho || '(Sin título)'}</h2>
-            ${esRevisar && c.motivo ? `<div class="clip-alert">⚠️ ${c.motivo}</div>` : ''}
-            <div class="btn-group">
-              <button onclick="abrirPrevisualizacion('${c.url}', '${c.gancho || c.nombre}', 'video')" class="btn-action-secondary">
-                <i data-lucide="eye" style="width:18px;height:18px;"></i>
-                <span>Ver</span>
-              </button>
-              <a href="${c.url}" download class="btn-action-primary">
-                <i data-lucide="download" style="width:18px;height:18px;"></i>
-                <span>Descargar</span>
-              </a>
-            </div>
-          </div>
-        </article>
-      `).join('');
-
-      animateGrid('#' + containerId + ' .clip-card');
-      */
-    }
-
     function filtrarClips() {
       const query = document.getElementById('searchInput').value.toLowerCase();
       document.querySelectorAll('.clip-card').forEach(card => {
         const text = card.getAttribute('data-search') || '';
         card.style.display = text.includes(query) ? 'flex' : 'none';
       });
-    }
-
-    async function cargarArchivosLegacy(subpath) {
-      return cargarArchivosSeguro(subpath); /*
-      currentPath = subpath;
-      try {
-        const res = await fetch('/api/browse?path=' + encodeURIComponent(subpath));
-        const data = await res.json();
-
-        // Render Breadcrumbs
-        const parts = subpath ? subpath.split('/').filter(Boolean) : [];
-        let breadHTML = `<span class="crumb-link" onclick="cargarArchivos('')">🏠 Inicio (/app/clips)</span>`;
-        let acc = '';
-        parts.forEach((p) => {
-          acc += (acc ? '/' : '') + p;
-          const target = acc;
-          breadHTML += ` <span class="crumb-divider">/</span> <span class="crumb-link" onclick="cargarArchivos('${target}')">${p}</span>`;
-        });
-        document.getElementById('breadcrumbs').innerHTML = breadHTML;
-
-        // Render Grid
-        const grid = document.getElementById('files-grid');
-        if (!data.items || data.items.length === 0) {
-          grid.innerHTML = `<div class="empty-box"><p style="color:var(--text-muted)">Esta carpeta está vacía.</p></div>`;
-          return;
-        }
-
-        grid.innerHTML = data.items.map(item => {
-          const iconName = item.is_dir ? 'folder' : (item.name.endsWith('.mp4') ? 'film' : 'file-text');
-          const itemPath = subpath ? (subpath + '/' + item.name) : item.name;
-          const fileUrl = '/files/' + itemPath;
-          const isVideo = item.name.endsWith('.mp4');
-          const isText = item.name.endsWith('.txt') || item.name.endsWith('.log') || item.name.endsWith('.csv') || item.name.endsWith('.json');
-
-          if (item.is_dir) {
-            return `
-              <div class="file-card" onclick="cargarArchivos('${itemPath}')">
-                <div class="file-card-icon">
-                  <i data-lucide="folder" style="width:24px;height:24px;"></i>
-                </div>
-                <div class="file-card-meta">
-                  <div class="file-card-name">${item.name}</div>
-                  <div class="file-card-sub">Carpeta</div>
-                </div>
-                <i data-lucide="chevron-right" style="width:20px;height:20px;color:var(--text-dim);"></i>
-              </div>`;
-          } else {
-            return `
-              <div class="file-card">
-                <div class="file-card-icon" onclick="${isVideo ? `abrirPrevisualizacion('${fileUrl}', '${item.name}', 'video')` : (isText ? `abrirPrevisualizacion('${fileUrl}', '${item.name}', 'text')` : '')}">
-                  <i data-lucide="${iconName}" style="width:24px;height:24px;"></i>
-                </div>
-                <div class="file-card-meta" onclick="${isVideo ? `abrirPrevisualizacion('${fileUrl}', '${item.name}', 'video')` : (isText ? `abrirPrevisualizacion('${fileUrl}', '${item.name}', 'text')` : '')}">
-                  <div class="file-card-name" title="${item.name}">${item.name}</div>
-                  <div class="file-card-sub">${item.size}</div>
-                </div>
-                <div style="display:flex; gap:0.4rem;">
-                  ${isVideo || isText ? `<button onclick="abrirPrevisualizacion('${fileUrl}', '${item.name}', '${isVideo ? 'video' : 'text'}')" class="btn-action-secondary" style="padding:0.6rem 0.8rem; flex:none;"><i data-lucide="eye" style="width:16px;height:16px;"></i></button>` : ''}
-                  <a href="${fileUrl}" download class="btn-action-secondary" style="padding:0.6rem 0.8rem; flex:none;">
-                    <i data-lucide="download" style="width:16px;height:16px;"></i>
-                  </a>
-                </div>
-              </div>`;
-          }
-        }).join('');
-
-        lucide.createIcons();
-        animateGrid('#files-grid .file-card');
-
-      } catch (e) {
-        console.error("Error explorando archivos:", e);
-      }
-    }
-
-      */
     }
 
     async function cargarArchivosSeguro(subpath) {
@@ -1126,37 +1026,6 @@ HTML_TEMPLATE = """<!doctype html>
       modal.classList.add('active');
       gsap.from('.modal-window', { scale: 0.9, opacity: 0, duration: 0.3, ease: 'back.out(1.5)' });
       lucide.createIcons();
-    }
-
-    async function abrirPrevisualizacionLegacy(url, title, type) {
-      return abrirPrevisualizacionSeguro(url, title, type); /*
-      const modal = document.getElementById('previewModal');
-      const modalTitle = document.getElementById('modalTitle');
-      const modalBody = document.getElementById('modalBody');
-      const modalDownloadBtn = document.getElementById('modalDownloadBtn');
-
-      modalTitle.textContent = title || 'Previsualización';
-      modalDownloadBtn.href = url;
-      modalBody.innerHTML = '<p style="color:var(--text-muted)">Cargando...</p>';
-
-      if (type === 'video') {
-        modalBody.innerHTML = `<video src="${url}" class="video-player-modal" controls autoplay playsinline></video>`;
-      } else if (type === 'text') {
-        try {
-          const res = await fetch(url);
-          const text = await res.text();
-          modalBody.innerHTML = `<div style="width:100%; background:#040711; border:1px solid var(--border); border-radius:14px; padding:1.25rem; font-family:'Space Grotesk',monospace; font-size:0.9rem; color:#38bdf8; max-height:50vh; overflow-y:auto; white-space:pre-wrap;">${text || '(Archivo vacío)'}</div>`;
-        } catch (e) {
-          modalBody.innerHTML = `<p style="color:var(--danger)">No se pudo cargar el contenido del archivo.</p>`;
-        }
-      }
-
-      modal.classList.add('active');
-      gsap.from('.modal-window', { scale: 0.9, opacity: 0, duration: 0.3, ease: 'back.out(1.5)' });
-      lucide.createIcons();
-    }
-
-      */
     }
 
     function cerrarPrevisualizacion(e) {
@@ -1321,12 +1190,7 @@ class Handler(SimpleHTTPRequestHandler):
                     gancho = m.group(1).strip()
 
             rel_url = f"/files/out/{'REVISAR' if es_revisar else 'LISTOS'}/{quote(mp4.name, safe='')}"
-            try:
-                duracion = float(clipper.run([
-                    clipper.FFPROBE, "-v", "error", "-show_entries", "format=duration",
-                    "-of", "default=nw=1:nk=1", str(mp4)]).stdout.strip())
-            except (ValueError, OSError, subprocess.CalledProcessError):
-                duracion = 0
+            duracion = _duracion_video(mp4)
 
             clips.append({
                 "nombre": mp4.name,
@@ -1388,12 +1252,18 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, formato, *args):
         pass
 
+    def copyfile(self, source, outputfile):
+        try:
+            super().copyfile(source, outputfile)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass
+
 
 def arrancar(puerto: int = None, en_hilo: bool = False):
     usuario = os.environ.get("CLIPPER_WEB_USUARIO", "clips")
     clave = os.environ.get("CLIPPER_WEB_CLAVE", "").strip()
-    if not clave:
-        raise RuntimeError("CLIPPER_WEB_CLAVE es obligatoria para arrancar la galeria")
+    if not clave or clave.casefold() == "pon-aqui-una-clave-larga":
+        raise RuntimeError("CLIPPER_WEB_CLAVE debe ser una clave real y no el marcador del ejemplo")
     puerto = puerto or int(os.environ.get("CLIPPER_WEB_PUERTO", "8080"))
 
     DATA.mkdir(parents=True, exist_ok=True)
@@ -1404,7 +1274,7 @@ def arrancar(puerto: int = None, en_hilo: bool = False):
     servidor = ThreadingHTTPServer(("0.0.0.0", puerto), handler)
     servidor.daemon_threads = True
 
-    print(f"[>] Galería Web e interfaz en http://0.0.0.0:{puerto} (usuario: {usuario})")
+    print(f"🌐 GALERÍA WEB ACTIVA\n   URL: http://0.0.0.0:{puerto}\n   USUARIO: {usuario}")
     if en_hilo:
         threading.Thread(target=servidor.serve_forever, daemon=True).start()
         return servidor

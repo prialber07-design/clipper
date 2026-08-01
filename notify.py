@@ -60,9 +60,10 @@ def _sincronizar(destino: Path, txt: Path | None):
         shutil.copy2(destino, carpeta / destino.name)
         if txt and txt.exists():
             shutil.copy2(txt, carpeta / txt.name)
-        LOG.info("Clip sincronizado carpeta=%s archivo=%s", carpeta, destino.name)
+        LOG.info("☁️ CLIP SINCRONIZADO\n   CARPETA: %s\n   ARCHIVO: %s", carpeta, destino.name)
     except OSError as e:
-        LOG.warning("No se pudo sincronizar carpeta=%s (%s); el clip sigue en LISTOS", carpeta, e)
+        LOG.warning("⚠️ SINCRONIZACIÓN FALLIDA\n   CARPETA: %s\n   MOTIVO: %s\n   EL CLIP SIGUE EN: LISTOS",
+                    carpeta, e)
 
 
 def registrar_listo(mp4: Path, meta: dict) -> Path:
@@ -110,11 +111,12 @@ def _preparar_adjunto(mp4: Path) -> Path | None:
     # 8% de margen para el contenedor y el audio
     bitrate = int((limite * 8 * 0.92) / segundos) - 128_000
     if bitrate < 600_000:
-        LOG.warning("El adjunto no cabe en %.0fMB con calidad publicable; aviso solo con texto",
+        LOG.warning("⚠️ ADJUNTO OMITIDO\n   LÍMITE: %.0f MB\n   MOTIVO: NO CABE CON CALIDAD PUBLICABLE\n   AVISO: SOLO TEXTO",
                     limite / 1024 / 1024)
         return None
 
-    LOG.info("Recomprimiendo adjunto para móvil tamaño_mb=%.1f", mp4.stat().st_size / 1024 / 1024)
+    LOG.info("📱 RECOMPRIMIENDO ADJUNTO PARA MÓVIL\n   TAMAÑO ORIGINAL: %.1f MB",
+             mp4.stat().st_size / 1024 / 1024)
     try:
         clipper.run([clipper.FFMPEG, "-y", "-hide_banner", "-loglevel", "error", "-i", str(mp4),
                      "-c:v", "libx264", "-preset", "veryfast",
@@ -122,7 +124,7 @@ def _preparar_adjunto(mp4: Path) -> Path | None:
                      "-bufsize", str(bitrate * 2), "-pix_fmt", "yuv420p",
                      "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", str(ligero)])
     except Exception as e:
-        LOG.warning("No se pudo preparar el adjunto (%s)", e)
+        LOG.warning("⚠️ ADJUNTO NO PREPARADO\n   MOTIVO: %s", e)
         return None
     return ligero if ligero.exists() and ligero.stat().st_size <= limite else None
 
@@ -144,11 +146,11 @@ def avisar(titulo: str, mensaje: str, adjunto: Path | None = None,
            enlace: str | None = None):
     """Manda el aviso a ntfy. Nunca revienta el pipeline si falla la red."""
     if not NOTIF.get("activo"):
-        LOG.info("Aviso ntfy omitido titulo=%s motivo=desactivado", titulo)
+        LOG.info("📱 NTFY OMITIDO\n   TÍTULO: %s\n   MOTIVO: DESACTIVADO", titulo)
         return
     topic = NOTIF.get("ntfy_topic", "").strip()
     if not topic:
-        LOG.warning("Aviso ntfy no enviado titulo=%s motivo=topic_vacio", titulo)
+        LOG.warning("⚠️ NTFY NO ENVIADO\n   TÍTULO: %s\n   MOTIVO: TOPIC VACÍO", titulo)
         return
 
     url = f"https://ntfy.sh/{topic}"
@@ -176,9 +178,10 @@ def avisar(titulo: str, mensaje: str, adjunto: Path | None = None,
                                      headers={k: v for k, v in cabeceras.items()},
                                      method="POST")
         urllib.request.urlopen(req, timeout=15)
-        LOG.info("Aviso ntfy enviado titulo=%s adjunto=%s", titulo, envio.name if envio else "no")
+        LOG.info("📱 NTFY ENVIADO\n   TÍTULO: %s\n   ADJUNTO: %s",
+                 titulo, envio.name if envio else "NO")
     except (urllib.error.URLError, OSError) as e:
-        LOG.warning("No se pudo enviar aviso ntfy (%s); el clip sigue guardado", e)
+        LOG.warning("⚠️ NTFY NO ENVIADO\n   MOTIVO: %s\n   EL CLIP SIGUE GUARDADO", e)
 
 
 def publicar(mp4: Path, meta: dict) -> Path:
@@ -187,7 +190,8 @@ def publicar(mp4: Path, meta: dict) -> Path:
     dur = meta.get("duracion", "?")
     canal = meta.get("canal", "desconocido")
 
-    LOG.info("Clip listo canal=%s archivo=%s duracion_s=%s gancho=%r",
+    LOG.info("✅ CLIP PUBLICADO EN LISTOS\n   CANAL: %s\n   ARCHIVO: %s\n"
+             "   DURACIÓN: %ss\n   GANCHO: %r",
              canal, destino.name, dur, gancho)
 
     aviso = f"{gancho}\n\n{dur}s"
@@ -198,7 +202,8 @@ def publicar(mp4: Path, meta: dict) -> Path:
     # Con el PC apagado el enlace es lo unico que convierte el aviso en algo
     # accionable: abres, ves el clip y lo descargas al movil.
     base = os.environ.get("CLIPPER_URL_PUBLICA", "").rstrip("/")
-    enlace = f"{base}/{quote(destino.name)}" if base else None
+    enlace = (f"{base}/files/out/LISTOS/{quote(destino.name, safe='')}"
+              if base else None)
     if enlace:
         aviso += f"\n\n{enlace}"
 

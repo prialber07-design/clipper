@@ -151,7 +151,8 @@ def apartar(mp4: Path, motivos: list[str], meta: dict) -> Path:
     canal = meta.get("canal", "desconocido")
     dur = meta.get("duracion", "?")
 
-    LOG.warning("Clip apartado para revisión canal=%s archivo=%s duracion_s=%s motivos=%s",
+    LOG.warning("🟡 CLIP APARTADO PARA REVISIÓN\n   CANAL: %s\n   ARCHIVO: %s\n"
+                "   DURACIÓN: %ss\n   MOTIVOS: %s",
                 canal, destino.name, dur, "; ".join(motivos))
 
     return destino

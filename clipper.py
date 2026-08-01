@@ -150,9 +150,9 @@ def run(cmd, cwd=None):
         raise FileNotFoundError(f"No encuentro el ejecutable '{cmd[0]}'") from e
     if proc.returncode != 0:
         if proc.stdout.strip():
-            LOG.error("Salida del comando fallido:\n%s", proc.stdout[-4000:].strip())
+            LOG.error("❌ COMANDO FALLIDO · SALIDA\n%s", proc.stdout[-4000:].strip())
         if proc.stderr.strip():
-            LOG.error("Error del comando fallido:\n%s", proc.stderr[-4000:].strip())
+            LOG.error("❌ COMANDO FALLIDO · ERROR\n%s", proc.stderr[-4000:].strip())
         raise subprocess.CalledProcessError(
             proc.returncode, cmd, output=proc.stdout, stderr=proc.stderr)
     return proc
@@ -173,19 +173,19 @@ def cmd_fetch(args):
     dest = d / "source.mp4"
 
     if Path(src).exists():
-        LOG.info("Copiando archivo local -> %s", dest)
+        LOG.info("📥 COPIANDO ARCHIVO LOCAL\n   DESTINO: %s", dest)
         shutil.copy(src, dest)
     else:
-        LOG.info("Descargando %s", src)
+        LOG.info("🌐 DESCARGANDO FUENTE\n   URL: %s", src)
         run([sys.executable, "-m", "yt_dlp",
              "-f", "bv*[height<=1080]+ba/b[height<=1080]/b",
              "--merge-output-format", "mp4",
              "-o", str(dest), src])
 
-    LOG.info("Extrayendo audio 16kHz mono")
+    LOG.info("🎧 EXTRAYENDO AUDIO\n   FORMATO: 16 kHz · MONO")
     run([FFMPEG, "-y", "-i", str(dest), "-vn", "-ac", "1", "-ar", "16000",
          "-c:a", "pcm_s16le", str(d / "audio.wav")])
-    LOG.info("fetch completado slug=%s audio=%s", slug, d / "audio.wav")
+    LOG.info("✅ FETCH COMPLETADO\n   JOB: %s\n   AUDIO: %s", slug, d / "audio.wav")
     return slug
 
 
@@ -205,13 +205,19 @@ def liberar_whisper_model():
 def canal_desde_nombre(nombre: str) -> str:
     """Extrae el canal de nombres antiguos y nuevos de clips."""
     stem = Path(nombre).stem
-    stem = re.sub(r"-\d+$", "", stem)
-    encontrado = re.match(r"^(?P<canal>.+?)-(?:(?:\d{8})-)?\d{6}$", stem)
+    antiguo = re.match(
+        r"^\d+_(?P<canal>.+?)_\d{4}-\d{2}-\d{2}(?:_\d{6})?$",
+        stem,
+    )
+    if antiguo:
+        return antiguo.group("canal")
+    stem_sin_clip = re.sub(r"-\d+$", "", stem)
+    encontrado = re.match(r"^(?P<canal>.+?)-(?:(?:\d{8})-)?\d{6}$", stem_sin_clip)
     if encontrado:
         return encontrado.group("canal")
     partes = stem.split("_")
     if len(partes) >= 3 and partes[0].isdigit():
-        return partes[1]
+        return "_".join(partes[1:-1])
     return partes[0] if partes and partes[0] else "desconocido"
 
 def get_whisper_model(modelo_name, device, compute_type):
@@ -220,8 +226,9 @@ def get_whisper_model(modelo_name, device, compute_type):
     key = (modelo_name, device, compute_type)
     if key not in _MODELO_CACHE:
         cpu_threads = int(os.environ.get("CLIPPER_CPU_THREADS", 8))
-        LOG.info("Cargando modelo Whisper modelo=%s dispositivo=%s compute=%s hilos_cpu=%s",
-                 modelo_name, device, compute_type, cpu_threads)
+        LOG.info("🧠 CARGANDO WHISPER\n   MODELO: %s\n   DISPOSITIVO: %s\n"
+                 "   COMPUTE: %s\n   HILOS CPU: %s",
+                 modelo_name, device.upper(), compute_type, cpu_threads)
         _MODELO_CACHE[key] = WhisperModel(
             modelo_name,
             device=device,
@@ -249,7 +256,8 @@ def cmd_transcribe(args):
 
     def _intento(dev, comp):
         model = get_whisper_model(wcfg["modelo"], dev, comp)
-        LOG.info("Transcripción iniciada dispositivo=%s compute=%s audio=%s", dev, comp, audio)
+        LOG.info("🧠 TRANSCRIPCIÓN INICIADA\n   DISPOSITIVO: %s\n   COMPUTE: %s\n   AUDIO: %s",
+                 dev.upper(), comp, audio)
         segments, _ = model.transcribe(
             str(audio), language=wcfg["idioma"], word_timestamps=True,
             beam_size=1, vad_filter=True, vad_parameters={"min_silence_duration_ms": 300},
@@ -260,9 +268,9 @@ def cmd_transcribe(args):
                 segs.append({"start": s.start, "end": s.end, "text": s.text.strip()})
                 for w in (s.words or []):
                     words.append({"start": w.start, "end": w.end, "word": w.word.strip()})
-                LOG.info("Transcripción avanza minuto=%0.1f", s.end / 60)
+                LOG.info("🧠 TRANSCRIPCIÓN EN CURSO\n   PROGRESO: %.1f MINUTOS", s.end / 60)
         except IndexError:
-            LOG.warning("Tramo sin habla alineable; transcripción vacía")
+            LOG.warning("⚠️ TRANSCRIPCIÓN VACÍA\n   MOTIVO: TRAMO SIN HABLA ALINEABLE")
             return [], []
         return segs, words
 
@@ -270,7 +278,7 @@ def cmd_transcribe(args):
         try:
             segs, words = _intento("cuda", "float16")
         except Exception as e:
-            LOG.warning("CUDA falló (%s); reintento en CPU", str(e).splitlines()[0])
+            LOG.warning("⚠️ CUDA FALLÓ · CAMBIO A CPU\n   MOTIVO: %s", str(e).splitlines()[0])
             device = "cpu"
             segs, words = _intento("cpu", wcfg["compute_type"])
     else:
@@ -288,9 +296,10 @@ def cmd_transcribe(args):
     clips = _auto_candidates(segs, energy, args.n)
     (d / "clips.json").write_text(json.dumps({"clips": clips}, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    LOG.info("Transcripción completada segmentos=%d palabras=%d archivo=%s",
+    LOG.info("✅ TRANSCRIPCIÓN COMPLETADA\n   SEGMENTOS: %d\n   PALABRAS: %d\n   ARCHIVO: %s",
              len(segs), len(words), d / "transcript.txt")
-    LOG.info("Candidatos generados=%d archivo=%s", len(clips), d / "clips.json")
+    LOG.info("💡 CANDIDATOS GENERADOS\n   TOTAL: %d\n   ARCHIVO: %s",
+             len(clips), d / "clips.json")
 
 
 def _energy_curve(audio: Path, hop=0.5):
@@ -575,7 +584,8 @@ def cmd_rejilla(args):
     p = run([FFPROBE, "-v", "error", "-select_streams", "v:0",
              "-show_entries", "stream=width,height", "-of", "csv=p=0", str(fuente)])
     ancho, alto = (int(v) for v in p.stdout.strip().split(","))
-    LOG.info("Rejilla generada=%s fuente=%dx%d celda=%dx%d cam_rect=[x,y,ancho,alto]",
+    LOG.info("🧭 REJILLA GENERADA\n   ARCHIVO: %s\n   FUENTE: %dx%d\n"
+             "   CELDA: %dx%d\n   CAM_RECT: [X,Y,ANCHO,ALTO]",
              destino, ancho, alto, ancho // 8, alto // 8)
 
 
@@ -635,7 +645,7 @@ def cmd_render(args):
     tmp.mkdir(exist_ok=True)
 
     for c in clips:
-        LOG.info("Render iniciado slug=%s clip=%s inicio=%.1fs fin=%.1fs duracion=%.0fs",
+        LOG.info("🎬 RENDER INICIADO\n   JOB: %s\n   CLIP: %s\n   RANGO: %.1fs → %.1fs\n   DURACIÓN: %.0fs",
                  args.slug, c["id"], c["start"], c["end"], c["end"] - c["start"])
         _build_ass(words, c, tmp / "subs.ass")
         target = outdir / f"{args.slug}-{c['id']}.mp4"
@@ -651,7 +661,7 @@ def cmd_render(args):
         (outdir / f"{args.slug}-{c['id']}.txt").write_text(
             _ficha_texto(args.slug, c), encoding="utf-8")
 
-    LOG.info("Render completado clips=%d salida=%s", len(clips), outdir)
+    LOG.info("✅ RENDER COMPLETADO\n   CLIPS: %d\n   SALIDA: %s", len(clips), outdir)
 
 
 # --- cli ----------------------------------------------------------------------

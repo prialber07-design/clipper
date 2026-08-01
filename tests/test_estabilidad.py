@@ -1,4 +1,7 @@
 import json
+import io
+import multiprocessing
+import os
 import subprocess
 import sys
 import tempfile
@@ -13,6 +16,13 @@ import live
 import notify
 import publicar_todo
 import web
+
+
+def _incrementar_contador(contadores, bloqueo_path, repeticiones):
+    live.CONTADORES = Path(contadores)
+    live.CONTADORES_LOCK = Path(bloqueo_path)
+    for _ in range(repeticiones):
+        live.elegir_duracion("canal")
 
 
 class EstabilidadTests(unittest.TestCase):
@@ -34,7 +44,11 @@ class EstabilidadTests(unittest.TestCase):
             clipper.canal_desde_nombre("elcalvolol-20260801-193235-01.mp4"),
             "elcalvolol",
         )
-        self.assertEqual(clipper.canal_desde_nombre("001_elcalvolol_2026-08-01.mp4"), "elcalvolol")
+        self.assertEqual(clipper.canal_desde_nombre("001_mi_canal_2026-08-01.mp4"), "mi_canal")
+        self.assertEqual(
+            clipper.canal_desde_nombre("001_mi_canal_2026-08-01_193235.mp4"),
+            "mi_canal",
+        )
 
     def test_contador_de_duraciones_es_atomico(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -47,6 +61,21 @@ class EstabilidadTests(unittest.TestCase):
                 self.assertEqual(json.loads(live.CONTADORES.read_text())["canal"], 2)
             finally:
                 live.CONTADORES, live.CONTADORES_LOCK = anterior, anterior_lock
+
+    def test_contador_de_duraciones_entre_procesos(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            contadores, bloqueo_path = root / "contadores.json", root / "contadores.lock"
+            ctx = multiprocessing.get_context("spawn" if os.name == "nt" else "fork")
+            procesos = [ctx.Process(target=_incrementar_contador,
+                                     args=(str(contadores), str(bloqueo_path), 6))
+                         for _ in range(2)]
+            for proceso in procesos:
+                proceso.start()
+            for proceso in procesos:
+                proceso.join(30)
+                self.assertEqual(proceso.exitcode, 0)
+            self.assertEqual(json.loads(contadores.read_text())["canal"], 12)
 
     def test_registrar_listo_propag_n(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -76,10 +105,29 @@ class EstabilidadTests(unittest.TestCase):
             mp4 = carpeta / "elcalvolol-20260801-193235-01.mp4"
             mp4.write_bytes(b"video")
             handler = object.__new__(web.Handler)
-            with patch.object(clipper, "run", return_value=SimpleNamespace(stdout="33.7")):
+            web._duracion_video_cache.cache_clear()
+            with patch.object(clipper, "run", return_value=SimpleNamespace(stdout="33.7")) as ejecutar:
                 clips = handler._obtener_clips_dir(carpeta, es_revisar=True)
+                handler._obtener_clips_dir(carpeta, es_revisar=True)
             self.assertEqual(clips[0]["canal"], "elcalvolol")
             self.assertEqual(clips[0]["duracion"], 34)
+            self.assertEqual(ejecutar.call_count, 1)
+
+    def test_web_rechaza_clave_de_ejemplo(self):
+        with patch.dict(os.environ, {"CLIPPER_WEB_CLAVE": "pon-aqui-una-clave-larga"}):
+            with self.assertRaises(RuntimeError):
+                web.arrancar()
+
+    def test_web_silencia_desconexion_de_video(self):
+        handler = object.__new__(web.Handler)
+
+        for error in (BrokenPipeError, ConnectionResetError):
+            class ClienteCierra:
+                def write(self, _datos):
+                    raise error
+
+            with self.subTest(error=error):
+                handler.copyfile(io.BytesIO(b"video"), ClienteCierra())
 
     def test_publicar_todo_es_idempotente(self):
         with tempfile.TemporaryDirectory() as tmp:

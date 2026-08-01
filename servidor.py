@@ -59,8 +59,8 @@ class Vigilante:
         self.proc = subprocess.Popen(cmd, cwd=ROOT, stdout=self.log,
                                      stderr=subprocess.STDOUT, env=entorno, **extra)
         self.arrancado = time.time()
-        LOG.info("Vigilante arrancado canal=%s plataforma=%s pid=%s",
-                 self.canal, self.plataforma, self.proc.pid)
+        LOG.info("🚀 VIGILANTE INICIADO\n   CANAL: %s\n   PLATAFORMA: %s\n   PID: %s",
+                 self.canal, self.plataforma.upper(), self.proc.pid)
 
     def vivo(self) -> bool:
         return self.proc is not None and self.proc.poll() is None
@@ -100,7 +100,7 @@ class Vigilante:
             except subprocess.TimeoutExpired:
                 pass
         self.reinicios += 1
-        LOG.warning("Vigilante caído canal=%s; relanzo intento=%d espera_s=%d",
+        LOG.warning("🔁 VIGILANTE CAÍDO\n   CANAL: %s\n   REINICIO: %d\n   PRÓXIMO INTENTO: %ds",
                     self.canal, self.reinicios, self.espera)
         self.arrancar()
         self.espera = min(self.espera * 2, REINTENTO_MAX_S)
@@ -141,13 +141,15 @@ def cmd_estado():
         if m:
             vivos.append(m.group(1))
     if not vivos:
-        LOG.warning("No hay vigilantes en marcha")
+        LOG.warning("🔴 SIN VIGILANTES ACTIVOS")
         return 1
     for canal in sorted(set(vivos)):
         listos = sum(clipper.canal_desde_nombre(p.name) == canal
                      for p in (OUT / "LISTOS").glob("*.mp4")) \
             if (OUT / "LISTOS").exists() else 0
-        LOG.info("Estado canal=%s vigilante=activo clips_listos=%d (esto no confirma directo)",
+        LOG.info("🟢 ESTADO DEL VIGILANTE\n   CANAL: %s\n   ESTADO: ACTIVO\n"
+                 "   CLIPS LISTOS: %d\n   NOTA: ESTO NO CONFIRMA QUE HAYA DIRECTO\n"
+                 "   vigilante=activo",
                  canal, listos)
     return 0
 
@@ -175,7 +177,8 @@ def limpiar_archivos_antiguos(dias: int = 7):
                     if (ahora - mtime) > limite_segundos:
                         item.unlink(missing_ok=True)
                         borrados += 1
-                        LOG.info("Limpieza: borrado archivo antiguo ruta=%s", item.relative_to(DATA))
+                        LOG.info("🧹 LIMPIEZA · ARCHIVO ANTIGUO BORRADO\n   RUTA: %s",
+                                 item.relative_to(DATA))
                 except Exception:
                     pass
             elif item.is_dir():
@@ -186,7 +189,8 @@ def limpiar_archivos_antiguos(dias: int = 7):
                 except Exception:
                     pass
     if borrados > 0:
-        LOG.info("Limpieza completada borrados=%d antiguedad_dias=%d", borrados, dias)
+        LOG.info("✅ LIMPIEZA COMPLETADA\n   ARCHIVOS BORRADOS: %d\n   ANTIGÜEDAD: %d DÍAS",
+                 borrados, dias)
 
 
 def main():
@@ -203,7 +207,7 @@ def main():
     if not lista:
         sys.exit("[x] Ningun canal verificado que vigilar")
 
-    LOG.info("Supervisor arrancando vigilantes=%d fecha=%s",
+    LOG.info("🚀 SUPERVISOR INICIANDO\n   VIGILANTES: %d\n   FECHA: %s",
              len(lista), datetime.now().astimezone().isoformat(timespec="seconds"))
 
     # La galeria va en el mismo proceso: un contenedor, un puerto, una cosa
@@ -212,14 +216,14 @@ def main():
         import web
         web.arrancar(en_hilo=True)
     except Exception as e:
-        LOG.warning("Galería web no disponible (%s); los clips siguen en %s", e, OUT)
+        LOG.warning("⚠️ GALERÍA WEB NO DISPONIBLE\n   MOTIVO: %s\n   LOS CLIPS SIGUEN EN: %s", e, OUT)
 
     vigilantes = [Vigilante(f) for f in lista]
     for v in vigilantes:
         v.arrancar()
 
     def apagar(*_):
-        LOG.info("Parando supervisor")
+        LOG.info("🛑 SUPERVISOR DETENIENDO")
         for v in vigilantes:
             v.parar()
         sys.exit(0)
@@ -251,9 +255,8 @@ def main():
                 for mp4 in listos_dir.glob("*.mp4"):
                     if mp4.name not in vistos_clips:
                         vistos_clips.add(mp4.name)
-                        partes = mp4.stem.rsplit("-", 2)
-                        canal = partes[0] if len(partes) == 3 else "desconocido"
-                        LOG.info("Nuevo clip detectado estado=listo canal=%s archivo=%s galeria=disponible",
+                        canal = clipper.canal_desde_nombre(mp4.name)
+                        LOG.info("✅ CLIP LISTO\n   CANAL: %s\n   ARCHIVO: %s\n   GALERÍA: DISPONIBLE",
                                  canal, mp4.name)
 
             # 2. Comprobar si se ha generado un CLIP EN REVISIÓN
@@ -262,16 +265,15 @@ def main():
                 for mp4 in revisar_dir.glob("*.mp4"):
                     if mp4.name not in vistos_revisar:
                         vistos_revisar.add(mp4.name)
-                        partes = mp4.stem.rsplit("-", 2)
-                        canal = partes[0] if len(partes) == 3 else "desconocido"
-                        LOG.warning("Nuevo clip detectado estado=revisar canal=%s archivo=%s",
+                        canal = clipper.canal_desde_nombre(mp4.name)
+                        LOG.warning("🟡 CLIP EN REVISIÓN\n   CANAL: %s\n   ARCHIVO: %s",
                                     canal, mp4.name)
 
             # 3. Heartbeat del supervisor: confirma procesos, no inventa que hay
             # un directo solo porque quedaron segmentos en el buffer.
             activos = [v.canal for v in vigilantes if v.vivo()]
-            LOG.info("Heartbeat supervisor vigilantes_activos=%d/%d canales=%s",
-                     len(activos), len(vigilantes), ",".join(activos) or "ninguno")
+            LOG.info("💓 SUPERVISOR ACTIVO\n   VIGILANTES: %d/%d\n   CANALES: %s",
+                     len(activos), len(vigilantes), ", ".join(activos) or "NINGUNO")
 
     except KeyboardInterrupt:
         apagar()
