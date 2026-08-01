@@ -278,23 +278,25 @@ def avisar_directo(canal: str, url: str):
 
 
 def elegir_duracion(canal: str) -> tuple[str, dict]:
-    """Alterna clips cortos y largos.
+    """Reparte las duraciones siguiendo un patron fijo.
 
-    TikTok solo monetiza vídeos de más de un minuto, pero un feed entero de
-    clips largos rinde peor: se alterna para tener de los dos.
+    Los clips que de verdad circulan en estas comunidades duran entre 4 y 30
+    segundos: los mas vistos de Lopezfnx son de 9 y de 4. Pero TikTok solo
+    monetiza a partir del minuto. Con un patron ciclico salen los dos sin
+    depender de la suerte.
     """
     d = CONFIG.get("duraciones", {})
-    cada = int(d.get("uno_largo_cada", 3))
+    patron = d.get("patron") or ["corto", "largo", "corto", "medio", "largo", "corto"]
     try:
         cont = json.loads(CONTADORES.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         cont = {}
-    n = cont.get(canal, 0) + 1
-    cont[canal] = n
+    n = cont.get(canal, 0)
+    cont[canal] = n + 1
     CONTADORES.parent.mkdir(parents=True, exist_ok=True)
     CONTADORES.write_text(json.dumps(cont), encoding="utf-8")
 
-    modo = "largo" if cada > 0 and n % cada == 0 else "corto"
+    modo = patron[n % len(patron)]
     return modo, d.get(modo, {"min": 26, "max": 34})
 
 
