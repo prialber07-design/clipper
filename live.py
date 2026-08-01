@@ -435,9 +435,16 @@ def _pendiente_visual(mp4: Path, slug: str, canal: str, clip: dict, segs) -> Pat
     destino = carpeta / f"{slug}.mp4"
     destino.write_bytes(mp4.read_bytes())
 
-    hoja = clipper.mosaico(slug)
-    if hoja:
-        (carpeta / f"{slug}_mosaico.png").write_bytes(hoja.read_bytes())
+    # El mosaico es lo que permite decidir; si falla no puede llevarse por
+    # delante la ficha, o queda un pendiente que nadie puede revisar.
+    try:
+        hoja = clipper.mosaico(slug)
+        if hoja:
+            (carpeta / f"{slug}_mosaico.png").write_bytes(hoja.read_bytes())
+        else:
+            print("[!] No se pudo generar el mosaico de este clip")
+    except (OSError, SystemExit, ValueError) as e:
+        print(f"[!] Mosaico fallido ({e}); la ficha se escribe igual")
 
     texto = "\n".join(f"[{s['start']:6.1f}] {s['text'].strip()}" for s in segs)
     (carpeta / f"{slug}.md").write_text(
