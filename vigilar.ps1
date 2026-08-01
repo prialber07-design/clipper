@@ -19,7 +19,10 @@ $py   = "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe"
 
 function Get-Vigilantes {
     # Devuelve @{ canal = ...; pid = ... } por cada live.py watch en marcha.
-    $procs = Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue
+    # pythonw.exe tambien cuenta: es el interprete que usa la tarea programada,
+    # y buscar solo python.exe hacia parecer que no habia nada corriendo.
+    $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+             Where-Object { $_.Name -in @('python.exe', 'pythonw.exe') }
     $salida = @()
     foreach ($p in $procs) {
         $cmd = $p.CommandLine

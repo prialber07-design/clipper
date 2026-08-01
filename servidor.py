@@ -23,6 +23,36 @@ ROOT = Path(__file__).resolve().parent
 LOGS = ROOT / "logs"
 CONFIG = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
 
+
+class _Tee:
+    """Escribe por pantalla y en el log a la vez.
+
+    Bajo pythonw.exe no hay consola donde mirar, y sin esto el supervisor
+    trabajaria a ciegas.
+    """
+
+    def __init__(self, destino: Path):
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        self.fichero = destino.open("a", encoding="utf-8", errors="replace")
+        self.consola = sys.__stdout__
+
+    def write(self, texto):
+        self.fichero.write(texto)
+        self.fichero.flush()
+        if self.consola:
+            try:
+                self.consola.write(texto)
+            except (OSError, ValueError):
+                pass
+
+    def flush(self):
+        self.fichero.flush()
+
+
+def _registrar_salida():
+    tee = _Tee(LOGS / "servidor.log")
+    sys.stdout = sys.stderr = tee
+
 REINTENTO_MIN_S = 15
 REINTENTO_MAX_S = 300
 
@@ -98,9 +128,13 @@ def cmd_estado():
     import re
     vivos = []
     if os.name == "nt":
-        out = subprocess.run(["wmic", "process", "where", "name='python.exe'",
-                              "get", "ProcessId,CommandLine"],
-                             capture_output=True, text=True).stdout
+        # Bajo la tarea programada el interprete es pythonw.exe, no python.exe:
+        # buscar solo uno de los dos hace parecer que no hay nada corriendo.
+        out = ""
+        for exe in ("python.exe", "pythonw.exe"):
+            out += subprocess.run(["wmic", "process", "where", f"name='{exe}'",
+                                   "get", "ProcessId,CommandLine"],
+                                  capture_output=True, text=True).stdout or ""
     else:
         out = subprocess.run(["ps", "-eo", "pid,args"], capture_output=True,
                              text=True).stdout
@@ -126,6 +160,7 @@ def main():
     if args.estado:
         return cmd_estado()
 
+    _registrar_salida()
     filtro = [c.strip() for c in args.canales.split(",")] if args.canales else None
     lista = fichas(filtro)
     if not lista:
