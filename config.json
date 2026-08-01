@@ -101,11 +101,11 @@
     },
     {
       "nombre": "Mario Taxi",
-      "plataforma": "kick",
+      "plataforma": "twitch",
       "canal": "mariotaxi",
-      "seguidores": 6029,
+      "seguidores": null,
       "verificado": true,
-      "detector": "solo_audio",
+      "detector": "reaccion",
       "permiso_clips": "PENDIENTE",
       "layout": "irl",
       "temas": [
@@ -116,8 +116,10 @@
         "bici",
         "semaforo",
         "multa",
-        "trafico"
-      ]
+        "trafico",
+        "visage"
+      ],
+      "fuente": "Emite en twitch.tv/mariotaxi. El handle de Kick existe (6.030 seguidores) pero esta inactivo: resolverlo por existencia del handle fue un error."
     },
     {
       "nombre": "Viviendo en la calle",
@@ -203,7 +205,9 @@
         "yeremi",
         "artista",
         "festival",
-        "arenal"
+        "arenal",
+        "toni",
+        "huevo"
       ],
       "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
     },
@@ -230,7 +234,9 @@
         "fifa",
         "ometv",
         "heaters",
-        "sevilla"
+        "sevilla",
+        "cama",
+        "caida"
       ],
       "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
     },
@@ -266,7 +272,8 @@
         "chicas",
         "trio",
         "cadera",
-        "te gusta"
+        "te gusta",
+        "aitana"
       ],
       "_temas_nota": "Revisar cada pocas semanas: lo que hacen cambia (ver CREADORES.md)"
     }

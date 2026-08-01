@@ -119,41 +119,56 @@ Igual: máximo 1.580 visitas. `ah!` · `yo flipo tio` · `Se cae yony pobrecito`
 
 ---
 
-## Qué están haciendo ahora (agosto 2026)
+## Qué están haciendo ahora (revisado 2026-08-01)
 
 Esto caduca rápido: revisar cada pocas semanas.
 
 **Los cuatro de Twitch están en el mismo circuito.** Tour IRL por España, La
-Velada del Año en Sevilla y festivales de verano (Arenal Sound, Share
-Festival). Se cruzan constantemente: El Calvo y Lopezfnx coinciden en el Share
-Festival de Barcelona, Franbeuve y El Calvo van juntos a la Velada.
+Velada del Año en Sevilla (ya pasada, "post Velada") y festivales de verano
+(Arenal Sound, Share Festival). Se cruzan constantemente: El Calvo y Lopezfnx
+coinciden en el Share Festival de Barcelona, Franbeuve y El Calvo van juntos
+a la Velada, y Lopezfnx+Iratxe se cruzan también con El Calvo ("Iratxe y
+López", 2.121 vistas en el canal de El Calvo).
 
-- **El Calvo** — Tour IRL España. Su titular más reciente lo dice todo:
-  *"ME EXPULSAN POR COLARME · ME HA DENUNCIADO IBAI"*. Conoce artistas
-  (Juseph, Omar Montes, Danirep, Myke Towers) y futbolistas (Yeremi Pino).
-  Directos de 4–6 h.
-- **Lopezfnx** — Todo con **Iratxe**. Barcelona, Madrid, Roblox juntos, y el
-  anuncio de una serie. Clips de esta semana: *"y esa mirada iratxe???"* (7 s),
-  *"AMORRRR????"* (6 s). Directos de 3–4,5 h.
-- **Franbeuve** — Vuelta tras la Velada, días en su pueblo, FIFA y OmeTV.
-  Clips recientes: *"cama"*, *"como se cae"*, *"#para los heaters"*.
-- **José Nogales** — Entró a un reality (*La casa del gemelo*). Directos
-  cortos e irregulares, muchos de madrugada (*"4am"*, *"muy nocturno"*).
-  **Ojo con este:** el looksmaxxing es su discurso, pero **no es lo que su
-  comunidad clipea**. Sus clips del último mes son todos sociales: *"liada
-  historica"* (14.282), *"el trio"*, *"beso queda mal"*, *"asi se demuestra
-  cual te gusta"*, *"cadera de muñeka"*. Es decir: lo mismo que El Calvo y
-  Franbeuve — que ligue y que salga bien o mal.
+- **El Calvo** — Tour IRL España (Andalucía, Sevilla, Valencia, Cataluña) y
+  ahora post-Velada en Arenal Sound con artistas (Juseph, Omar Montes,
+  Danirep) y Paula Monnet. **Nuevo running gag: Toni.** Se le cae el
+  invisalign, le tiran un huevo, "Doble Huevazo a Toni" — tres clips
+  distintos en el último mes. También un meme suelto: clips titulados
+  simplemente *"67"* (dos veces). Directos de 4–6 h.
+- **Lopezfnx** — Sigue siendo todo con **Iratxe**: IRL Barcelona, anuncio de
+  una serie juntos. Top clips del mes: *"SEMICUCHARITA DE IRATXE"* (32.610),
+  *"Iratxe enamorada?"* (15.267). Sin cambios de fondo.
+- **Franbeuve** — Vuelta tras la Velada, día 2–3 en su pueblo (moto
+  eléctrica, FIFA, OmeTV), luego "short stream" de vuelta. Clips nuevos con
+  algo de tracción: *"cama"* (573), *"como se cae"* (397). Volumen bajo en
+  general (mejor clip del mes: 720 vistas).
+- **José Nogales** — Sigue en el reality (*La casa del gemelo*), directos
+  cortos e irregulares de madrugada, más un DJ set en Cádiz/Magaluf. **Nuevo
+  nombre recurrente: Aitana** — *"aitana"* (746) y *"aitana y jose"* (420),
+  ambos hace 21 días. Confirma lo ya sabido: el looksmaxxing es su discurso,
+  pero su comunidad sigue clipeando lo social (*"liada historica"*, *"el
+  trio"*, *"cadera de muñeka"*).
 
 **Kick, último mes:**
 
-- **La Cobra** — Vive del **fútbol**. Todos sus clips del mes son goles:
-  *"GOLAZO CABO VERDE"*, *"GOL DE ENZO FERNANDEZ ARGENTINA VS INGLATERRA"*.
-  Contexto de Mundial 2026. Un gol es un pico de audio y chat enorme.
-- **Davoo** — Just Chatting. Estuvo en España (*"ULTIMO STREAM EN SEVILLA"*).
-- **RdJavi** — Se ha pasado a **GTA V**. Sus clips históricos eran sustos en
-  Just Chatting; los recientes son todos GTA.
-- **Mario Taxi y Viviendo en la calle** — **cero clips este mes**. Dormidos.
+- **La Cobra** — Sigue viviendo del **fútbol** (Mundial 2026 llegando a su
+  fin): *"tercer gol"*, *"GOLAZO CABO VERDE"*, *"GOL DE ENZO FERNANDEZ
+  ARGENTINA VS INGLATERRA"*. Sin cambios.
+- **Davoo** — Cerró su etapa en España (*"ULTIMO STREAM EN SEVILLA"*) y
+  volvió a Just Chatting habitual. Sin temas nuevos con tracción suficiente
+  para añadir (vistas del último mes muy bajas, 200–420).
+- **RdJavi** — Sigue en **GTA V**, pero el volumen de clips del último mes es
+  bajo (máx. 580 vistas) y sin títulos con señal clara. Sin cambios.
+- **Rey de la city** — Sin señal aprovechable, como siempre (*"gg"*, *"ssss"*,
+  *"TYTY"*).
+- **Mario Taxi** — **No está dormido**: varios directos largos recientes
+  (hasta 11,9 h) con VTC de noche y, en varias sesiones, "noche de Visage"
+  (juego de terror) tras acabar las carreras. Formato mixto taxi+terror
+  nocturno; se añade `visage` a temas. Sus clips de Twitch no se han podido
+  recoger todavía (los pinta JS y quedó fuera del muestreo de esta semana).
+- **Viviendo en la calle** — Confirmado sin clips en el último mes. Sigue
+  dormido.
 
 ---
 
