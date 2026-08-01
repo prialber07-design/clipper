@@ -40,10 +40,11 @@ if ($Estado) {
             $ultimo = ((Get-Content $log -Raw) -split "`r|`n" |
                        Where-Object { $_.Trim() } | Select-Object -Last 1).Trim()
         }
-        $clips = 0
-        if (Test-Path "$raiz\out\LISTOS") {
-            $clips = @(Get-ChildItem "$raiz\out\LISTOS" -Filter "$($v.canal)_*.mp4" -EA SilentlyContinue).Count
-        }
+    $clips = 0
+    if (Test-Path "$raiz\out\LISTOS") {
+        $clips = @(Get-ChildItem "$raiz\out\LISTOS" -Filter "*.mp4" -EA SilentlyContinue |
+                   Where-Object { $_.BaseName -match "(^|_)$($v.canal)(_|-)" }).Count
+    }
         "{0,-20} PID {1,-7} {2} clips | {3}" -f $v.canal, $v.pid, $clips, $ultimo
     }
     return
@@ -84,8 +85,6 @@ foreach ($canal in $Canales) {
     if (-not $info.verificado) { Write-Warning "$canal no esta verificado. Lo salto."; continue }
 
     $argumentos = @("$raiz\live.py", "watch", $canal, "--plataforma", $info.plataforma)
-    if ($info.plataforma -ne "twitch") { $argumentos += "--solo-audio" }
-
     New-Item -ItemType Directory -Force "$raiz\logs" | Out-Null
     # Sin esto el log sale con mojibake ("Â¿CuÃ¡ntas?") y los ganchos con tildes
     # se vuelven ilegibles justo donde mas falta hace leerlos.

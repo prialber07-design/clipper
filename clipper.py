@@ -12,6 +12,7 @@ Edita clips.json (start/end/hook/title/hashtags) y lanza 'render'.
 """
 
 import argparse
+import gc
 import json
 import math
 import os
@@ -110,7 +111,9 @@ def _find(name: str) -> str:
     for c in candidates:
         if c.exists():
             return str(c)
-    sys.exit(f"[x] No encuentro '{name}'. Reinicia la terminal o instalalo.")
+    # Dejar que --help y los tests funcionen aunque el binario no este instalado.
+    # run() dara el error legible cuando una operacion necesite ejecutarlo.
+    return name
 
 FFMPEG = _find("ffmpeg")
 FFPROBE = _find("ffprobe")
@@ -140,13 +143,18 @@ _cargar_dlls_cuda()
 
 
 def run(cmd, cwd=None):
-    proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    try:
+        proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
+                              encoding="utf-8", errors="replace")
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"No encuentro el ejecutable '{cmd[0]}'") from e
     if proc.returncode != 0:
         if proc.stdout.strip():
             LOG.error("Salida del comando fallido:\n%s", proc.stdout[-4000:].strip())
         if proc.stderr.strip():
             LOG.error("Error del comando fallido:\n%s", proc.stderr[-4000:].strip())
-        sys.exit(f"Fallo ejecutando: {' '.join(str(c) for c in cmd[:3])}...")
+        raise subprocess.CalledProcessError(
+            proc.returncode, cmd, output=proc.stdout, stderr=proc.stderr)
     return proc
 
 
@@ -184,6 +192,27 @@ def cmd_fetch(args):
 # --- 2. transcribe ------------------------------------------------------------
 
 _MODELO_CACHE = {}
+
+
+def liberar_whisper_model():
+    """Libera el modelo del proceso al terminar una transcripcion."""
+    modelos = list(_MODELO_CACHE.values())
+    _MODELO_CACHE.clear()
+    modelos.clear()
+    gc.collect()
+
+
+def canal_desde_nombre(nombre: str) -> str:
+    """Extrae el canal de nombres antiguos y nuevos de clips."""
+    stem = Path(nombre).stem
+    stem = re.sub(r"-\d+$", "", stem)
+    encontrado = re.match(r"^(?P<canal>.+?)-(?:(?:\d{8})-)?\d{6}$", stem)
+    if encontrado:
+        return encontrado.group("canal")
+    partes = stem.split("_")
+    if len(partes) >= 3 and partes[0].isdigit():
+        return partes[1]
+    return partes[0] if partes and partes[0] else "desconocido"
 
 def get_whisper_model(modelo_name, device, compute_type):
     from faster_whisper import WhisperModel
@@ -539,11 +568,10 @@ def cmd_rejilla(args):
     if not fuente.exists():
         sys.exit(f"[x] No existe {fuente}")
     destino = d / "rejilla.png"
-    dibujo = ("drawgrid=w=iw/8:h=ih/8:t=2:c=red@0.7,"
-              "drawtext=text='%{eif\\:floor(n)\\:d}':x=10:y=10:fontsize=1:fontcolor=black")
+    dibujo = "drawgrid=w=iw/8:h=ih/8:t=2:c=red@0.7"
     run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
          "-ss", str(args.t), "-i", str(fuente), "-frames:v", "1",
-         "-vf", dibujo.split(",drawtext")[0], str(destino)])
+         "-vf", dibujo, str(destino)])
     p = run([FFPROBE, "-v", "error", "-select_streams", "v:0",
              "-show_entries", "stream=width,height", "-of", "csv=p=0", str(fuente)])
     ancho, alto = (int(v) for v in p.stdout.strip().split(","))
@@ -566,7 +594,7 @@ def hashtags_para(canal: str, extra=None) -> list:
 
 def _ficha_texto(slug: str, c: dict) -> str:
     """Lo que copias y pegas al subir: titulo, descripcion y etiquetas."""
-    canal = re.split(r"-\d{6}$", slug)[0]
+    canal = canal_desde_nombre(slug)
     hook = (c.get("hook") or "").strip()
     titulo = hook if hook and not hook.startswith("ESCRIBE") else c.get("title", "").strip()
     tags = " ".join(c.get("hashtags") or hashtags_para(canal))
@@ -651,11 +679,18 @@ def main():
     r = sub.add_parser("render", help="renderiza los clips de clips.json")
     r.add_argument("slug")
     r.add_argument("--only", help="ids separados por coma, ej: 01,03")
-    r.add_argument("--layout", choices=["blur", "crop"])
+    r.add_argument("--layout", choices=["completo", "blur", "crop", "reaccion", "irl", "zoom"])
     r.set_defaults(func=cmd_render)
 
     args = p.parse_args()
-    args.func(args)
+    try:
+        args.func(args)
+    except (FileNotFoundError, subprocess.CalledProcessError) as e:
+        detalle = getattr(e, "stderr", None) or str(e)
+        p.exit(1, f"[x] {detalle.strip()}\n")
+    finally:
+        if args.cmd == "transcribe":
+            liberar_whisper_model()
 
 
 if __name__ == "__main__":

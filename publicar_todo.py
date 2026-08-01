@@ -9,7 +9,6 @@ publicar igualmente. Manda un solo aviso al movil, no uno por clip.
 """
 
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -32,15 +31,14 @@ def main():
 
     publicados = 0
     for mp4 in pendientes:
-        canal = re.split(r"[-_]", mp4.name)[0]
+        canal = clipper.canal_desde_nombre(mp4.name)
         hook, dur = "", ""
 
         # Los apartados por el filtro conservan el original en out/<slug>/,
         # con su .txt de titulo y hashtags; los movidos a mano ya vienen con el.
-        m = re.match(r"(.+?)-(\d{6})-01\.mp4$", mp4.name)
+        slug = mp4.stem.rsplit("-", 1)[0]
         origen = mp4
-        if m:
-            slug = f"{m.group(1)}-{m.group(2)}"
+        if (clipper.OUT / slug).is_dir():
             cand = clipper.OUT / slug / f"{slug}-01.mp4"
             if cand.exists():
                 origen = cand
@@ -58,6 +56,8 @@ def main():
         destino = notify.registrar_listo(origen, {
             "canal": canal, "motivo": "publicado a mano", "hook": hook, "duracion": dur,
         })
+        mp4.unlink(missing_ok=True)
+        mp4.with_suffix(".motivos.txt").unlink(missing_ok=True)
         publicados += 1
         print(f"[ok] {destino.name}  <- {mp4.name}")
 

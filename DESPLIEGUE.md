@@ -191,6 +191,17 @@ Si prefieres que los clips aparezcan solos en el móvil, monta una carpeta del
 host en vez del volumen y sincronízala con rclone a Drive/Dropbox. Es más
 cómodo, pero depende de las cuotas del proveedor.
 
+### Estabilidad del servicio
+
+Whisper usa una sola cola entre vigilantes y libera el modelo al terminar cada
+trabajo. El buffer se poda tambien mientras hay una transcripcion o un render
+en curso. La limpieza automatica conserva el comportamiento intencional de
+siete dias y expira tambien trabajos, logs, contadores e indices antiguos.
+
+Los ganchos automaticos se mandan a `REVISAR` para revision humana. La galeria
+web exige `CLIPPER_WEB_CLAVE`; no existe una credencial por defecto. El panel
+refresca clips y logs cada 15 segundos.
+
 ### Variables (`.env`)
 
 | Variable | Para qué |
@@ -201,6 +212,7 @@ cómodo, pero depende de las cuotas del proveedor.
 | `CLIPPER_COMPUTE` | `float16` con GPU, `int8` en CPU |
 | `CLIPPER_CARPETA_SINCRONIZADA` | Ruta de sincronización; vacía en contenedor |
 | `CLIPPER_DOCKERFILE` | `Dockerfile` o `Dockerfile.gpu` |
+| `CLIPPER_WEB_CLAVE` | Obligatoria; usa una clave larga y aleatoria |
 
 Los canales se eligen en `config.json`, o al arrancar:
 `command: python servidor.py --canales elcalvolol,lopezfnx`

@@ -9,18 +9,15 @@ Permite explorar todas las carpetas (/app/clips), previsualizar vídeos en modal
 import base64
 import hmac
 import json
-import mimetypes
 import os
 import re
-import shutil
-import sys
+import subprocess
 import threading
-from datetime import datetime
 from functools import partial
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 import clipper
 
@@ -768,8 +765,12 @@ HTML_TEMPLATE = """<!doctype html>
       lucide.createIcons();
       animateHeader();
       cargarClips();
-      cargarArchivos('');
+      cargarArchivosSeguro('');
       cargarLogs();
+      setInterval(() => {
+        cargarClips();
+        cargarLogs();
+      }, 15000);
 
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') cerrarPrevisualizacion();
@@ -806,15 +807,102 @@ HTML_TEMPLATE = """<!doctype html>
         document.getElementById('count-listos').textContent = data.listos.length;
         document.getElementById('count-revisar').textContent = data.revisar.length;
 
-        renderGrid('grid-listos', data.listos, false);
-        renderGrid('grid-revisar', data.revisar, true);
+        renderGridSeguro('grid-listos', data.listos, false);
+        renderGridSeguro('grid-revisar', data.revisar, true);
         lucide.createIcons();
       } catch (e) {
         console.error("Error cargando clips:", e);
       }
     }
 
-    function renderGrid(containerId, clips, esRevisar) {
+    function safeFileUrl(value) {
+      try {
+        const url = new URL(value, window.location.origin);
+        if (url.origin !== window.location.origin || !url.pathname.startsWith('/files/')) return '#';
+        return url.href;
+      } catch (_) {
+        return '#';
+      }
+    }
+
+    function textNode(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      node.textContent = text || '';
+      return node;
+    }
+
+    function icon(name, size = 18) {
+      const node = document.createElement('i');
+      node.dataset.lucide = name;
+      node.style.width = `${size}px`;
+      node.style.height = `${size}px`;
+      return node;
+    }
+
+    function renderGridSeguro(containerId, clips, esRevisar) {
+      const container = document.getElementById(containerId);
+      container.replaceChildren();
+      if (!clips || clips.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-box';
+        empty.append(icon(esRevisar ? 'sparkles' : 'coffee', 48));
+        empty.append(textNode('h3', '', esRevisar ? 'No hay clips pendientes de revisión' : 'No hay clips listos para subir todavía'));
+        empty.append(textNode('p', '', esRevisar ? 'Todos los clips generados han superado el filtro de calidad.' : 'Los clips aparecerán aquí de forma automática en cuanto salten picos en los directos.'));
+        container.append(empty);
+        lucide.createIcons();
+        return;
+      }
+
+      clips.forEach((clip) => {
+        const url = safeFileUrl(clip.url);
+        const article = document.createElement('article');
+        article.className = 'clip-card';
+        article.dataset.search = `${clip.canal || ''} ${clip.gancho || ''}`.toLowerCase();
+
+        const thumb = document.createElement('div');
+        thumb.className = 'video-thumb-container';
+        const video = document.createElement('video');
+        video.src = url;
+        video.controls = true;
+        video.preload = 'metadata';
+        video.playsInline = true;
+        thumb.append(video);
+        thumb.addEventListener('click', () => abrirPrevisualizacionSeguro(url, clip.gancho || clip.nombre, 'video'));
+        article.append(thumb);
+
+        const body = document.createElement('div');
+        body.className = 'clip-body';
+        const tags = document.createElement('div');
+        tags.className = 'tags-row';
+        tags.append(textNode('span', 'streamer-pill', `#${clip.canal || 'desconocido'}`));
+        tags.append(textNode('span', 'dur-pill', `⏱️ ${clip.duracion || 0}s`));
+        body.append(tags, textNode('h2', 'clip-heading', clip.gancho || '(Sin título)'));
+        if (esRevisar && clip.motivo) body.append(textNode('div', 'clip-alert', `⚠️ ${clip.motivo}`));
+
+        const buttons = document.createElement('div');
+        buttons.className = 'btn-group';
+        const view = document.createElement('button');
+        view.className = 'btn-action-secondary';
+        view.type = 'button';
+        view.append(icon('eye'), textNode('span', '', 'Ver'));
+        view.addEventListener('click', () => abrirPrevisualizacionSeguro(url, clip.gancho || clip.nombre, 'video'));
+        const download = document.createElement('a');
+        download.className = 'btn-action-primary';
+        download.href = url;
+        download.download = '';
+        download.append(icon('download'), textNode('span', '', 'Descargar'));
+        buttons.append(view, download);
+        body.append(buttons);
+        article.append(body);
+        container.append(article);
+      });
+      lucide.createIcons();
+      animateGrid('#' + containerId + ' .clip-card');
+    }
+
+    function renderGridLegacy(containerId, clips, esRevisar) {
+      return renderGridSeguro(containerId, clips, esRevisar); /*
       const container = document.getElementById(containerId);
       if (!clips || clips.length === 0) {
         container.innerHTML = `
@@ -858,6 +946,7 @@ HTML_TEMPLATE = """<!doctype html>
       `).join('');
 
       animateGrid('#' + containerId + ' .clip-card');
+      */
     }
 
     function filtrarClips() {
@@ -868,7 +957,8 @@ HTML_TEMPLATE = """<!doctype html>
       });
     }
 
-    async function cargarArchivos(subpath) {
+    async function cargarArchivosLegacy(subpath) {
+      return cargarArchivosSeguro(subpath); /*
       currentPath = subpath;
       try {
         const res = await fetch('/api/browse?path=' + encodeURIComponent(subpath));
@@ -939,7 +1029,107 @@ HTML_TEMPLATE = """<!doctype html>
       }
     }
 
-    async function abrirPrevisualizacion(url, title, type) {
+      */
+    }
+
+    async function cargarArchivosSeguro(subpath) {
+      currentPath = subpath;
+      try {
+        const res = await fetch('/api/browse?path=' + encodeURIComponent(subpath));
+        const data = await res.json();
+        const breadcrumbs = document.getElementById('breadcrumbs');
+        breadcrumbs.replaceChildren();
+        const home = textNode('span', 'crumb-link', '🏠 Inicio (/app/clips)');
+        home.addEventListener('click', () => cargarArchivosSeguro(''));
+        breadcrumbs.append(home);
+        let acc = '';
+        for (const part of (subpath ? subpath.split('/').filter(Boolean) : [])) {
+          acc += (acc ? '/' : '') + part;
+          breadcrumbs.append(textNode('span', 'crumb-divider', '/'));
+          const crumb = textNode('span', 'crumb-link', part);
+          const target = acc;
+          crumb.addEventListener('click', () => cargarArchivosSeguro(target));
+          breadcrumbs.append(crumb);
+        }
+
+        const grid = document.getElementById('files-grid');
+        grid.replaceChildren();
+        if (!data.items || data.items.length === 0) {
+          grid.append(textNode('div', 'empty-box', 'Esta carpeta está vacía.'));
+          return;
+        }
+        for (const item of data.items) {
+          const itemPath = subpath ? `${subpath}/${item.name}` : item.name;
+          const fileUrl = safeFileUrl('/files/' + itemPath.split('/').map(encodeURIComponent).join('/'));
+          const card = document.createElement('div');
+          card.className = 'file-card';
+          const isVideo = item.name.toLowerCase().endsWith('.mp4');
+          const isText = /[.](txt|log|csv|json)$/i.test(item.name);
+          card.append(icon(item.is_dir ? 'folder' : (isVideo ? 'film' : 'file-text'), 24));
+          const meta = document.createElement('div');
+          meta.className = 'file-card-meta';
+          meta.append(textNode('div', 'file-card-name', item.name), textNode('div', 'file-card-sub', item.is_dir ? 'Carpeta' : item.size));
+          card.append(meta);
+          if (item.is_dir) {
+            card.addEventListener('click', () => cargarArchivosSeguro(itemPath));
+          } else if (isVideo || isText) {
+            const preview = document.createElement('button');
+            preview.type = 'button';
+            preview.className = 'btn-action-secondary';
+            preview.append(icon('eye', 16));
+            preview.addEventListener('click', () => abrirPrevisualizacionSeguro(fileUrl, item.name, isVideo ? 'video' : 'text'));
+            const download = document.createElement('a');
+            download.className = 'btn-action-secondary';
+            download.href = fileUrl;
+            download.download = '';
+            download.append(icon('download', 16));
+            const actions = document.createElement('div');
+            actions.style.cssText = 'display:flex;gap:.4rem';
+            actions.append(preview, download);
+            card.append(actions);
+          }
+          grid.append(card);
+        }
+        lucide.createIcons();
+        animateGrid('#files-grid .file-card');
+      } catch (e) {
+        console.error('Error explorando archivos:', e);
+      }
+    }
+
+    async function abrirPrevisualizacionSeguro(url, title, type) {
+      const modal = document.getElementById('previewModal');
+      const modalTitle = document.getElementById('modalTitle');
+      const modalBody = document.getElementById('modalBody');
+      const modalDownloadBtn = document.getElementById('modalDownloadBtn');
+      const safeUrl = safeFileUrl(url);
+      modalTitle.textContent = title || 'Previsualización';
+      modalDownloadBtn.href = safeUrl;
+      modalBody.replaceChildren();
+      if (type === 'video') {
+        const video = document.createElement('video');
+        video.className = 'video-player-modal';
+        video.src = safeUrl;
+        video.controls = true;
+        video.autoplay = true;
+        video.playsInline = true;
+        modalBody.append(video);
+      } else if (type === 'text') {
+        try {
+          const res = await fetch(safeUrl);
+          const text = await res.text();
+          modalBody.append(textNode('div', '', text || '(Archivo vacío)'));
+        } catch (_) {
+          modalBody.append(textNode('p', '', 'No se pudo cargar el contenido del archivo.'));
+        }
+      }
+      modal.classList.add('active');
+      gsap.from('.modal-window', { scale: 0.9, opacity: 0, duration: 0.3, ease: 'back.out(1.5)' });
+      lucide.createIcons();
+    }
+
+    async function abrirPrevisualizacionLegacy(url, title, type) {
+      return abrirPrevisualizacionSeguro(url, title, type); /*
       const modal = document.getElementById('previewModal');
       const modalTitle = document.getElementById('modalTitle');
       const modalBody = document.getElementById('modalBody');
@@ -966,13 +1156,16 @@ HTML_TEMPLATE = """<!doctype html>
       lucide.createIcons();
     }
 
+      */
+    }
+
     function cerrarPrevisualizacion(e) {
       if (e && e.target !== document.getElementById('previewModal') && !e.target.classList.contains('btn-close-modal')) return;
       const modal = document.getElementById('previewModal');
       const modalBody = document.getElementById('modalBody');
       gsap.to('.modal-window', { scale: 0.9, opacity: 0, duration: 0.2, onComplete: () => {
         modal.classList.remove('active');
-        modalBody.innerHTML = '';
+        modalBody.replaceChildren();
       }});
     }
 
@@ -1018,6 +1211,24 @@ class Handler(SimpleHTTPRequestHandler):
             return False
         return (hmac.compare_digest(usuario, self.usuario)
                 and hmac.compare_digest(clave, self.clave))
+
+    def do_HEAD(self):
+        path = urlparse(self.path).path
+        if path == "/salud":
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            return
+        if not self._autorizado():
+            return self._pedir_credenciales()
+        if path.startswith("/files/"):
+            root = DATA.resolve()
+            target = (root / unquote(path[7:])).resolve()
+            if not target.is_relative_to(root) or not target.is_file():
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+            self.path = "/" + target.relative_to(root).as_posix()
+        super().do_HEAD()
 
     def _responder_json(self, data):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -1069,7 +1280,12 @@ class Handler(SimpleHTTPRequestHandler):
 
         if path.startswith("/files/"):
             rel_path = unquote(path[7:])
-            self.path = "/" + rel_path
+            root = DATA.resolve()
+            target = (root / rel_path).resolve()
+            if not target.is_relative_to(root) or not target.is_file():
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+            self.path = "/" + target.relative_to(root).as_posix()
 
         super().do_GET()
 
@@ -1088,8 +1304,7 @@ class Handler(SimpleHTTPRequestHandler):
             return clips
 
         for mp4 in sorted(dir_path.glob("*.mp4"), reverse=True):
-            partes = mp4.stem.split("_")
-            canal = partes[1] if len(partes) >= 2 else "clip"
+            canal = clipper.canal_desde_nombre(mp4.name)
 
             gancho = ""
             motivo = ""
@@ -1105,12 +1320,18 @@ class Handler(SimpleHTTPRequestHandler):
                 if m:
                     gancho = m.group(1).strip()
 
-            rel_url = f"/files/out/{'REVISAR' if es_revisar else 'LISTOS'}/{mp4.name}"
+            rel_url = f"/files/out/{'REVISAR' if es_revisar else 'LISTOS'}/{quote(mp4.name, safe='')}"
+            try:
+                duracion = float(clipper.run([
+                    clipper.FFPROBE, "-v", "error", "-show_entries", "format=duration",
+                    "-of", "default=nw=1:nk=1", str(mp4)]).stdout.strip())
+            except (ValueError, OSError, subprocess.CalledProcessError):
+                duracion = 0
 
             clips.append({
                 "nombre": mp4.name,
                 "canal": canal,
-                "duracion": 30,
+                "duracion": round(duracion),
                 "gancho": gancho or mp4.stem,
                 "motivo": motivo,
                 "url": rel_url
@@ -1118,9 +1339,10 @@ class Handler(SimpleHTTPRequestHandler):
         return clips
 
     def _handle_api_browse(self, subpath: str):
-        target = (DATA / subpath).resolve()
-        if not str(target).startswith(str(DATA.resolve())):
-            target = DATA.resolve()
+        root = DATA.resolve()
+        target = (root / subpath).resolve()
+        if not target.is_relative_to(root):
+            target = root
 
         items = []
         if target.exists() and target.is_dir():
@@ -1158,6 +1380,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def end_headers(self):
         self.send_header("Cache-Control", "no-cache")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "same-origin")
         super().end_headers()
 
     def log_message(self, formato, *args):
@@ -1166,7 +1391,9 @@ class Handler(SimpleHTTPRequestHandler):
 
 def arrancar(puerto: int = None, en_hilo: bool = False):
     usuario = os.environ.get("CLIPPER_WEB_USUARIO", "clips")
-    clave = os.environ.get("CLIPPER_WEB_CLAVE", "clips")
+    clave = os.environ.get("CLIPPER_WEB_CLAVE", "").strip()
+    if not clave:
+        raise RuntimeError("CLIPPER_WEB_CLAVE es obligatoria para arrancar la galeria")
     puerto = puerto or int(os.environ.get("CLIPPER_WEB_PUERTO", "8080"))
 
     DATA.mkdir(parents=True, exist_ok=True)

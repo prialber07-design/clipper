@@ -35,7 +35,7 @@ import bloqueo
 import calidad
 import clipper
 import notify
-from clipper import CONFIG, DATA, FFMPEG, ROOT, WORK
+from clipper import CONFIG, DATA, FFMPEG, WORK
 from registro import obtener
 
 LIVE = CONFIG["live"]
@@ -89,12 +89,6 @@ def estado_directo(url: str) -> tuple[bool, str | None]:
     return bool(data.get("streams")), None
 
 
-def esta_en_directo(url: str) -> bool:
-    """Compatibilidad para llamadas externas; el vigilante usa estado_directo."""
-    online, _ = estado_directo(url)
-    return online
-
-
 # --- captura a buffer rodante -------------------------------------------------
 
 class Captura:
@@ -104,6 +98,8 @@ class Captura:
         self.url, self.destino = url, destino
         self.t0 = None
         self.sl = self.ff = None
+        self._poda_fin = threading.Event()
+        self._poda_hilo = None
 
     def arrancar(self):
         # En POSIX cada captura va en su propio grupo para poder matarla entera.
@@ -132,6 +128,10 @@ class Captura:
             self.parar()
             raise RuntimeError("streamlink/ffmpeg terminó al iniciar la captura")
         self.t0 = time.time()
+        self._poda_fin.clear()
+        self._poda_hilo = threading.Thread(
+            target=self._poda_loop, name=f"poda-{self.destino.name}", daemon=True)
+        self._poda_hilo.start()
 
     def vivo(self) -> bool:
         return self.ff is not None and self.ff.poll() is None
@@ -143,6 +143,9 @@ class Captura:
         ffmpeg y bloquea el buffer. En Linux pasa lo mismo si no se mata el
         grupo de procesos.
         """
+        self._poda_fin.set()
+        if self._poda_hilo and self._poda_hilo is not threading.current_thread():
+            self._poda_hilo.join(timeout=2)
         for p in (self.ff, self.sl):
             if not p or p.poll() is not None:
                 continue
@@ -158,6 +161,7 @@ class Captura:
                 p.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 pass
+        self._poda_hilo = None
 
     def segmentos(self):
         return sorted(self.destino.glob("*.ts"))
@@ -166,7 +170,14 @@ class Captura:
         segs = self.segmentos()
         sobran = len(segs) - LIVE["buffer_max_s"] // LIVE["segmento_s"]
         for s in segs[:max(0, sobran)]:
-            s.unlink(missing_ok=True)
+            try:
+                s.unlink(missing_ok=True)
+            except PermissionError:
+                continue
+
+    def _poda_loop(self):
+        while not self._poda_fin.wait(LIVE["segmento_s"]):
+            self.podar()
 
 
 # --- chat de Twitch (IRC anonimo, sin credenciales) ---------------------------
@@ -270,6 +281,7 @@ def zscore(valor: float, historial) -> float:
 # --- montaje de la ventana ----------------------------------------------------
 
 CONTADORES = WORK / "_contadores.json"
+CONTADORES_LOCK = WORK / "_contadores.lock"
 
 
 def elegir_duracion(canal: str) -> tuple[str, dict]:
@@ -280,14 +292,17 @@ def elegir_duracion(canal: str) -> tuple[str, dict]:
     """
     d = CONFIG.get("duraciones", {})
     cada = int(d.get("uno_largo_cada", 3))
-    try:
-        cont = json.loads(CONTADORES.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        cont = {}
-    n = cont.get(canal, 0) + 1
-    cont[canal] = n
-    CONTADORES.parent.mkdir(parents=True, exist_ok=True)
-    CONTADORES.write_text(json.dumps(cont), encoding="utf-8")
+    with bloqueo.exclusivo(CONTADORES_LOCK, etiqueta="contador de duraciones"):
+        try:
+            cont = json.loads(CONTADORES.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            cont = {}
+        n = cont.get(canal, 0) + 1
+        cont[canal] = n
+        CONTADORES.parent.mkdir(parents=True, exist_ok=True)
+        temporal = CONTADORES.with_name(f"{CONTADORES.name}.{os.getpid()}.tmp")
+        temporal.write_text(json.dumps(cont), encoding="utf-8")
+        os.replace(temporal, CONTADORES)
 
     modo = "largo" if cada > 0 and n % cada == 0 else "corto"
     return modo, d.get(modo, {"min": 26, "max": 34})
@@ -416,7 +431,7 @@ def gancho_automatico(segs, t_pico: float, chat=None) -> str:
 def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str, chat=None):
     recargar()  # coge los ajustes de config.json sin reiniciar
     aplicar_ajustes_canal(canal)
-    slug = f"{canal}-{time.strftime('%H%M%S')}"
+    slug = f"{canal}-{time.strftime('%Y%m%d-%H%M%S')}"
     LOG.info("Pico detectado canal=%s motivo=%s t_video=%.0fs job=%s", canal, motivo, t_video, slug)
     t_ini = time.time()
 
@@ -434,7 +449,10 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
     # Una unica cola de Whisper entre todos los vigilantes del servidor.
     # El modelo se cachea por proceso; el cerrojo evita inferencias solapadas.
     with bloqueo.exclusivo(DATA / ".whisper.lock", etiqueta=f"transcripcion de {canal}"):
-        clipper.cmd_transcribe(args)
+        try:
+            clipper.cmd_transcribe(args)
+        finally:
+            clipper.liberar_whisper_model()
 
     d = WORK / slug
     datos = json.loads((d / "transcript.json").read_text(encoding="utf-8"))
@@ -556,18 +574,20 @@ def cmd_watch(args):
                         await listener.start()
                         self.conectado.set()
                         LOG.info("Chat Kick conectado canal=%s", self.canal)
-                        while not self.parar_flag.is_set():
-                            await asyncio.sleep(2)
-                            c = listener.poll_and_reset()
-                            if c > 0:
-                                for _ in range(int(c)):
-                                    self.queue_eventos.put((time.time(), 2, "jaja clip"))
+                        try:
+                            while not self.parar_flag.is_set():
+                                await asyncio.sleep(2)
+                                for texto in listener.poll_and_reset():
+                                    self.queue_eventos.put((time.time(), peso_mensaje(texto), texto))
+                        finally:
+                            await listener.stop()
                     try:
                         loop.run_until_complete(poll())
                     except Exception:
                         LOG.exception("Chat Kick no disponible canal=%s", self.canal)
                     finally:
                         self.conectado.clear()
+                        asyncio.set_event_loop(None)
                         loop.close()
             chat_kick = ChatKickThread(args.canal, DATA, eventos)
             chat = chat_kick
@@ -649,6 +669,7 @@ def cmd_watch(args):
             cap.parar()
             if chat:
                 chat.parar_flag.set()
+                chat.join(timeout=5)
 
         LOG.info("Directo terminado canal=%s", args.canal)
 
@@ -661,10 +682,6 @@ class BufferExistente:
 
     def segmentos(self):
         return sorted(self.destino.glob("*.ts"))
-
-    def podar(self):
-        pass
-
 
 def cmd_now(args):
     """Clipa YA del buffer existente, sin esperar a ningun pico."""

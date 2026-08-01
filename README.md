@@ -63,6 +63,17 @@ python servidor.py                 # todos los canales de config.json
 python servidor.py --estado
 ```
 
+El supervisor mantiene una sola cola de Whisper: los trabajos se procesan en
+serie y el modelo se libera al terminar cada transcripcion para no acumular una
+copia por canal. Los clips con gancho automatico van a `out/REVISAR/` hasta que
+se revisan manualmente; los nombres nuevos incluyen fecha para no colisionar.
+El buffer se poda tambien mientras Whisper o ffmpeg estan trabajando y los
+datos se conservan siete dias.
+
+Kick usa el chat real cuando `aiohttp` esta instalado. La galeria web exige
+`CLIPPER_WEB_CLAVE`, refresca los clips automaticamente y es la interfaz unica
+de revision.
+
 Docker:
 
 ```bash

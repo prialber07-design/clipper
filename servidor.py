@@ -10,13 +10,14 @@ systemd o Docker, que relanza solo cualquier vigilante que se caiga.
 """
 
 import argparse
-import json
 import os
 import signal
+import shutil
 import subprocess
 import sys
 import time
 from datetime import datetime
+from pathlib import Path
 import clipper
 from registro import obtener
 
@@ -39,13 +40,18 @@ class Vigilante:
         self.espera = REINTENTO_MIN_S
         self.arrancado = None
         self.reinicios = 0
+        self.log = None
+
+    def _cerrar_log(self):
+        if self.log and not self.log.closed:
+            self.log.flush()
+            self.log.close()
 
     def arrancar(self):
+        self._cerrar_log()
         LOGS.mkdir(parents=True, exist_ok=True)
         cmd = [sys.executable, str(ROOT / "live.py"), "watch", self.canal,
                "--plataforma", self.plataforma]
-        if self.plataforma != "twitch":
-            cmd.append("--solo-audio")
 
         entorno = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUNBUFFERED": "1"}
         extra = {"start_new_session": True} if os.name != "nt" else {}
@@ -61,6 +67,7 @@ class Vigilante:
 
     def parar(self):
         if not self.vivo():
+            self._cerrar_log()
             return
         try:
             if os.name == "nt":
@@ -70,6 +77,11 @@ class Vigilante:
                 os.killpg(os.getpgid(self.proc.pid), signal.SIGTERM)
         except (OSError, ProcessLookupError):
             self.proc.kill()
+        try:
+            self.proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.proc.kill()
+        self._cerrar_log()
 
     def revisar(self):
         """Relanza si murio. La espera crece si se cae en bucle, para no
@@ -81,6 +93,12 @@ class Vigilante:
             return
         if self.arrancado and time.time() - self.arrancado < self.espera:
             return
+        self._cerrar_log()
+        if self.proc:
+            try:
+                self.proc.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                pass
         self.reinicios += 1
         LOG.warning("Vigilante caído canal=%s; relanzo intento=%d espera_s=%d",
                     self.canal, self.reinicios, self.espera)
@@ -124,12 +142,14 @@ def cmd_estado():
             vivos.append(m.group(1))
     if not vivos:
         LOG.warning("No hay vigilantes en marcha")
-        return
+        return 1
     for canal in sorted(set(vivos)):
-        listos = len(list((OUT / "LISTOS").glob(f"*_{canal}_*.mp4"))) \
+        listos = sum(clipper.canal_desde_nombre(p.name) == canal
+                     for p in (OUT / "LISTOS").glob("*.mp4")) \
             if (OUT / "LISTOS").exists() else 0
         LOG.info("Estado canal=%s vigilante=activo clips_listos=%d (esto no confirma directo)",
                  canal, listos)
+    return 0
 
 
 def limpiar_archivos_antiguos(dias: int = 7):
@@ -176,7 +196,7 @@ def main():
     args = p.parse_args()
 
     if args.estado:
-        return cmd_estado()
+        sys.exit(cmd_estado())
 
     filtro = [c.strip() for c in args.canales.split(",")] if args.canales else None
     lista = fichas(filtro)

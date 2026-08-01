@@ -1,17 +1,14 @@
 """
 Bandeja de salida + aviso al movil.
 
-Cada clip terminado se copia a out/LISTOS/ con nombre plano, se registra en
-index.csv, se regenera index.html (galeria para revisar antes de subir) y se
-manda una notificacion via ntfy.
+Cada clip terminado se copia a out/LISTOS/ con nombre plano y se manda una
+notificacion via ntfy. La galeria web es la unica interfaz de revision.
 
 ntfy: gratis, sin cuenta. Instala la app, te suscribes al topic de config.json
 y listo. El topic es la unica credencial: cualquiera que lo sepa recibe (y puede
 mandar) avisos. Por eso se genera aleatorio y no se comparte.
 """
 
-import csv
-import json
 import os
 import shutil
 import urllib.error
@@ -21,17 +18,16 @@ from pathlib import Path
 from urllib.parse import quote
 
 import clipper
+import bloqueo
 from registro import obtener
 
-ROOT = clipper.ROOT
 LISTOS = clipper.OUT / "LISTOS"
-INDEX_CSV = LISTOS / "index.csv"
-INDEX_HTML = LISTOS / "index.html"
 CONFIG = clipper.CONFIG
 NOTIF = CONFIG.get("notificaciones", {})
 
 
 CONTADOR = LISTOS / ".contador"
+SALIDA_LOCK = clipper.DATA / ".salida.lock"
 LOG = obtener("notify")
 
 
@@ -43,7 +39,9 @@ def _siguiente_numero() -> int:
         n = 0
     n += 1
     CONTADOR.parent.mkdir(parents=True, exist_ok=True)
-    CONTADOR.write_text(str(n), encoding="utf-8")
+    temporal = CONTADOR.with_name(f"{CONTADOR.name}.{os.getpid()}.tmp")
+    temporal.write_text(str(n), encoding="utf-8")
+    os.replace(temporal, CONTADOR)
     return n
 
 
@@ -68,7 +66,12 @@ def _sincronizar(destino: Path, txt: Path | None):
 
 
 def registrar_listo(mp4: Path, meta: dict) -> Path:
-    """Copia el clip a la bandeja de salida y lo apunta en el indice."""
+    with bloqueo.exclusivo(SALIDA_LOCK, etiqueta="registro de clip listo"):
+        return _registrar_listo(mp4, meta)
+
+
+def _registrar_listo(mp4: Path, meta: dict) -> Path:
+    """Copia el clip a la bandeja de salida con numeracion exclusiva."""
     LISTOS.mkdir(parents=True, exist_ok=True)
     ts = datetime.now()
     n = _siguiente_numero()
@@ -77,7 +80,7 @@ def registrar_listo(mp4: Path, meta: dict) -> Path:
     base = f"{n:03d}_{meta.get('canal','clip')}_{ts:%Y-%m-%d}"
     if (LISTOS / f"{base}.mp4").exists():
         base = f"{base}_{ts:%H%M%S}"
-    meta = {**meta, "n": n}
+    meta["n"] = n
 
     destino = LISTOS / f"{base}.mp4"
     shutil.copy2(mp4, destino)
@@ -90,71 +93,7 @@ def registrar_listo(mp4: Path, meta: dict) -> Path:
 
     _sincronizar(destino, txt_destino)
 
-    nuevo = not INDEX_CSV.exists()
-    with INDEX_CSV.open("a", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        if nuevo:
-            w.writerow(["n", "fecha", "canal", "archivo", "duracion_s", "motivo",
-                        "gancho", "subido"])
-        w.writerow([f"{meta.get('n', 0):03d}", f"{ts:%Y-%m-%d %H:%M:%S}",
-                    meta.get("canal", ""), destino.name, meta.get("duracion", ""),
-                    meta.get("motivo", ""), meta.get("hook", ""), "NO"])
-
-    _regenerar_html()
     return destino
-
-
-def _regenerar_html():
-    filas = []
-    if INDEX_CSV.exists():
-        with INDEX_CSV.open(encoding="utf-8") as f:
-            filas = list(csv.DictReader(f))
-    filas.reverse()
-
-    tarjetas = []
-    for r in filas:
-        subido = (r.get("subido", "NO") or "NO").upper() != "NO"
-        tarjetas.append(f"""
-    <article class="clip{' subido' if subido else ''}">
-      <span class="num">#{r.get('n','---')}</span>
-      <video src="{r['archivo']}" controls preload="metadata" playsinline></video>
-      <div class="meta">
-        <p class="gancho">{r.get('gancho','') or '(sin gancho)'}</p>
-        <p class="datos">{r['fecha']} &middot; {r['canal']} &middot; {r.get('duracion_s','?')}s</p>
-        <a href="{r['archivo']}" download>Descargar</a>
-      </div>
-    </article>""")
-
-    html = f"""<!doctype html>
-<html lang="es"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Clips listos para subir</title>
-<style>
- :root {{ color-scheme: light dark; }}
- body {{ font-family: system-ui, sans-serif; margin: 0; padding: 1.5rem;
-        background: Canvas; color: CanvasText; }}
- h1 {{ font-size: 1.3rem; margin: 0 0 .25rem; }}
- .sub {{ opacity: .65; margin: 0 0 1.5rem; font-size: .9rem; }}
- .grid {{ display: grid; gap: 1.25rem;
-          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }}
- .clip {{ border: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
-          border-radius: 12px; overflow: hidden; position: relative; }}
- .num {{ position: absolute; top: .5rem; left: .5rem; z-index: 2;
-         background: #000c; color: #fff; font-weight: 700; font-size: .85rem;
-         padding: .15rem .5rem; border-radius: 999px; letter-spacing: .03em; }}
- .clip.subido {{ opacity: .45; }}
- video {{ width: 100%; display: block; background: #000; aspect-ratio: 9/16;
-          object-fit: contain; }}
- .meta {{ padding: .75rem; }}
- .gancho {{ font-weight: 600; margin: 0 0 .4rem; font-size: .95rem; }}
- .datos {{ margin: 0 0 .5rem; font-size: .8rem; opacity: .65; }}
- a {{ font-size: .85rem; }}
-</style></head><body>
-<h1>Clips listos para subir</h1>
-<p class="sub">{len(filas)} clips. Marca <code>subido</code> como SI en index.csv para atenuarlos.</p>
-<div class="grid">{''.join(tarjetas)}</div>
-</body></html>"""
-    INDEX_HTML.write_text(html, encoding="utf-8")
 
 
 def _preparar_adjunto(mp4: Path) -> Path | None:
@@ -182,15 +121,19 @@ def _preparar_adjunto(mp4: Path) -> Path | None:
                      "-b:v", str(bitrate), "-maxrate", str(int(bitrate * 1.2)),
                      "-bufsize", str(bitrate * 2), "-pix_fmt", "yuv420p",
                      "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", str(ligero)])
-    except SystemExit:
+    except Exception as e:
+        LOG.warning("No se pudo preparar el adjunto (%s)", e)
         return None
     return ligero if ligero.exists() and ligero.stat().st_size <= limite else None
 
 
 def _duracion(mp4: Path) -> float:
     import clipper
-    p = clipper.run([clipper.FFPROBE, "-v", "error", "-show_entries", "format=duration",
-                     "-of", "default=nw=1:nk=1", str(mp4)])
+    try:
+        p = clipper.run([clipper.FFPROBE, "-v", "error", "-show_entries", "format=duration",
+                         "-of", "default=nw=1:nk=1", str(mp4)])
+    except Exception:
+        return 0.0
     try:
         return float(p.stdout.strip())
     except ValueError:

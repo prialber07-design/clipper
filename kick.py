@@ -8,16 +8,15 @@ Motor Ultraligero de Chat para Kick (100% Python Nativo sin Playwright):
 from __future__ import annotations
 
 import asyncio
+import collections
 import json
 import logging
 import time
 from pathlib import Path
 from urllib.request import Request, urlopen
-import aiohttp
 
 LOG = logging.getLogger(__name__)
 
-HYPE_WORDS = {"jaja", "jajaja", "kekw", "wtf", "lmao", "lol", "pog", "clip", "xd", "omg", "base"}
 PUSHER_KEY = "32cbd69e4b950bf97679"
 
 
@@ -66,7 +65,7 @@ class KickChatListener:
     def __init__(self, channel: str, data_dir: Path):
         self.channel = channel.lower()
         self.discovery = KickDiscovery(data_dir)
-        self.count = 0
+        self.messages = collections.deque(maxlen=1000)
         self._running = False
         self._task: asyncio.Task | None = None
 
@@ -78,13 +77,16 @@ class KickChatListener:
         self._running = False
         if self._task:
             self._task.cancel()
+            await asyncio.gather(self._task, return_exceptions=True)
+            self._task = None
 
-    def poll_and_reset(self) -> float:
-        val = float(self.count)
-        self.count = 0
-        return val
+    def poll_and_reset(self) -> list[str]:
+        mensajes = list(self.messages)
+        self.messages.clear()
+        return mensajes
 
     async def _listen_loop(self):
+        import aiohttp
         while self._running:
             chatroom_id = await asyncio.to_thread(self.discovery.get_chatroom_id, self.channel)
             if not chatroom_id:
@@ -109,13 +111,34 @@ class KickChatListener:
                                 event = payload.get("event", "")
                                 if event == "pusher:ping":
                                     await ws.send_str(json.dumps({"event": "pusher:pong", "data": {}}))
-                                elif "ChatMessage" in event or "message" in event:
-                                    data_str = payload.get("data", "")
-                                    if any(w in data_str.lower() for w in HYPE_WORDS):
-                                        self.count += 1
+                                elif "ChatMessage" in event or "message" in event.lower():
+                                    texto = _texto_mensaje(payload.get("data", ""))
+                                    if texto:
+                                        self.messages.append(texto)
                             elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
                                 break
             except asyncio.CancelledError:
                 break
             except Exception:
                 await asyncio.sleep(5)
+
+
+def _texto_mensaje(data) -> str:
+    """Extrae el contenido real de los formatos de evento de Kick."""
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except json.JSONDecodeError:
+            return data.strip()
+    if not isinstance(data, dict):
+        return ""
+    for key in ("content", "text", "body"):
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    for key in ("message", "data"):
+        value = data.get(key)
+        texto = _texto_mensaje(value)
+        if texto:
+            return texto
+    return ""

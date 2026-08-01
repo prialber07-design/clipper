@@ -129,7 +129,6 @@
                                     "cam_y":  175,
                                     "cam_altura":  480,
                                     "contenido_y":  885,
-                                    "separacion_px":  6,
                                     "_nota":  "cam_rect es [x,y,w,h] de la webcam DENTRO del frame original. Sacalo con: clip.ps1 rejilla \u003cslug\u003e. Si es null, la banda de arriba usa el frame entero.",
                                     "margen_px":  30,
                                     "borde_color":  "white@0.22",
@@ -192,7 +191,7 @@
                     "hook_min_chars":  18,
                     "volumen_min_db":  -40,
                     "negro_max_s":  2,
-                    "publicar_con_gancho_automatico":  true,
+                    "publicar_con_gancho_automatico":  false,
                     "gancho_puntuacion_minima":  3
                 },
     "duraciones":  {
