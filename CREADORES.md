@@ -125,9 +125,12 @@ Igual: máximo 1.580 visitas. `ah!` · `yo flipo tio` · `Se cae yony pobrecito`
 alta) → Lopezfnx (motor claro con Iratxe) → El Calvo, Franbeuve, José Nogales,
 La Cobra → Rey de la city → Mario Taxi y Viviendo en la calle.
 
-**Mario Taxi y Viviendo en la calle no rentan**: con techos de 594 y 1.580
-visitas, el tiempo de máquina cunde mucho más en cualquier otro.
+**Los diez canales se mantienen** (decidido el 2026-08-01). Mario Taxi y
+Viviendo en la calle tienen techos bajos —594 y 1.580 visitas— pero son canales
+pequeños en crecimiento y vigilarlos no cuesta nada mientras estén offline la
+mayor parte del día. No volver a proponer quitarlos.
 
-**Ajuste pendiente:** los cortes automáticos están en 10–20 s el nivel corto.
-Para competir en este formato haría falta permitir 5–10 s en momentos muy
-concretos: una caída, una mirada, un susto.
+**Las tres franjas de duración se mantienen** tal cual: corto 10–20 s, medio
+26–34 s, largo 64–95 s, con el patrón cíclico. No bajar el corto a 5–10 s.
+La prioridad es tener siempre material que monetice en TikTok, aunque los
+clips de 4–9 s sean los que más circulan en estas comunidades.
