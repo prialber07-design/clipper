@@ -57,6 +57,13 @@ SENALES = [
     (re.compile(r"¿[^?]{10,80}\?"), 1, "pregunta"),
 ]
 
+# Contenido sexual explicito. No es lenguaje de odio (eso lo veta calidad.py),
+# pero las plataformas lo restringen y un clip asi no llega a nadie. Resta en
+# vez de vetar: a veces la palabra cae de pasada en un clip que va de otra cosa.
+EXPLICITO = re.compile(
+    r"\b(follar|follan|follo|follas|pajas?|polla|coño|tetas|culo|"
+    r"masturb\w+|orgasmo|porno|nopor)\b", re.I)
+
 # Relleno: si domina esto, el clip no cuenta nada.
 RUIDO = re.compile(
     r"\b(gracias por (el|los|ese)|por ese prime|por esos meses|se ha suscrito|"
@@ -94,6 +101,11 @@ def puntuar(lineas: list[str]) -> tuple[int, list[str]]:
     if ruido:
         puntos -= 2 * min(ruido, 5)
         motivos.append(f"relleno x{ruido}")
+
+    sexo = len(EXPLICITO.findall(texto))
+    if sexo:
+        puntos -= 4 * min(sexo, 6)
+        motivos.append(f"explicito x{sexo}")
 
     # Frases largas y seguidas = alguien contando algo. Frases de tres palabras
     # sueltas = comentario de partida.
