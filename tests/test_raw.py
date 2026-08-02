@@ -80,6 +80,18 @@ class RawTests(unittest.TestCase):
         raw._atomic_write(raw.RAW / f"{raw_id}.json", data)
         return raw_id
 
+    def _gemini_v2(self, raw_id, *, analyzed_id=None, schema=2):
+        path = raw.RAW / "_gemini" / f"{raw_id}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({
+            "schema": schema,
+            "identity_policy_version": 2,
+            "raw_id": analyzed_id or raw_id,
+            "status": "ok",
+            "result": _visual(),
+        }), encoding="utf-8")
+        return path
+
     def test_api_raw_no_expone_manifesta(self):
         self._manifest()
         item = raw.listar_api()[0]
@@ -87,6 +99,10 @@ class RawTests(unittest.TestCase):
         self.assertIn("/files/out/RAW/", item["url"])
         self.assertNotIn("segments", item)
         self.assertNotIn("words", item)
+
+    def test_gemini_auto_ya_no_puede_activarse(self):
+        with patch.dict(os.environ, {"CLIPPER_RAW_MODO": "gemini_auto"}):
+            self.assertEqual(raw.modo(), "manual")
 
     def test_dos_clics_no_crean_dos_procesos(self):
         raw_id = self._manifest()
@@ -189,6 +205,68 @@ class RawTests(unittest.TestCase):
             raw._run(raw_id, "luna", "attempt3")
         self.assertEqual(raw._read(raw_id)["status"], "error_luna")
 
+    def test_escaner_solo_encola_gemini_v2_del_mismo_raw(self):
+        raw_id = self._manifest()
+        with patch.object(raw, "enqueue_analizado") as enqueue:
+            self.assertEqual(raw.procesar_analizados(), 0)
+            enqueue.assert_not_called()
+
+            self._gemini_v2(raw_id, analyzed_id="otro-raw")
+            self.assertEqual(raw.procesar_analizados(), 0)
+            enqueue.assert_not_called()
+
+            self._gemini_v2(raw_id)
+            self.assertEqual(raw.procesar_analizados(), 1)
+            self.assertEqual(enqueue.call_args.args[0], raw_id)
+            self.assertEqual(enqueue.call_args.args[1]["summary"], "Una escena factual.")
+
+    def test_identidad_v2_exige_dos_urls(self):
+        raw_id = self._manifest()
+        path = self._gemini_v2(raw_id)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["result"]["people"] = [{
+            "description": "Presentador",
+            "name": "Persona conocida",
+            "confidence": 0.95,
+            "evidence": ["Nombre visible en pantalla", "https://example.com/uno"],
+            "role_in_clip": "Presentador",
+        }]
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with patch.object(raw, "enqueue_analizado") as enqueue:
+            self.assertEqual(raw.procesar_analizados(), 0)
+            enqueue.assert_not_called()
+        self.assertIn("dos fuentes", raw._read(raw_id)["last_error"])
+
+    def test_resultado_v2_pasa_a_luna_y_completa(self):
+        raw_id = self._manifest("procesando_luna")
+        manifest = raw._read(raw_id)
+        manifest["attempt"] = {"id": "external1", "mode": "luna", "started_at": "now"}
+        raw._atomic_write(raw.RAW / f"{raw_id}.json", manifest)
+        with patch.object(raw.clipper, "evaluar_editorial",
+                          return_value=("Giro inesperado", _llm())) as luna, \
+                patch.object(raw, "_render_and_publish",
+                             return_value={"queue": "LISTOS", "name": "clip.mp4"}):
+            raw._run(raw_id, "luna", "external1", _visual())
+        result = raw._read(raw_id)
+        self.assertEqual(result["status"], "completado")
+        self.assertEqual(result["gemini"]["model"], "external-v2")
+        self.assertEqual(luna.call_args.kwargs["analisis_visual"]["summary"],
+                         "Una escena factual.")
+
+    def test_fallo_luna_externo_programa_reintento(self):
+        raw_id = self._manifest("procesando_luna")
+        manifest = raw._read(raw_id)
+        manifest["attempt"] = {"id": "external2", "mode": "luna", "started_at": "now"}
+        raw._atomic_write(raw.RAW / f"{raw_id}.json", manifest)
+        with patch.object(raw.clipper, "evaluar_editorial",
+                          side_effect=RuntimeError("timeout")):
+            raw._run(raw_id, "luna", "external2", _visual())
+        result = raw._read(raw_id)
+        self.assertEqual(result["status"], "error_luna")
+        self.assertEqual(result["retry_count"], 1)
+        self.assertTrue(result["next_retry_at"])
+        self.assertTrue(raw._reintento_pendiente(result))
+
     def test_reinicio_recupera_proceso_huerfano(self):
         raw_id = self._manifest("procesando_luna")
         raw.recuperar_huerfanos()
@@ -234,37 +312,13 @@ class RawTests(unittest.TestCase):
         finally:
             live.WORK = anterior
 
-    def test_gemini_auto_reutiliza_el_mismo_procesador(self):
-        anterior = live.WORK
-        live.WORK = self.root / "work"
-        slug = "canal-20260802-030000"
-        trabajo = live.WORK / slug
-        trabajo.mkdir(parents=True)
-        (trabajo / "transcript.json").write_text(json.dumps({
-            "segments": [{"start": 0, "end": 40, "text": "Esto es un momento increíble"}],
-            "words": [],
-        }), encoding="utf-8")
-        try:
-            with patch.object(live, "recargar"), patch.object(live, "aplicar_ajustes_canal"), \
-                    patch.object(live.time, "strftime", return_value="20260802-030000"), \
-                    patch.object(live, "elegir_duracion", return_value=("corto", {"min": 26, "max": 34})), \
-                    patch.object(live, "montar_ventana", return_value=(self.root / "source.mp4", 20)), \
-                    patch.object(live.bloqueo, "exclusivo", return_value=nullcontext()), \
-                    patch.object(live.clipper, "cmd_transcribe"), \
-                    patch.object(live.raw, "crear", return_value={"id": slug + "-01", "nombre": "x.mp4", "status": "pendiente"}), \
-                    patch.object(live.raw, "modo", return_value="gemini_auto"), \
-                    patch.object(live.raw, "enqueue") as enqueue:
-                live.procesar(Mock(), 20, "canal", "pico", "cpu", [])
-            enqueue.assert_called_once_with(slug + "-01", "gemini")
-        finally:
-            live.WORK = anterior
-
-    def test_ui_raw_tiene_acciones_y_api_post(self):
+    def test_ui_raw_espera_gemini_sin_acciones_manuales(self):
         self.assertIn("panel-raw", web.HTML_TEMPLATE)
-        self.assertIn("processRaw", web.HTML_TEMPLATE)
-        self.assertIn("/api/raw/process", web.HTML_TEMPLATE)
+        self.assertIn("Esperando análisis Gemini", web.HTML_TEMPLATE)
+        self.assertNotIn("processRaw", web.HTML_TEMPLATE)
+        self.assertNotIn("/api/raw/process", web.HTML_TEMPLATE)
+        self.assertNotIn("Procesar con Luna", web.HTML_TEMPLATE)
         self.assertIn("textContent", web.HTML_TEMPLATE)
-        self.assertIn("disabled", web.HTML_TEMPLATE)
 
 
 if __name__ == "__main__":

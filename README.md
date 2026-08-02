@@ -16,9 +16,9 @@ detector: velocidad y contenido del chat + energía de audio
         ↓
 pico → ventana → faster-whisper (timestamps por palabra)
         ↓
-out/RAW (MP4 limpio + manifiesto) → botón Gemini o Luna
+out/RAW (MP4 limpio + manifiesto) → agy escribe _gemini/<id>.json v2
         ↓
-Luna + filtro de calidad → ffmpeg (9:16 + subtítulos + gancho)
+Gemini v2 validado → Luna + filtro de calidad → ffmpeg (9:16 + subtítulos + gancho)
         ↓
 bandeja numerada + aviso al móvil (ntfy)
 ```
@@ -78,23 +78,22 @@ Kick usa el chat real cuando `aiohttp` esta instalado. La galeria web exige
 `CLIPPER_WEB_CLAVE`, refresca los clips automaticamente y es la interfaz unica
 de revision.
 
-## Validación manual RAW
+## Validación RAW con Gemini v2
 
 El despliegue usa `CLIPPER_RAW_MODO=manual`: después de Whisper cada candidato
-queda en `out/RAW/` con su MP4 limpio y un manifiesto privado. El pipeline se
-detiene ahí; no llama a Gemini, Luna ni renderiza por su cuenta.
+queda en `out/RAW/` con su MP4 limpio y un manifiesto privado. El CLI `agy` del
+host analiza el MP4 y escribe `out/RAW/_gemini/<id>.json`.
 
-En la pestaña **RAW** de la galería puedes previsualizarlo y elegir **Analizar
-con Gemini** (MP4 directo + Whisper + chat, seguido de una sola llamada a Luna)
-o **Procesar con Luna** (sin vídeo). Los fallos quedan visibles en RAW y no se
-mueven silenciosamente a REVISAR. `gemini_auto` está preparado para una fase
-posterior, pero no debe activarse todavía.
+El supervisor comprueba esa carpeta cada 15 segundos. Solo acepta esquema 2,
+política de identidad 2, `raw_id` coincidente, estado `ok`, contrato visual
+válido y dos URLs para cualquier identidad nombrada. Entonces envía el análisis,
+Whisper y chat a una única llamada de Luna y renderiza hacia `LISTOS` o
+`REVISAR`. Sin JSON v2 válido, el RAW espera y no existe un botón para saltarse
+Gemini.
 
-El análisis de Gemini exige confirmar `useG1Credits=false` antes de invocar el
-CLI y usa un timeout de 120 segundos. No se registran prompts, transcripciones,
-chat, tokens ni análisis completos en los logs. OAuth y la confianza de agy se
-configuran desde el workspace estable `CLIPPER_DATA/antigravity-workspace`
-(en Docker, `/app/clips/antigravity-workspace`); no se debe usar otra carpeta.
+Los fallos de Luna o render se reintentan a 1, 5 y 15 minutos y después cada
+hora. No se registran prompts, transcripciones, chat, tokens ni análisis
+completos en los logs.
 
 ## Sincronizacion automatica para Windows
 

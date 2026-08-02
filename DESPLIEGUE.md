@@ -1,8 +1,211 @@
-# Poner el clipper en un servidor
+# Estado del proyecto Clipper
 
-El código ya es multiplataforma: `servidor.py` sustituye a `vigilar.ps1` y
-funciona igual en Windows y en Linux. Levanta un vigilante por canal y relanza
-solo el que se caiga, con espera creciente para no machacar la plataforma.
+**Este documento es el punto de entrada para cualquier agente que trabaje en
+este repositorio.** Léelo entero antes de tocar nada o de responder al usuario
+sobre el estado del proyecto.
+
+Sirve para tres cosas:
+
+1. Saber qué está hecho de verdad y qué solo está escrito.
+2. Saber qué no se puede afirmar ni activar todavía.
+3. Saber cuál es el siguiente paso, sin volver a investigarlo.
+
+Al final hay un anexo con las recetas de despliegue. Ese anexo es material de
+consulta, no el contenido principal.
+
+**Última actualización del código: 2 de agosto de 2026, 22:25 CEST.**
+**Última verificación del servidor: 2 de agosto de 2026, 22:10 CEST.**
+Si hoy es una fecha muy posterior, trata la sección "Estado real del servidor"
+como caducada y verifícala con los comandos del apartado "Cómo comprobar el
+estado tú mismo" antes de afirmar nada.
+
+---
+
+## Reglas para agentes
+
+Estas reglas no son sugerencias. Rompen el proyecto si se ignoran.
+
+- **No actives `gemini_auto`.** Ya no es un valor admitido.
+  `CLIPPER_RAW_MODO` debe seguir en `manual`: el avance automático ocurre solo
+  cuando aparece un `_gemini/<id>.json` v2 válido.
+- **No permitas saltarse Gemini.** Se retiraron los botones Gemini/Luna y
+  `POST /api/raw/process`. Solo el consumidor interno de resultados v2 puede
+  llamar a Luna.
+- **No reinstales Antigravity 2.0, XFCE, XRDP ni un navegador en el servidor.**
+  Se eliminaron a propósito. El CLI `agy` ya demostró que puede inspeccionar
+  un MP4 directamente, así que un escritorio no aporta nada.
+- **No monetices ningún canal.** Los diez canales de `config.json` están
+  marcados `permiso_clips: PENDIENTE`. Nadie ha verificado aún la política
+  oficial de clips de cada uno. Ver "Bloqueantes".
+- **Secretos fuera del repositorio.** OAuth, `OPENAI_API_KEY` y la confianza
+  del workspace de `agy` viven en el perfil privado del usuario. Nunca en el
+  repo, ni copiados al entorno de un proceso hijo, ni en logs.
+- **Antes de reescribir varios archivos, commitea o haz stash.** El usuario
+  trabaja con el árbol sucio a menudo.
+
+---
+
+## Qué funciona hoy
+
+Esto está implementado y verificado en el servidor.
+
+- Captura continua de Twitch y Kick, buffer rodante y detección de momentos por
+  reacción del chat más energía de audio.
+- Una sola cola de Whisper compartida por todos los canales. En el servidor va
+  con `small` e `int8` porque el contenedor no tiene GPU.
+- `CLIPPER_RAW_MODO=manual`: cada candidato se recorta sin subtítulos, hook,
+  marca de agua ni recodificación, y se deja como pareja `.mp4` + `.json` en
+  `/app/clips/out/RAW/`. El vigilante se detiene ahí y espera un análisis v2.
+- Dashboard web autenticado con pestañas `RAW`, `LISTOS` y `REVISAR`, vista
+  previa y logs. RAW ya no ofrece acciones manuales que puedan saltarse Gemini.
+- El supervisor revisa cada 15 segundos `RAW/_gemini/<id>.json`. Exige esquema
+  y política de identidad 2, `raw_id` coincidente, estado `ok`, contrato visual
+  estricto y dos fuentes URL para cada identidad nombrada. Solo entonces llama
+  a Luna, renderiza y mueve la salida a `LISTOS` o `REVISAR`.
+- Los fallos de Luna o render se reintentan automáticamente tras 1, 5 y 15
+  minutos y después cada hora, sin duplicar trabajos.
+- Luna hace una sola evaluación editorial por candidato y devuelve decisión,
+  puntuación, confianza, hook, descripción y de 4 a 6 hashtags. Solo pasan a
+  `LISTOS` los que dan `publicar` con score 80 o más, confianza 0,75 o más y
+  todos los controles técnicos locales en verde. El resto va a `REVISAR` y no
+  se borra.
+- Render vertical 1080x1920 con subtítulos y hook permanente: TikTok Sans Bold,
+  texto negro sobre caja blanca opaca, centrado en torno al 18% de la altura,
+  con cero, uno o dos emojis opcionales al final.
+- Cada salida genera `.mp4` y `.txt`. El TXT lleva solo la descripción, una
+  línea en blanco y los hashtags listos para copiar.
+- `windows-sync/` instala una tarea de Windows cada diez minutos. Descarga solo
+  parejas completas desde `LISTOS` a la carpeta elegida, guarda la contraseña
+  con DPAPI, usa temporales `.part`, comprueba tamaño y nunca borra archivos
+  locales.
+- Logs RAW estructurados y persistentes en
+  `/app/clips/logs/raw-processing.jsonl`. No contienen prompts,
+  transcripciones, chat, secretos ni respuestas completas.
+- Limpieza automática a siete días, que expira también trabajos, logs,
+  contadores e índices antiguos. El buffer se poda incluso mientras hay una
+  transcripción o un render en curso.
+
+## Qué NO funciona todavía
+
+- **El análisis temporal automático.** La tarea creada con `Schedule` dentro de
+  Antigravity es local a esa sesión interactiva y desaparece al cerrar o
+  reiniciar el CLI. A fecha de la última verificación no había ningún proceso
+  `agy` vivo.
+- **El nuevo consumidor aún necesita despliegue y prueba real.** El código y 52
+  pruebas locales pasan, pero no se debe afirmar que el servidor está
+  procesando v2 hasta desplegar y comprobar `GEMINI_V2_ACCEPTED`, `LUNA_*` y
+  `RAW_COMPLETED` en el log persistente.
+
+## Bloqueantes, por orden
+
+1. **Permiso de clips sin verificar.** Los diez canales de `config.json` están
+   en `permiso_clips: PENDIENTE`, con nota explícita de no monetizar. Esto
+   bloquea el objetivo del proyecto, no solo el despliegue. Hasta resolverlo,
+   todo lo demás es infraestructura sin salida comercial.
+2. **`agy` no persiste.** Hace falta una sola ejecución de `agy` que sobreviva
+   fuera de una sesión interactiva, sin depender de `Schedule`.
+3. **Falta verificar el recorrido desplegado.** El cable v2 → Luna ya está en
+   el código; falta desplegarlo y comprobar una salida real y sus reintentos.
+
+## Siguiente paso
+
+Desplegar y verificar el bloqueante 3. Después hacer persistente `agy` para que
+los nuevos RAW reciban análisis sin una sesión interactiva. En todo momento
+`CLIPPER_RAW_MODO` permanece en `manual`.
+
+---
+
+## Cómo comprobar el estado tú mismo
+
+No te fíes de las fechas de este documento. Comprueba.
+
+```bash
+docker logs -f <contenedor-clipper>
+tail -f /etc/easypanel/projects/automatizaciones/clips-alberto/volumes/clips/logs/raw-processing.jsonl
+find /etc/easypanel/projects/automatizaciones/clips-alberto/volumes/clips/out/RAW -maxdepth 1 -type f -printf '%f\n'
+ls /etc/easypanel/projects/automatizaciones/clips-alberto/volumes/clips/out/RAW/_gemini/errors/
+pgrep -af agy
+```
+
+Qué mirar:
+
+- Cuántos RAW hay y cuántos tienen ya `_gemini/<id>.json`.
+- Si `_gemini/errors/` está vacío.
+- Si hay algún proceso `agy` vivo. Si no lo hay, el análisis temporal está
+  parado, que es el estado conocido.
+
+Estado del supervisor y arranque manual:
+
+```bash
+python servidor.py --estado
+python servidor.py --canales elcalvolol,lopezfnx
+```
+
+## Mapa del repositorio
+
+Para saber dónde tocar sin leerlo todo.
+
+| Archivo | Qué hace |
+|---|---|
+| `servidor.py` | Supervisor. Un vigilante por canal, relanza el que se cae con espera creciente. Sustituye a `vigilar.ps1` y funciona en Windows y Linux |
+| `live.py` | Captura en directo, buffer rodante, detección del momento y recorte |
+| `raw.py` | Valida `_gemini/<id>.json` v2, encola Luna y programa reintentos |
+| `calidad.py` | Filtro técnico previo: silencio, audio inaudible, pantalla en negro, hook vacío |
+| `antigravity.py` | Contrato y validador estricto del análisis visual Gemini |
+| `web.py` | Galería autenticada; RAW informa estado sin acciones manuales |
+| `notify.py` | Bandeja `LISTOS` y aviso a ntfy |
+| `kick.py` | Chat de Kick por WebSocket nativo, sin Playwright |
+| `bloqueo.py` | Cerrojo entre procesos para que no haya dos transcripciones a la vez |
+| `resolver.py` | Resuelve plataforma y existencia de cada canal |
+| `clipper.py` | Flujo v1 sobre VOD, de URL a clip vertical |
+| `publicar_todo.py` | Pasa a bandeja todo lo que haya en `REVISAR` |
+| `registro.py` | Log de consola compartido |
+| `config.json` | Canales, layouts, render, umbrales de detección y de Luna |
+| `docs/plans/` | Decisiones de diseño. Contexto histórico, no estado actual |
+
+`docs/plans/` conserva por qué se decidió cada cosa, pero **no** describe lo que
+está funcionando. Si hay conflicto, manda este documento.
+
+## Cómo actualizar este documento
+
+Cuando termines un trabajo que cambie el estado:
+
+1. Cambia la fecha de "Última actualización verificada" solo si has comprobado
+   el servidor de verdad, no si solo has cambiado código.
+2. Mueve lo que hayas terminado de "Qué NO funciona todavía" a "Qué funciona
+   hoy", y solo con logs que lo demuestren.
+3. Reordena "Bloqueantes" y reescribe "Siguiente paso".
+4. Si algo deja de ser cierto, bórralo. Un estado desactualizado hace más daño
+   que un hueco.
+
+No añadas aquí decisiones de diseño. Esas van a `docs/plans/`.
+
+---
+
+# Anexo: despliegue
+
+Material de consulta. No hace falta leerlo para entender el estado del
+proyecto.
+
+## Errores conocidos en este anexo
+
+Antes de seguir cualquiera de estas recetas al pie de la letra:
+
+- El bloque de variables de EasyPanel no incluye `CLIPPER_LLM_ACTIVO` ni
+  `OPENAI_API_KEY`. Si lo copias tal cual, Luna no se activa y nada llega a
+  `LISTOS`.
+- La lista de variables de EasyPanel y la tabla de `.env` no coinciden. La
+  tabla es la más completa.
+- No está documentado si `CLIPPER_MODELO` y `CLIPPER_COMPUTE` ganan a
+  `whisper.modelo` y `whisper.compute_type` de `config.json`. Ambos están hoy
+  en `small` e `int8`, así que en la práctica no hay conflicto.
+- La tarea programada de la Opción A usa `AtStartup` sin `-LogonType S4U` ni
+  credenciales guardadas, y pasa `0` a `-ExecutionTimeLimit`, que espera un
+  `TimeSpan`. Pruébala antes de confiar en ella.
+- La tabla dice que `CLIPPER_NTFY_TOPIC` es la única credencial. No lo es:
+  también están `CLIPPER_WEB_CLAVE` y `OPENAI_API_KEY`.
+
+## Arranque
 
 ```bash
 python servidor.py                      # todos los canales verificados
@@ -10,83 +213,7 @@ python servidor.py --canales elcalvolol,lopezfnx
 python servidor.py --estado
 ```
 
-## Estado actual del proyecto — 2 de agosto de 2026, 22:10 CEST
-
-Este apartado es la referencia operativa vigente. Los documentos de
-`docs/plans/` conservan las decisiones de diseño, pero no sustituyen este
-estado real.
-
-### Qué está implementado
-
-- Captura continua de Twitch/Kick, buffer rodante y detección por reacción del
-  chat más energía de audio.
-- Una sola cola de Whisper para todos los canales. En el servidor se usa
-  `small` con `int8` porque no hay GPU disponible para el contenedor.
-- `CLIPPER_RAW_MODO=manual`: cada candidato se recorta sin subtítulos, hook,
-  marca de agua ni recodificación y se detiene como pareja `.mp4` + `.json` en
-  `/app/clips/out/RAW/`.
-- Dashboard autenticado con pestañas `RAW`, `LISTOS` y `REVISAR`, vista previa,
-  logs y acciones **Analizar con Gemini** o **Procesar con Luna**.
-- Luna hace una sola evaluación editorial y devuelve decisión, puntuación,
-  confianza, hook, descripción y 4–6 hashtags. Solo `publicar`, score mínimo
-  80, confianza mínima 0,75 y controles técnicos válidos llegan a `LISTOS`.
-- Render vertical 1080×1920 con subtítulos y hook permanente: TikTok Sans Bold,
-  texto negro sobre caja blanca opaca, centrado aproximadamente al 18% de la
-  altura y con cero, uno o dos emojis opcionales al final.
-- Cada salida genera `.mp4` y `.txt`; el TXT contiene únicamente la descripción,
-  una línea en blanco y los hashtags listos para copiar.
-- `windows-sync/` instala una tarea de Windows cada diez minutos. Descarga solo
-  parejas completas de `LISTOS` directamente a la carpeta elegida, usa DPAPI
-  para la contraseña, temporales `.part`, comprobación de tamaño y nunca borra
-  archivos locales.
-- Logs RAW estructurados y persistentes en
-  `/app/clips/logs/raw-processing.jsonl`; no incluyen prompts, transcripciones,
-  chat, secretos ni respuestas completas.
-
-### Estado real del servidor
-
-- EasyPanel mantiene el volumen persistente en
-  `/etc/easypanel/projects/automatizaciones/clips-alberto/volumes/clips/` y el
-  contenedor lo ve como `/app/clips/`.
-- El CLI del host es `agy 1.1.9`, autenticado con OAuth de Google AI Pro.
-- Se eliminó la aplicación gráfica Antigravity 2.0 junto con XFCE, XRDP y
-  Chrome; no son necesarios para el flujo actual.
-- Se validó que `agy` puede abrir un MP4 real directamente con `view_file`. La
-  prueba sintética identificó correctamente el contenido de ambas mitades en
-  aproximadamente un segundo.
-- Tras limpiar el histórico se conservaron cuatro clips con análisis de
-  identidad v2. Como los vigilantes siguen activos, a las 22:10 había siete
-  RAW: cuatro analizados y tres candidatos nuevos pendientes. No había errores
-  en `_gemini/errors/`.
-- En ese momento no había ningún proceso `agy` vivo: la tarea creada con
-  `Schedule` dentro de Antigravity es local a esa sesión y desaparece al cerrar
-  o reiniciar el CLI. Por tanto, **el análisis temporal no está ejecutándose
-  automáticamente ahora mismo**.
-
-### Dos rutas Gemini distintas
-
-1. **Integración de Clipper**: `POST /api/raw/process` con `mode=gemini` encola
-   `MP4 → Antigravity → Luna → render → LISTOS/REVISAR`. El código valida cuota,
-   OAuth, JSON, timeout de 120 s y errores, pero esta ruta no está operativa en
-   producción porque el `agy` autenticado vive en el host y no dentro del
-   contenedor.
-2. **Validación temporal del host**: una tarea interactiva de `agy` lee como
-   máximo tres MP4 por ejecución desde el volumen RAW y escribe
-   `_gemini/<id>.json`. El esquema v2 exige descripción temporal, personas,
-   identidad solo con evidencia contextual y al menos dos URLs independientes,
-   rol, texto visible, lugar, momento clave, hechos editoriales y advertencias.
-
-Los JSON de `_gemini/` son actualmente resultados de validación: `raw.py` no
-los busca ni los entrega a Luna. No debe afirmarse que Gemini está enriqueciendo
-automáticamente los renders hasta conectar explícitamente ese directorio con el
-procesador RAW o hacer operativa la integración dentro del contenedor.
-
-### Próximo paso bloqueante
-
-Hacer persistente una sola ejecución de `agy` sin depender de `Schedule` dentro
-de una sesión interactiva y conectar cada JSON v2 validado con la llamada única
-a Luna. Hasta verificarlo con logs reales, `CLIPPER_RAW_MODO` debe seguir en
-`manual` y `gemini_auto` no debe activarse.
+Los canales se eligen en `config.json` o al arrancar.
 
 ## Qué hardware hace falta de verdad
 
@@ -94,31 +221,31 @@ Lo que manda es la **transcripción**, no la captura.
 
 | Recurso | Por canal | 10 canales |
 |---|---|---|
-| Descarga continua | 3–6 Mbps | **30–60 Mbps sostenidos** |
+| Descarga continua | 3-6 Mbps | **30-60 Mbps sostenidos** |
 | Disco (buffer 15 min) | ~1 GB | ~10 GB rodando |
-| RAM | ~300 MB | ~3 GB + 2–4 GB del modelo |
+| RAM | ~300 MB | ~3 GB + 2-4 GB del modelo |
 
 **Transcripción de una ventana de 90 s**:
 
 - GPU NVIDIA con `large-v3-turbo`: ~15 s
-- CPU 8 núcleos: ~90–150 s
-- CPU 4 núcleos: no llega; se encolan los picos
+- CPU 8 núcleos: ~90-150 s
+- CPU 4 núcleos: no llega, se encolan los picos
 
 Un clip cada ~2 min por canal, con 10 canales, son hasta 5 transcripciones por
 minuto en hora punta. **En CPU eso no cabe.** Opciones reales:
 
-1. **VPS con GPU** (~0,20–0,60 €/h según proveedor). Es la única que aguanta 10
+1. **VPS con GPU** (~0,20-0,60 €/h según proveedor). Es la única que aguanta 10
    canales a la vez sin encolar.
-2. **VPS de CPU (8 vCPU, ~25–40 €/mes)** con `modelo: "small"` o `"base"` en
+2. **VPS de CPU (8 vCPU, ~25-40 €/mes)** con `modelo: "small"` o `"base"` en
    `config.json` en vez de `large-v3-turbo`. Pierdes precisión en los
    subtítulos, que es justo lo que más se nota en pantalla.
-3. **Tu PC como servidor**: ya tiene la GPU. Es la opción más barata con
-   diferencia; solo hay que dejarlo encendido.
+3. **El PC del usuario como servidor**: ya tiene la GPU. Es la opción más
+   barata con diferencia, solo hay que dejarlo encendido.
 
-Mi recomendación: **empieza por la 3**. Si el PC no puede quedarse encendido,
-pasa a la 1 con 3–4 canales, no 10.
+Recomendación original: empezar por la 3. Si el PC no puede quedarse encendido,
+pasar a la 1 con 3 o 4 canales, no 10.
 
-## Opción A — tu PC como servidor (sin coste)
+## Opción A: el PC como servidor (sin coste)
 
 Tarea programada que arranca al encender y sobrevive a reinicios:
 
@@ -131,7 +258,7 @@ $cfg = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-Time
 Register-ScheduledTask -TaskName "clipper" -Action $acc -Trigger $dis -Settings $cfg -RunLevel Highest
 ```
 
-## Opción B — VPS Linux con systemd
+## Opción B: VPS Linux con systemd
 
 ```bash
 git clone <tu-repo> /opt/clipper && cd /opt/clipper
@@ -164,12 +291,12 @@ systemctl enable --now clipper && journalctl -u clipper -f
 Con GPU añade `nvidia-cuda-toolkit` y
 `pip install nvidia-cublas-cu12 nvidia-cudnn-cu12`.
 
-## Opción C — EasyPanel (lo más rápido si ya lo tienes)
+## Opción C: EasyPanel (la que está en uso)
 
 EasyPanel construye la imagen desde el repositorio y ya trae proxy con
-certificado automático, así que **no necesitas Caddy ni el docker-compose**.
+certificado automático, así que **no hace falta Caddy ni el docker-compose**.
 
-1. **Create Service → App**, origen **GitHub**, tu repositorio, rama `main`.
+1. **Create Service → App**, origen **GitHub**, el repositorio, rama `main`.
 2. **Build**: `Dockerfile` (o `Dockerfile.gpu` si el servidor tiene GPU).
 3. **Environment**: pega esto ajustando valores.
 
@@ -189,9 +316,12 @@ certificado automático, así que **no necesitas Caddy ni el docker-compose**.
    CLIPPER_AGY_BIN=agy
    ```
 
-4. **Volumes**: volumen persistente montado en **`/app/clips`**. Sin esto pierdes
-   los clips y el modelo en cada despliegue.
-5. **Domains**: tu dominio, puerto **8080**, HTTPS activado.
+   Recuerda añadir `CLIPPER_LLM_ACTIVO` y `OPENAI_API_KEY`, que faltan en ese
+   bloque y sin ellos Luna no evalúa nada.
+
+4. **Volumes**: volumen persistente montado en **`/app/clips`**. Sin esto se
+   pierden los clips y el modelo en cada despliegue.
+5. **Domains**: el dominio, puerto **8080**, HTTPS activado.
 6. **Deploy**.
 
 La galería queda en `https://tu-dominio` y el aviso del móvil trae el enlace
@@ -200,13 +330,21 @@ directo al clip.
 ### Ajustes obligatorios en EasyPanel
 
 - **`CLIPPER_MODELO=small`** salvo que el servidor tenga GPU. Con
-  `large-v3-turbo` en CPU los picos se encolan y pierdes clips.
+  `large-v3-turbo` en CPU los picos se encolan y se pierden clips.
 - **Menos canales**: edita `config.json` o arranca con
-  `python servidor.py --canales a,b,c`. Con 3–4 va bien; con 10 en CPU, no.
+  `python servidor.py --canales a,b,c`. Con 3 o 4 va bien; con 10 en CPU, no.
 - **El buffer va a disco** (en compose iba a tmpfs). Son ~1 GB por canal
   rodando; cuenta el espacio y el desgaste del SSD.
 
-## Opción D — Docker a pelo
+### Dónde vive todo en el servidor actual
+
+- Volumen persistente en
+  `/etc/easypanel/projects/automatizaciones/clips-alberto/volumes/clips/`, que
+  el contenedor ve como `/app/clips/`.
+- El CLI del host es `agy 1.1.9`, en `/home/fable5/.local/bin`, autenticado con
+  OAuth de Google AI Pro.
+
+## Opción D: Docker a pelo
 
 ```bash
 cp .env.ejemplo .env      # y ajusta topic, marca y modelo
@@ -228,8 +366,8 @@ docker compose --profile proxy up -d --build
 
 ### Qué hace la imagen
 
-- **Datos fuera del código**: `CLIPPER_DATA=/app/clips`, montado como volumen. La
-  imagen no guarda nada; borrarla y reconstruirla no pierde clips.
+- **Datos fuera del código**: `CLIPPER_DATA=/app/clips`, montado como volumen.
+  La imagen no guarda nada; borrarla y reconstruirla no pierde clips.
 - **Buffer en tmpfs** (16 GB): el buffer rodante escribe sin parar y en disco lo
   desgasta para nada, porque es material que se descarta.
 - **tini como PID 1**: cada canal lanza `streamlink` y `ffmpeg`; sin él quedan
@@ -241,10 +379,9 @@ docker compose --profile proxy up -d --build
 
 ### Recoger los clips con el PC apagado
 
-Esta es la pieza que cierra el círculo. El contenedor levanta una **galería web**
-con los clips numerados, en vertical, con su gancho y botón de descarga, y el
-aviso de ntfy incluye el **enlace directo**: te llega la notificación, la tocas,
-se abre el clip en el móvil y lo descargas. Sin PC.
+El contenedor levanta una **galería web** con los clips numerados, en vertical,
+con su gancho y botón de descarga, y el aviso de ntfy incluye el **enlace
+directo**.
 
 1. Apunta un dominio por DNS a la IP del servidor.
 2. En `.env`: `CLIPPER_DOMINIO`, `CLIPPER_WEB_CLAVE` y
@@ -258,109 +395,59 @@ clips abierta en internet es una fuga, no una comodidad.
 
 #### Sin dominio
 
-Cloudflare Tunnel te da una URL con HTTPS sin abrir puertos ni tener IP fija:
+Cloudflare Tunnel da una URL con HTTPS sin abrir puertos ni tener IP fija:
 
 ```bash
 cloudflared tunnel --url http://localhost:8080
 ```
 
-Sirve para probar; para uso diario, un túnel con nombre y un dominio.
+Sirve para probar. Para uso diario, un túnel con nombre y un dominio.
 
 #### Alternativa sin web
 
-Si prefieres que los clips aparezcan solos en el móvil, monta una carpeta del
-host en vez del volumen y sincronízala con rclone a Drive/Dropbox. Es más
+Si se prefiere que los clips aparezcan solos en el móvil, monta una carpeta del
+host en vez del volumen y sincronízala con rclone a Drive o Dropbox. Es más
 cómodo, pero depende de las cuotas del proveedor.
 
-### Estabilidad del servicio
-
-Whisper usa una sola cola entre vigilantes y libera el modelo al terminar cada
-trabajo. El buffer se poda tambien mientras hay una transcripcion o un render
-en curso. La limpieza automatica conserva el comportamiento intencional de
-siete dias y expira tambien trabajos, logs, contadores e indices antiguos.
-
-Luna decide cada candidato una sola vez. Solo `publicar`, score mínimo 80,
-confianza mínima 0,75 y todos los controles locales llegan a `LISTOS`; los
-demás van a `REVISAR` sin borrarse. La galería web exige `CLIPPER_WEB_CLAVE`;
-no existe una credencial por defecto. El panel refresca clips y logs cada 15
-segundos.
-
-### Variables (`.env`)
+## Variables (`.env`)
 
 | Variable | Para qué |
 |---|---|
-| `CLIPPER_NTFY_TOPIC` | Topic de avisos. Es la única credencial: cámbialo |
+| `CLIPPER_NTFY_TOPIC` | Topic de avisos. Cámbialo, es adivinable |
 | `CLIPPER_MARCA` | Marca de agua quemada en el vídeo |
 | `CLIPPER_MODELO` | `large-v3-turbo` con GPU, `small` en CPU |
 | `CLIPPER_COMPUTE` | `float16` con GPU, `int8` en CPU |
 | `CLIPPER_CARPETA_SINCRONIZADA` | Ruta de sincronización; vacía en contenedor |
 | `CLIPPER_DOCKERFILE` | `Dockerfile` o `Dockerfile.gpu` |
-| `CLIPPER_WEB_CLAVE` | Obligatoria; usa una clave larga y aleatoria |
+| `CLIPPER_WEB_CLAVE` | Obligatoria; clave larga y aleatoria |
 | `CLIPPER_LLM_ACTIVO` | Activa la evaluación editorial estricta de Luna |
-| `OPENAI_API_KEY` | Clave del servidor; nunca la subas al repositorio |
+| `OPENAI_API_KEY` | Clave del servidor; nunca al repositorio |
 | `CLIPPER_LLM_MODELO` | Por defecto `gpt-5.6-luna` |
-| `CLIPPER_RAW_MODO` | `manual` en el despliegue; `gemini_auto` solo preparado |
-| `CLIPPER_ANTIGRAVITY_ACTIVO` | Enriquecimiento visual opcional; `0` por defecto |
+| `CLIPPER_RAW_MODO` | Debe ser `manual`; cualquier otro valor cae a `manual` |
+| `CLIPPER_ANTIGRAVITY_ACTIVO` | Ruta directa heredada; mantener `0` |
 | `CLIPPER_AGY_BIN` | Ruta del binario oficial `agy`; por defecto `agy` |
+| `CLIPPER_DOMINIO` | Solo con Caddy propio; el panel no lo usa |
 
-### Cola RAW y validación manual
+## Contrato Gemini v2
 
-Con `CLIPPER_RAW_MODO=manual`, cada candidato válido tras Whisper se guarda en
-`/app/clips/out/RAW/` como MP4 limpio más manifiesto privado y el vigilante se
-detiene. La galería añade la pestaña **RAW** con los botones **Analizar con
-Gemini** y **Procesar con Luna**. El POST solo encola el trabajo y devuelve
-inmediatamente; el estado, error y latencias quedan en el manifiesto y en
-`/app/clips/logs/raw-processing.jsonl`.
+El `agy` autenticado del host es responsable de escribir
+`RAW/_gemini/<id>.json`. Clipper no lo invoca desde la web. `raw.py` comprueba
+el envoltorio v2 y reutiliza `antigravity.validar()` para sanear y limitar el
+resultado antes de pasarlo a Luna como contexto no confiable.
 
-Gemini recibe el MP4 RAW directo, Whisper y chat; Luna recibe solo texto y, en
-la ruta Gemini, el análisis visual validado como contexto no confiable. Un
-fallo conserva el candidato en RAW. `gemini_auto` existe como preparación, pero
-no se debe activar durante esta fase.
+El módulo conserva la implementación directa anterior con timeout de 120 s,
+salida máxima de 48 KB, entorno sin secretos y control de créditos, pero no hay
+endpoint ni modo de captura que la active en el flujo vigente.
 
-Para consultar el despliegue por SSH:
-
-```bash
-docker logs -f <contenedor-clipper>
-tail -f /ruta-del-volumen/clips/logs/raw-processing.jsonl
-find /ruta-del-volumen/clips/out/RAW -maxdepth 1 -type f -printf '%f\n'
-```
-
-### Antigravity: integración prevista y prueba temporal
-
-`antigravity.py` implementa la ruta integrada: copia un único candidato a un
-workspace estable, ejecuta `agy -p` con `Gemini 3.5 Flash (Low)`, limita la
-salida a 48 KB, aplica un timeout de 120 s, mata el grupo de procesos en timeout
-y valida estrictamente el JSON antes de enviarlo como contexto no confiable a
-Luna. También elimina secretos del entorno, serializa las ejecuciones y no usa
-`--dangerously-skip-permissions`.
-
-Antes de invocar el CLI exige poder confirmar `useG1Credits=false`; si la
-configuración es desconocida o permite créditos adicionales, falla de forma
-segura. OAuth, confianza del workspace y ajustes deben permanecer en el perfil
-privado del usuario y nunca en el repositorio, variables copiadas al proceso o
-logs.
-
-Esta integración directa todavía no está operativa en el despliegue actual. El
-OAuth funcional pertenece al `agy 1.1.9` instalado en `/home/fable5/.local/bin`
-del host, mientras Clipper se ejecuta dentro de Docker. El experimento funcional
-es la tarea temporal descrita al principio de este documento, que escribe JSON
-v2 en `/app/clips/out/RAW/_gemini/`; esos archivos aún no son consumidos por
-`raw.py`.
-
-No reinstalar Antigravity 2.0, un escritorio, XFCE, XRDP ni navegador en el
-servidor: el CLI ya demostró que puede inspeccionar MP4. No activar
-`gemini_auto` hasta que exista una ejecución persistente, se conecte el resultado
-v2 con Luna y se verifique el recorrido completo mediante logs.
-
-Los canales se eligen en `config.json`, o al arrancar:
-`command: python servidor.py --canales elcalvolol,lopezfnx`
+El esquema v2 que valida la tarea del host exige descripción temporal, personas,
+identidad solo con evidencia contextual y al menos dos URLs independientes, rol,
+texto visible, lugar, momento clave, hechos editoriales y advertencias.
 
 ## Antes de mover nada
 
-- **`carpeta_sincronizada`** apunta a tu OneDrive local. En un servidor no
-  existe: cámbiala por una ruta del servidor y sincroniza tú (rclone, un
-  recurso compartido, o lo que uses), o déjala vacía y recoge los clips por
-  `scp`/FTP.
+- **`carpeta_sincronizada`** apunta al OneDrive local del usuario. En un
+  servidor no existe: cámbiala por una ruta del servidor y sincroniza aparte
+  (rclone, recurso compartido), o déjala vacía y recoge los clips por `scp`.
 - **El aviso de ntfy funciona igual** desde cualquier sitio: es una petición
   saliente, no necesita puertos abiertos.
 - **Ancho de banda**: comprueba el límite de tráfico del proveedor. 10 canales

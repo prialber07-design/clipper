@@ -1,4 +1,4 @@
-"""Cola RAW y procesamiento editorial manual de candidatos."""
+"""Cola RAW y procesamiento editorial de candidatos analizados por Gemini."""
 
 import json
 import os
@@ -8,7 +8,7 @@ import tempfile
 import threading
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
 
@@ -26,6 +26,7 @@ RAW_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$")
 MODOS = {"gemini", "luna"}
 ESTADOS_ACTIVOS = {"procesando_gemini", "procesando_luna"}
 ESTADOS_REINTENTABLES = {"pendiente", "error_gemini", "error_luna", "error_render"}
+RETRY_DELAYS_S = (60, 300, 900, 3600)
 _MANIFEST_LOCK = clipper.DATA / ".raw-manifest.lock"
 _PROCESS_LOCK = clipper.DATA / ".raw-process.lock"
 _THREADS_LOCK = threading.Lock()
@@ -43,9 +44,8 @@ class RawActivo(RawError):
 
 def modo() -> str:
     valor = os.environ.get("CLIPPER_RAW_MODO", "manual").strip().lower()
-    if valor in {"manual", "gemini_auto"}:
-        return valor
-    LOG.warning("⚠️ RAW_CONFIG_INVALIDA · VALOR: %s · SE USA: MANUAL", valor[:40])
+    if valor != "manual":
+        LOG.warning("⚠️ RAW_CONFIG_INVALIDA · VALOR: %s · SE USA: MANUAL", valor[:40])
     return "manual"
 
 
@@ -66,6 +66,10 @@ def _manifest_path(raw_id: str) -> Path:
 
 def _mp4_path(raw_id: str) -> Path:
     return RAW / f"{validar_id(raw_id)}.mp4"
+
+
+def _gemini_path(raw_id: str) -> Path:
+    return RAW / "_gemini" / f"{validar_id(raw_id)}.json"
 
 
 def _atomic_write(path: Path, data: dict):
@@ -204,6 +208,8 @@ def crear(fuente: Path, inicio: float, fin: float, raw_id: str, *, canal: str,
         "gemini": None,
         "luna": None,
         "destination": None,
+        "retry_count": 0,
+        "next_retry_at": "",
     }
     try:
         _atomic_write(manifest_path, manifest)
@@ -262,10 +268,109 @@ def enqueue(raw_id: str, modo_actual: str) -> dict:
     return manifest
 
 
-def _fallar(raw_id: str, modo_actual: str, estado: str, error, evento: str = ""):
+def _leer_gemini_v2(raw_id: str, duracion: float) -> dict:
+    try:
+        data = json.loads(_gemini_path(raw_id).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise RawError("análisis Gemini v2 no disponible") from error
+    if (not isinstance(data, dict) or data.get("schema") != 2 or
+            data.get("identity_policy_version") != 2 or
+            data.get("raw_id") != raw_id or data.get("status") != "ok" or
+            not isinstance(data.get("result"), dict)):
+        raise RawError("análisis Gemini v2 inválido")
+    try:
+        result = antigravity.validar(
+            json.dumps(data["result"], ensure_ascii=False), float(duracion))
+    except (TypeError, ValueError, json.JSONDecodeError) as error:
+        raise RawError("resultado Gemini v2 inválido") from error
+    for person in result["people"]:
+        urls = [e for e in person["evidence"]
+                if e.startswith(("http://", "https://"))]
+        if person["name"] and len(urls) < 2:
+            raise RawError("identidad Gemini v2 sin dos fuentes")
+    return result
+
+
+def _reintento_pendiente(manifest: dict) -> bool:
+    value = manifest.get("next_retry_at")
+    if not value:
+        return False
+    try:
+        return datetime.fromisoformat(value) > datetime.now(timezone.utc)
+    except (TypeError, ValueError):
+        return False
+
+
+def enqueue_analizado(raw_id: str, visual: dict) -> dict:
+    manifest, intento = _claim(raw_id, "luna")
+    try:
+        hilo = threading.Thread(
+            target=_run,
+            args=(raw_id, "luna", intento, visual),
+            name=f"raw-{raw_id}",
+            daemon=True,
+        )
+        with _THREADS_LOCK:
+            _THREADS[(raw_id, intento)] = hilo
+        hilo.start()
+    except Exception as error:
+        with _THREADS_LOCK:
+            _THREADS.pop((raw_id, intento), None)
+        _fallar(raw_id, "luna", "error_luna", error, "LUNA_FAILED",
+                reintentar=True)
+        raise RawError("no se pudo encolar el candidato") from error
+    return manifest
+
+
+def procesar_analizados() -> int:
+    """Encola RAW con un resultado externo v2 válido y reintentos vencidos."""
+    if not RAW.exists():
+        return 0
+    encolados = 0
+    for path in sorted(RAW.glob("*.json")):
+        raw_id = path.stem
+        try:
+            manifest = _read(raw_id)
+            if (manifest.get("status") == "completado" or
+                    manifest.get("status") in ESTADOS_ACTIVOS or
+                    _reintento_pendiente(manifest) or
+                    not _mp4_path(raw_id).is_file() or
+                    not _gemini_path(raw_id).is_file()):
+                continue
+            visual = _leer_gemini_v2(raw_id, manifest.get("duracion", 0))
+            enqueue_analizado(raw_id, visual)
+            encolados += 1
+        except RawActivo:
+            continue
+        except RawError as error:
+            mensaje = _error_text(error)
+            try:
+                actual = _read(raw_id)
+                if actual.get("last_error") != mensaje:
+                    _update(raw_id, status="error_gemini", last_error=mensaje)
+                    _evento("GEMINI_V2_INVALID", raw_id, status="error_gemini",
+                            error=mensaje)
+            except RawError:
+                pass
+    return encolados
+
+
+def _fallar(raw_id: str, modo_actual: str, estado: str, error, evento: str = "",
+            reintentar: bool = False):
     motivo = _error_text(error)
     try:
-        _update(raw_id, status=estado, last_error=motivo)
+        cambios = {"status": estado, "last_error": motivo}
+        if reintentar:
+            manifest = _read(raw_id)
+            count = max(0, int(manifest.get("retry_count", 0))) + 1
+            delay = RETRY_DELAYS_S[min(count - 1, len(RETRY_DELAYS_S) - 1)]
+            cambios.update({
+                "retry_count": count,
+                "next_retry_at": (
+                    datetime.now(timezone.utc) + timedelta(seconds=delay)
+                ).isoformat(timespec="seconds"),
+            })
+        _update(raw_id, **cambios)
     except RawError:
         return
     if evento:
@@ -351,7 +456,8 @@ def _render_and_publish(manifest: dict, mp4: Path, hook: str, llm: dict) -> dict
         shutil.rmtree(clipper.OUT / slug, ignore_errors=True)
 
 
-def _run(raw_id: str, modo_actual: str, intento: str):
+def _run(raw_id: str, modo_actual: str, intento: str,
+         visual_prevalidado: dict | None = None):
     fase = "gemini" if modo_actual == "gemini" else "luna"
     try:
         with bloqueo.exclusivo(_PROCESS_LOCK, etiqueta="procesamiento RAW"):
@@ -362,7 +468,17 @@ def _run(raw_id: str, modo_actual: str, intento: str):
             if not mp4.is_file():
                 raise RawError("MP4 RAW ausente")
 
-            visual = None
+            visual = visual_prevalidado
+            automatico = visual_prevalidado is not None
+            if automatico:
+                _update(raw_id, status="procesando_luna", gemini={
+                    "model": "external-v2",
+                    "status": "ok",
+                    "latency_ms": 0,
+                    "result": visual,
+                })
+                _evento("GEMINI_V2_ACCEPTED", raw_id, modo_actual="luna",
+                        status="ok")
             if modo_actual == "gemini":
                 _evento("GEMINI_STARTED", raw_id, modo_actual=modo_actual,
                         status="procesando_gemini")
@@ -406,7 +522,8 @@ def _run(raw_id: str, modo_actual: str, intento: str):
                     estricto=True,
                 )
             except Exception as error:
-                _fallar(raw_id, modo_actual, "error_luna", error, "LUNA_FAILED")
+                _fallar(raw_id, modo_actual, "error_luna", error, "LUNA_FAILED",
+                        reintentar=automatico)
                 return
             _update(raw_id, luna=llm)
             _evento("LUNA_FINISHED", raw_id, modo_actual=modo_actual,
@@ -416,9 +533,11 @@ def _run(raw_id: str, modo_actual: str, intento: str):
             try:
                 destination = _render_and_publish(manifest, mp4, hook, llm)
             except Exception as error:
-                _fallar(raw_id, modo_actual, "error_render", error, "RENDER_FAILED")
+                _fallar(raw_id, modo_actual, "error_render", error, "RENDER_FAILED",
+                        reintentar=automatico)
                 return
-            _update(raw_id, status="completado", last_error="", destination=destination)
+            _update(raw_id, status="completado", last_error="", destination=destination,
+                    retry_count=0, next_retry_at="")
             _evento("RAW_COMPLETED", raw_id, modo_actual=modo_actual, status="completado")
     except Exception as error:
         estados = {
@@ -487,6 +606,8 @@ def listar_api() -> list[dict]:
                 "status": manifest.get("status", "pendiente"),
                 "last_attempt_at": manifest.get("last_attempt_at", ""),
                 "last_error": manifest.get("last_error", ""),
+                "gemini_ready": _gemini_path(manifest["id"]).is_file(),
+                "next_retry_at": manifest.get("next_retry_at", ""),
                 "gemini_latency_ms": gemini.get("latency_ms", 0),
                 "luna_latency_ms": luna.get("latency_ms", 0),
                 "destination": destination_url,

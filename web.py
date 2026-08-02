@@ -1877,7 +1877,19 @@ HTML_TEMPLATE = r"""<!doctype html>
         const panel = text("section", "raw-status");
         panel.setAttribute("aria-label", "Estado de validación RAW");
         panel.appendChild(text("span", "llm-kicker", "Estado RAW"));
-        panel.appendChild(text("strong", "raw-status-value", String(clip.status || "pendiente").toUpperCase()));
+        const status = String(clip.status || "pendiente");
+        const label = status === "completado"
+          ? "Completado"
+          : status.startsWith("procesando_")
+            ? "Procesando con Luna"
+            : status === "error_gemini"
+              ? "Análisis Gemini inválido"
+              : clip.next_retry_at
+                ? "Esperando reintento"
+                : clip.gemini_ready
+                  ? "Análisis Gemini recibido"
+                  : "Esperando análisis Gemini";
+        panel.appendChild(text("strong", "raw-status-value", label));
         if (clip.last_attempt_at) {
           panel.appendChild(text("p", "clip-reason", "Último intento: " + clip.last_attempt_at));
         }
@@ -1898,25 +1910,6 @@ HTML_TEMPLATE = r"""<!doctype html>
           panel.appendChild(link);
         }
         return panel;
-      }
-
-      async function processRaw(rawId, mode) {
-        try {
-          const response = await fetch("/api/raw/process", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: rawId, mode })
-          });
-          const data = await response.json().catch(() => ({}));
-          if (!response.ok) {
-            throw Error(data.error || "HTTP " + response.status);
-          }
-          notify(mode === "gemini" ? "Gemini encolado" : "Luna encolada", false);
-          cargarClips(true);
-        } catch (error) {
-          notify("No se pudo encolar: " + error.message, true);
-          cargarClips(true);
-        }
       }
 
       function makeCard(clip, kind) {
@@ -2015,22 +2008,6 @@ HTML_TEMPLATE = r"""<!doctype html>
         );
         download.innerHTML = icon("download") + "<span>Descargar</span>";
         actions.appendChild(download);
-
-        if (kind === "raw" && clip.status !== "completado") {
-          const activo = String(clip.status || "pendiente").startsWith("procesando_");
-          const reintento = ["error_gemini", "error_luna", "error_render"].includes(clip.status);
-          const gemini = text("button", "button primary", clip.status === "error_gemini" ? "Reintentar Gemini" : "Analizar con Gemini");
-          gemini.type = "button";
-          gemini.disabled = activo;
-          gemini.addEventListener("click", () => processRaw(clip.id, "gemini"));
-          actions.appendChild(gemini);
-
-          const luna = text("button", "button quiet", reintento ? "Procesar solo con Luna" : "Procesar con Luna");
-          luna.type = "button";
-          luna.disabled = activo;
-          luna.addEventListener("click", () => processRaw(clip.id, "luna"));
-          actions.appendChild(luna);
-        }
 
         body.appendChild(actions);
         article.appendChild(body);
@@ -2640,17 +2617,6 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _origen_valido(self) -> bool:
-        origen = self.headers.get("Origin", "").strip()
-        if not origen:
-            return True
-        parsed = urlparse(origen)
-        host = self.headers.get("Host", "").split(":", 1)[0].lower()
-        dominio = os.environ.get("CLIPPER_DOMINIO", "").strip().lower()
-        return parsed.scheme in {"http", "https"} and (
-            parsed.hostname == host or parsed.netloc.lower() == dominio
-        )
-
     def _archivo_publico(self, rel_path: str) -> Path | None:
         root = DATA.resolve()
         target = (root / rel_path).resolve()
@@ -2668,24 +2634,6 @@ class Handler(SimpleHTTPRequestHandler):
         if target.suffix.lower() not in {".mp4", ".txt"}:
             return None
         return target
-
-    def _leer_json_post(self) -> dict:
-        try:
-            length = int(self.headers.get("Content-Length", "-1"))
-        except ValueError as error:
-            raise ValueError("Content-Length inválido") from error
-        if length < 0 or length > 8192:
-            raise ValueError("cuerpo demasiado grande")
-        content_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
-        if content_type != "application/json":
-            raise ValueError("Content-Type debe ser application/json")
-        try:
-            data = json.loads(self.rfile.read(length).decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise ValueError("JSON inválido") from error
-        if not isinstance(data, dict):
-            raise ValueError("JSON debe ser un objeto")
-        return data
 
     def do_GET(self):
         if self.path == "/salud":
@@ -2725,42 +2673,6 @@ class Handler(SimpleHTTPRequestHandler):
             self.path = "/" + target.relative_to(DATA.resolve()).as_posix()
 
         super().do_GET()
-
-    def do_POST(self):
-        if not self._autorizado():
-            return self._pedir_credenciales()
-        if not self._origen_valido():
-            self._responder_json({"error": "origen no permitido"}, HTTPStatus.FORBIDDEN)
-            return
-        if urlparse(self.path).path != "/api/raw/process":
-            self.send_error(HTTPStatus.NOT_FOUND)
-            return
-        try:
-            data = self._leer_json_post()
-            raw_id = raw.validar_id(data.get("id"))
-            modo_solicitado = str(data.get("mode", ""))
-            if modo_solicitado not in {"gemini", "luna"}:
-                raise ValueError("mode debe ser gemini o luna")
-            manifest = raw.enqueue(raw_id, modo_solicitado)
-        except raw.RawActivo as error:
-            self._responder_json({"error": str(error)}, HTTPStatus.CONFLICT)
-            return
-        except (raw.RawError, ValueError, TypeError) as error:
-            mensaje = str(error)[:160] or "petición inválida"
-            estado = (HTTPStatus.NOT_FOUND if "no disponible" in mensaje
-                      else HTTPStatus.BAD_REQUEST)
-            self._responder_json({"error": mensaje}, estado)
-            return
-        except Exception:
-            self._responder_json({"error": "no se pudo encolar el trabajo"},
-                                 HTTPStatus.INTERNAL_SERVER_ERROR)
-            return
-        self._responder_json({
-            "ok": True,
-            "id": manifest["id"],
-            "mode": modo_solicitado,
-            "status": manifest["status"],
-        }, HTTPStatus.ACCEPTED)
 
     def _handle_api_clips(self):
         listos_dir = OUT / "LISTOS"

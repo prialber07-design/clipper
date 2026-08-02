@@ -517,12 +517,6 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
     )
     LOG.info("🧊 CANDIDATO DETENIDO EN RAW\n   JOB: %s\n   RAW: %s\n   MODO: %s",
              slug, manifest["nombre"], raw.modo().upper())
-    if raw.modo() == "gemini_auto":
-        try:
-            raw.enqueue(raw_id, "gemini")
-        except Exception as error:
-            LOG.error("❌ RAW AUTO NO ENCOLADO\n   ID: %s\n   MOTIVO: %s",
-                      raw_id, str(error)[:160])
 
 
 # --- bucle principal ----------------------------------------------------------

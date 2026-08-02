@@ -19,6 +19,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 import clipper
+import raw
 from registro import obtener
 
 ROOT = clipper.ROOT
@@ -249,6 +250,10 @@ def main():
 
             for v in vigilantes:
                 v.revisar()
+
+            # Los análisis los escribe agy en el volumen compartido. Solo un
+            # Gemini v2 válido permite continuar hacia Luna.
+            raw.procesar_analizados()
 
             # 1. Comprobar si se ha generado un NUEVO CLIP LISTO
             listos_dir = OUT / "LISTOS"
