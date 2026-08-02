@@ -38,6 +38,16 @@ def listar():
 
 
 def resolver(slug: str, gancho: str, descripcion: str = "", etiquetas=None):
+    # Esta via no pasa por calidad.evaluar: se publica a mano y a proposito. Pero
+    # la caja del gancho son tres lineas y lo que sobra se pierde sin avisar, asi
+    # que eso si hay que comprobarlo aqui tambien. Publicar "(el chat fue" en vez
+    # de "(el chat fue claro)" ya paso una vez.
+    if not clipper.cabe_el_hook(gancho):
+        lineas = clipper._lineas_hook(gancho)
+        sys.exit(f"[x] El gancho no cabe: se veria «{' '.join(lineas[:3])}» y se "
+                 f"perderia «{' '.join(lineas[3:])}».\n"
+                 f"    Acortalo a unos 66 caracteres (van {len(gancho)}).")
+
     cj = clipper.WORK / slug / "clips.json"
     if not cj.exists():
         sys.exit(f"[x] No existe {cj}")
