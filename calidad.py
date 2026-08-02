@@ -127,6 +127,12 @@ def evaluar(mp4: Path, clip: dict, segmentos: list,
         fallos.append("sin gancho")
     elif len(hook) < q.get("hook_min_chars", 18):
         fallos.append(f"gancho demasiado corto ({len(hook)} caracteres)")
+    elif not clipper.cabe_el_hook(hook):
+        # La caja del gancho son tres lineas y lo que sobra se tiraba SIN AVISAR.
+        # Paso de verdad: "(el chat fue claro)" se publico como "(el chat fue".
+        # Un gancho a medias es peor que no tenerlo, asi que no sale.
+        fallos.append(f"el gancho no cabe en la caja y se cortaria "
+                      f"({len(hook)} caracteres, entran unos 66)")
     else:
         flojo = _gancho_flojo(hook)
         if flojo:

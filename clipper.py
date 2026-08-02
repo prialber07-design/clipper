@@ -330,7 +330,10 @@ def _titulo(txt: str) -> str:
     return " ".join(p[:1].upper() + p[1:] if p else p for p in txt.split(" "))
 
 
-def _partir_hook(txt: str, max_linea: int = 22) -> str:
+MAX_LINEAS_HOOK = 3
+
+
+def _lineas_hook(txt: str, max_linea: int = 22) -> list[str]:
     """Reparte el gancho en lineas cortas: en movil una linea larga no se lee de un vistazo."""
     lineas, actual = [], ""
     for palabra in txt.split():
@@ -341,7 +344,16 @@ def _partir_hook(txt: str, max_linea: int = 22) -> str:
             actual = f"{actual} {palabra}".strip()
     if actual:
         lineas.append(actual)
-    return r"\N".join(lineas[:3])
+    return lineas
+
+
+def cabe_el_hook(txt: str) -> bool:
+    """El gancho entra entero en la caja, o se quedaria a medias?"""
+    return len(_lineas_hook(txt)) <= MAX_LINEAS_HOOK
+
+
+def _partir_hook(txt: str) -> str:
+    return r"\N".join(_lineas_hook(txt)[:MAX_LINEAS_HOOK])
 
 
 def _build_ass(words, clip, path: Path):
