@@ -23,6 +23,38 @@ por dos audiencias.
 
 ---
 
+## Antes del primer clip de un canal: mirar cómo emite
+
+El layout se asigna a ojo al añadir el canal y **casi siempre está mal**. Ha
+mordido dos veces el mismo día: Elxokas estaba en `reaccion` y emite League of
+Legends a pantalla completa; Peereira igual, y emite a cámara completa. Los dos
+habrían salido con una franja vacía haciendo de webcam.
+
+Cuesta un minuto comprobarlo, sacando un fotograma del buffer:
+
+```
+python clipper.py mosaico <slug>
+```
+
+| Canal | Layout | ¿Comprobado? |
+|---|---|---|
+| elxokas | `completo` | sí · LoL a pantalla completa |
+| peereira7 | `completo` | sí · Just Chatting, llena el cuadro |
+| zonagemelosyt | `completo` | sí · plano fijo de la casa |
+| lopezfnx | `reaccion` | sí · IRL con el móvil en horizontal |
+| franbeuve | `reaccion` | sí · IRL de sobremesa |
+| elcalvolol · reydelacity | `irl` | sí · IRL de calle |
+| **davooxeneize** | `reaccion` | **NO** |
+| **lacobraaa** | `reaccion` | **NO** |
+| **rdjavi** | `reaccion` | **NO** |
+| mariotaxi · viviendoenlacalle | `irl` | NO |
+| josenogales1 · agustin51 | `reaccion` | NO |
+| zonagemelosoficial | `completo` | NO |
+
+Los tres primeros en negrita son **los de más audiencia de toda la lista** (2,03 M,
+1,83 M y 969 k). Cuando alguno entre en directo, lo primero es mirar el
+fotograma; lo segundo, escribirle el gancho.
+
 ## Peereira7 · el caso que hay que copiar
 
 Es el creador del clip que mejor ha rendido de todos los analizados: **215.600
