@@ -34,6 +34,10 @@ NOTIF = CONFIG.get("notificaciones", {})
 
 CONTADOR = LISTOS / ".contador"
 
+# Las columnas del indice, en orden. Las comparte resultados.py.
+COLUMNAS_INDICE = ["n", "fecha", "canal", "archivo", "duracion_s", "slug",
+                   "motivo", "gancho", "subido", "visitas"]
+
 
 def _titulo_para_archivo(hook: str | None, tope: int = 70) -> str:
     """Convierte el gancho en algo que Windows acepte como nombre de fichero.
@@ -158,16 +162,26 @@ def registrar_listo(mp4: Path, meta: dict) -> Path:
 
     _sincronizar(destino, txt_destino)
 
+    # Por nombre de columna y no por posicion: escribiendo una lista suelta, en
+    # cuanto el indice gano la columna 'visitas' las filas nuevas salian con un
+    # campo de menos y el gancho se corria de sitio.
     nuevo = not INDEX_CSV.exists()
     with INDEX_CSV.open("a", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
+        w = csv.DictWriter(f, fieldnames=COLUMNAS_INDICE, extrasaction="ignore")
         if nuevo:
-            w.writerow(["n", "fecha", "canal", "archivo", "duracion_s", "slug",
-                        "motivo", "gancho", "subido"])
-        w.writerow([f"{meta.get('n', 0):03d}", f"{ts:%Y-%m-%d %H:%M:%S}",
-                    meta.get("canal", ""), destino.name, meta.get("duracion", ""),
-                    meta.get("slug", meta.get("motivo", "")), meta.get("motivo", ""),
-                    meta.get("hook", ""), "NO"])
+            w.writeheader()
+        w.writerow({
+            "n": f"{meta.get('n', 0):03d}",
+            "fecha": f"{ts:%Y-%m-%d %H:%M:%S}",
+            "canal": meta.get("canal", ""),
+            "archivo": destino.name,
+            "duracion_s": meta.get("duracion", ""),
+            "slug": meta.get("slug") or meta.get("motivo", ""),
+            "motivo": meta.get("motivo", ""),
+            "gancho": meta.get("hook", ""),
+            "subido": "NO",
+            "visitas": "",
+        })
 
     _regenerar_html()
     return destino
