@@ -23,6 +23,33 @@ por dos audiencias.
 
 ---
 
+## Peereira7 · el caso que hay que copiar
+
+Es el creador del clip que mejor ha rendido de todos los analizados: **215.600
+visitas desde una cuenta de 1.742 seguidores**, con un 9,3 % de compartidos.
+Ver la sección de estilos en `ESTILO.md`.
+
+**Su comunidad se clipea a sí misma en clave de broma.** Sus clips más vistos
+del último mes, con los títulos que le pone su propia gente:
+
+| Clip | Visitas | Duración |
+|---|---|---|
+| GOL ANULADO DE ESPAÑA | 24.536 | **0:10** |
+| GOL DE ESPAÑA | 10.480 | 0:29 |
+| peillo | 4.225 | 0:30 |
+| bailecito | 4.033 | 0:26 |
+| pillan a pepe fumando | 3.125 | 0:29 |
+| Urko se comió que? | 2.967 | 0:21 |
+
+**Dos filones:** el fútbol de la selección (los dos clips más vistos, con
+diferencia) y **el caos del grupo de amigos** — Urko, Pepe, Kata, Willy. Los
+nombres propios del grupo valen más que cualquier tema.
+
+**Su jerga:** `vqmoooooooss`, `MY BAD 🙏`, `peillo`, y el apodo que le puso la
+comunidad, **castor** (`#pereiracastor🦫`).
+
+Duración: casi todo entre **10 y 30 segundos**. El más visto dura diez.
+
 ## A quién estamos clipeando de verdad (2 de agosto de 2026)
 
 Repasando los 32 clips publicados, el reparto no se parece en nada al tamaño de
