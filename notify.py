@@ -11,6 +11,7 @@ mandar) avisos. Por eso se genera aleatorio y no se comparte.
 """
 
 import csv
+import hashlib
 import json
 import os
 import re
@@ -111,9 +112,32 @@ def _sincronizar(destino: Path, txt: Path | None):
         print(f"[!] No se pudo sincronizar ({e}). El clip esta en out/LISTOS igual.")
 
 
+def _ya_publicado(mp4: Path) -> Path | None:
+    """Busca en la bandeja un clip identico al que se va a publicar.
+
+    Se compara el contenido, no el nombre: el mismo clip se ha llegado a
+    publicar tres veces seguidas porque el gancho cambiaba de tildes y el
+    nombre le parecia nuevo (033, 034 y 035 eran el mismo riñon). Subir el
+    mismo video dos veces es lo peor que se puede hacer: la plataforma lo marca
+    como contenido duplicado y hunde el alcance de los dos.
+    """
+    if not LISTOS.exists():
+        return None
+    firma = hashlib.md5(mp4.read_bytes()).hexdigest()
+    for otro in LISTOS.glob("*.mp4"):
+        if otro.stat().st_size != mp4.stat().st_size:
+            continue        # el tamano descarta casi todo sin leer el fichero
+        if hashlib.md5(otro.read_bytes()).hexdigest() == firma:
+            return otro
+    return None
+
+
 def registrar_listo(mp4: Path, meta: dict) -> Path:
     """Copia el clip a la bandeja de salida y lo apunta en el indice."""
     LISTOS.mkdir(parents=True, exist_ok=True)
+    if repetido := _ya_publicado(mp4):
+        print(f"[!] Ya estaba publicado como {repetido.name}. No se duplica.")
+        return repetido
     ts = datetime.now()
     n = _siguiente_numero()
     # Numero + canal + gancho: el nombre del archivo ya dice de que va el clip,
