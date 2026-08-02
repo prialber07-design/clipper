@@ -26,6 +26,20 @@ LOG = obtener("bloqueo")
 
 
 @contextmanager
+def exclusivo_si(activo: bool, ruta: Path, etiqueta: str = ""):
+    """Toma el cerrojo solo si hace falta serializar.
+
+    Con GPU las tareas pesadas no se pelean por los mismos nucleos y ponerlas
+    en fila solo las retrasa, asi que quien llama decide.
+    """
+    if not activo:
+        yield
+        return
+    with exclusivo(ruta, etiqueta):
+        yield
+
+
+@contextmanager
 def exclusivo(ruta: Path, etiqueta: str = "", aviso_tras: float = 5.0):
     """Espera su turno. Bloqueante, sin tiempo maximo: perder el turno seria
     perder el clip, y el buffer aguanta 15 minutos."""

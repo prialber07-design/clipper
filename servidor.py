@@ -10,6 +10,7 @@ systemd o Docker, que relanza solo cualquier vigilante que se caiga.
 """
 
 import argparse
+import json
 import os
 import signal
 import shutil
@@ -155,8 +156,58 @@ def cmd_estado():
     return 0
 
 
+def _raw_caducado(manifest_path: Path, limite_segundos: float, ahora: float) -> str | None:
+    """Devuelve el id del RAW solo si ya cumplio su ciclo y puede borrarse.
+
+    Un RAW pendiente o con error es material que todavia no ha dado clip: si el
+    analisis externo va con retraso, borrarlo por antiguedad pierde el candidato
+    justo cuando mas falta hace. Solo caduca lo que ya termino en LISTOS o
+    REVISAR.
+    """
+    try:
+        if (ahora - manifest_path.stat().st_mtime) <= limite_segundos:
+            return None
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(manifest, dict) or manifest.get("status") != "completado":
+        return None
+    try:
+        # El id sale de un JSON: validarlo evita construir rutas con '..'.
+        return raw.validar_id(manifest.get("id", ""))
+    except raw.RawError:
+        return None
+
+
+def limpiar_raw_completados(limite_segundos: float, ahora: float) -> int:
+    carpeta = OUT / "RAW"
+    if not carpeta.exists():
+        return 0
+    borrados = 0
+    for manifest_path in carpeta.glob("*.json"):
+        raw_id = _raw_caducado(manifest_path, limite_segundos, ahora)
+        if not raw_id:
+            continue
+        for ruta in (manifest_path, carpeta / f"{raw_id}.mp4",
+                     carpeta / "_gemini" / f"{raw_id}.json"):
+            try:
+                if ruta.is_file():
+                    ruta.unlink()
+                    borrados += 1
+                    LOG.info("🧹 LIMPIEZA · RAW COMPLETADO BORRADO\n   RUTA: %s",
+                             ruta.relative_to(DATA))
+            except OSError as e:
+                LOG.warning("⚠️ LIMPIEZA · NO SE PUDO BORRAR\n   RUTA: %s\n   MOTIVO: %s",
+                            ruta, e)
+    return borrados
+
+
 def limpiar_archivos_antiguos(dias: int = 7):
-    """Elimina automáticamente vídeos, transcripciones y logs de /app/clips con más de 7 días de antigüedad."""
+    """Elimina automáticamente vídeos, transcripciones y logs de /app/clips con más de 7 días de antigüedad.
+
+    RAW se trata aparte: ahi solo caduca lo ya completado, nunca un candidato
+    que sigue esperando analisis.
+    """
     limite_segundos = dias * 86400
     ahora = time.time()
     borrados = 0
@@ -164,7 +215,6 @@ def limpiar_archivos_antiguos(dias: int = 7):
     carpetas_a_revisar = [
         OUT / "LISTOS",
         OUT / "REVISAR",
-        OUT / "RAW",
         DATA / "logs",
         DATA / "work"
     ]
@@ -181,15 +231,19 @@ def limpiar_archivos_antiguos(dias: int = 7):
                         borrados += 1
                         LOG.info("🧹 LIMPIEZA · ARCHIVO ANTIGUO BORRADO\n   RUTA: %s",
                                  item.relative_to(DATA))
-                except Exception:
-                    pass
+                except OSError as e:
+                    LOG.warning("⚠️ LIMPIEZA · NO SE PUDO BORRAR\n   RUTA: %s\n   MOTIVO: %s",
+                                item, e)
             elif item.is_dir():
                 try:
                     mtime = item.stat().st_mtime
                     if (ahora - mtime) > limite_segundos and not any(item.iterdir()):
                         shutil.rmtree(item, ignore_errors=True)
-                except Exception:
+                except OSError:
                     pass
+
+    borrados += limpiar_raw_completados(limite_segundos, ahora)
+
     if borrados > 0:
         LOG.info("✅ LIMPIEZA COMPLETADA\n   ARCHIVOS BORRADOS: %d\n   ANTIGÜEDAD: %d DÍAS",
                  borrados, dias)

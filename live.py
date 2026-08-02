@@ -466,7 +466,8 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
     args = argparse.Namespace(slug=slug, n=1, device=device, func=None, defer_clips=True)
     # Una unica cola de Whisper entre todos los vigilantes del servidor.
     # El modelo se cachea por proceso; el cerrojo evita inferencias solapadas.
-    with bloqueo.exclusivo(DATA / ".whisper.lock", etiqueta=f"transcripcion de {canal}"):
+    with bloqueo.exclusivo_si(clipper.serializar_cpu(), clipper.CPU_LOCK,
+                              etiqueta=f"transcripcion de {canal}"):
         try:
             clipper.cmd_transcribe(args)
         finally:

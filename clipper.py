@@ -33,6 +33,10 @@ ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get("CLIPPER_DATA", ROOT))
 WORK = DATA / "work"
 OUT = DATA / "out"
+# Un unico cerrojo para todo lo que se come la CPU: transcribir y renderizar.
+# Con cerrojos distintos cada uno creia tener la maquina entera y acababan
+# solapandose, que es justo lo que se queria evitar.
+CPU_LOCK = DATA / ".cpu.lock"
 LOG = obtener("clipper")
 
 
@@ -80,6 +84,11 @@ def _aplicar_entorno(cfg: dict) -> dict:
 
 _cargar_env()
 CONFIG = _aplicar_entorno(json.loads((ROOT / "config.json").read_text(encoding="utf-8")))
+
+
+def serializar_cpu() -> bool:
+    """Si las tareas pesadas van en fila. Con GPU se pone a false en config."""
+    return bool(CONFIG.get("cpu", {}).get("una_tarea_pesada_a_la_vez", True))
 
 
 def recargar_config():

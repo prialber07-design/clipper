@@ -17,6 +17,9 @@ from registro import obtener
 MODELO = "Gemini 3.5 Flash (Low)"
 TIMEOUT_S = 120
 MAX_SALIDA = 48_000
+# Igual que en raw.py: tachar un valor de uno o dos caracteres no protege nada
+# y en cambio mutila el texto que se manda a Gemini y lo que se registra.
+LARGO_MINIMO_SECRETO = 8
 WORKSPACE_NAME = "antigravity-workspace"
 LOG = obtener("antigravity")
 
@@ -52,7 +55,8 @@ def _secretos() -> list[str]:
     claves = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CLAVE", "TOPIC", "COOKIE",
               "CREDENTIAL", "AUTH", "PRIVATE", "DSN")
     return [valor for nombre, valor in os.environ.items()
-            if valor and any(palabra in nombre.upper() for palabra in claves)]
+            if len(valor or "") >= LARGO_MINIMO_SECRETO
+            and any(palabra in nombre.upper() for palabra in claves)]
 
 
 def _texto(valor, limite: int, obligatorio: bool = False) -> str:

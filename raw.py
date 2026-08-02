@@ -27,6 +27,11 @@ MODOS = {"gemini", "luna"}
 ESTADOS_ACTIVOS = {"procesando_gemini", "procesando_luna"}
 ESTADOS_REINTENTABLES = {"pendiente", "error_gemini", "error_luna", "error_render"}
 RETRY_DELAYS_S = (60, 300, 900, 3600)
+# Un valor de uno o dos caracteres no es un secreto que merezca proteccion, y
+# tacharlo destroza el log entero: con un ALGO_AUTH=1 en el entorno, cada "1"
+# del texto se convierte en [REDACTED] y hasta los identificadores quedan
+# ilegibles ("canal-0[REDACTED]"). Por debajo de este largo no se sustituye.
+LARGO_MINIMO_SECRETO = 8
 _MANIFEST_LOCK = clipper.DATA / ".raw-manifest.lock"
 _PROCESS_LOCK = clipper.DATA / ".raw-process.lock"
 _THREADS_LOCK = threading.Lock()
@@ -102,7 +107,8 @@ def _texto_log(value, limit=240) -> str:
     palabras_secretas = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CLAVE",
                          "COOKIE", "AUTH", "PRIVATE", "CREDENTIAL", "DSN")
     for nombre, secreto in os.environ.items():
-        if secreto and any(palabra in nombre.upper() for palabra in palabras_secretas):
+        if (len(secreto or "") >= LARGO_MINIMO_SECRETO
+                and any(palabra in nombre.upper() for palabra in palabras_secretas)):
             value = value.replace(secreto, "[REDACTED]")
     value = re.sub(r"[\x00-\x1f\x7f]", " ", value)
     return " ".join(value.split())[:limit]
@@ -420,7 +426,8 @@ def _render_and_publish(manifest: dict, mp4: Path, hook: str, llm: dict) -> dict
             "layout": None,
             "source_path": str(mp4),
         })()
-        with bloqueo.exclusivo(clipper.DATA / ".cpu.lock", etiqueta="render RAW"):
+        with bloqueo.exclusivo_si(clipper.serializar_cpu(), clipper.CPU_LOCK,
+                                  etiqueta="render RAW"):
             clipper.cmd_render(args)
         if not salida.exists():
             raise RawError("render sin archivo de salida")
