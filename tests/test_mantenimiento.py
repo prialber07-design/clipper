@@ -11,6 +11,7 @@ from unittest.mock import patch
 import antigravity
 import bloqueo
 import clipper
+import live
 import raw
 import servidor
 
@@ -187,6 +188,71 @@ class CerrojoCpuTests(unittest.TestCase):
         for nombre, texto in fuentes.items():
             self.assertIn("clipper.CPU_LOCK", texto, f"{nombre} no usa el cerrojo comun")
             self.assertNotIn(".whisper.lock", texto, f"{nombre} conserva un cerrojo propio")
+
+
+class VentanaSinRecodificarTests(unittest.TestCase):
+    """Montar la ventana copia los .ts; recodificar era el mayor coste de CPU."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.previous_work = live.WORK
+        live.WORK = self.root / "work"
+        self.buffer = self.root / "buffer"
+        self.buffer.mkdir(parents=True, exist_ok=True)
+        for i in range(12):
+            (self.buffer / f"{i:06d}.ts").write_bytes(b"ts")
+
+    def tearDown(self):
+        live.WORK = self.previous_work
+        self.temp.cleanup()
+
+    def _montar(self):
+        cap = live.BufferExistente(self.buffer)
+        with patch.object(live.clipper, "run") as run:
+            live.montar_ventana(cap, t_video=80.0, slug="prueba", antes=40.0)
+        return [call.args[0] for call in run.call_args_list]
+
+    def test_la_ventana_se_concatena_sin_recodificar(self):
+        concat = self._montar()[0]
+        self.assertIn("copy", concat)
+        self.assertNotIn("libx264", concat, "volver a recodificar la ventana")
+
+    def test_el_audio_se_sigue_extrayendo(self):
+        comandos = self._montar()
+        self.assertTrue(any("pcm_s16le" in cmd for cmd in comandos),
+                        "Whisper necesita el wav de 16 kHz")
+
+
+class RmsSegmentoTests(unittest.TestCase):
+    """El RMS lo calcula ffmpeg, pero la escala debe seguir siendo la misma."""
+
+    def _con_stderr(self, stderr):
+        salida = type("Proc", (), {"stderr": stderr})()
+        with patch.object(live.subprocess, "run", return_value=salida):
+            return live.rms_segmento(Path("da-igual.ts"))
+
+    def test_convierte_dbfs_a_amplitud_lineal(self):
+        # -20 dBFS es la decima parte de la escala completa.
+        self.assertAlmostEqual(self._con_stderr("RMS level dB: -20.000000"),
+                               3276.8, places=1)
+
+    def test_silencio_absoluto_no_revienta(self):
+        self.assertEqual(self._con_stderr("RMS level dB: -inf"), 0.0)
+
+    def test_sin_lectura_devuelve_cero(self):
+        self.assertEqual(self._con_stderr("ffmpeg no pudo abrir el fichero"), 0.0)
+
+    def test_se_queda_con_el_valor_global(self):
+        stderr = "RMS level dB: -30.000000\nRMS level dB: -20.000000\n"
+        self.assertAlmostEqual(self._con_stderr(stderr), 3276.8, places=1)
+
+
+class AdjuntoNtfyTests(unittest.TestCase):
+    def test_el_adjunto_viene_desactivado(self):
+        """Con ntfy anonimo el adjunto nunca llegaba a enviarse."""
+        self.assertFalse(
+            clipper.CONFIG.get("notificaciones", {}).get("adjuntar_video", False))
 
 
 if __name__ == "__main__":

@@ -13,9 +13,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # CLI oficial opcional para el análisis visual. Se deja instalado, pero el
 # flujo lo mantiene desactivado hasta que se complete OAuth y se configure.
-RUN curl -fsSL https://antigravity.google/cli/install.sh | bash \
-    && install -m 0755 /root/.local/bin/agy /usr/local/bin/agy \
-    && rm -rf /root/.local
+# Se instala desde el script oficial, sin version fijada ni verificacion de
+# hash: es lo unico que ofrece hoy el instalador. El analisis visual es
+# opcional, asi que una caida de esa URL no debe tumbar el despliegue entero:
+# si falla, la imagen se construye igual y el pipeline sigue funcionando sin
+# agy (CLIPPER_ANTIGRAVITY_ACTIVO queda sin efecto y los RAW esperan analisis).
+RUN (curl -fsSL https://antigravity.google/cli/install.sh | bash \
+      && install -m 0755 /root/.local/bin/agy /usr/local/bin/agy) \
+    || echo "AVISO: agy no se pudo instalar; el analisis visual quedara inactivo" \
+    ; rm -rf /root/.local
 
 COPY *.py *.sh config.json ./
 COPY fonts ./fonts

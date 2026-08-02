@@ -98,9 +98,13 @@ def _registrar_listo(mp4: Path, meta: dict) -> Path:
 
 
 def _preparar_adjunto(mp4: Path) -> Path | None:
-    """ntfy.sh corta en 15MB. Si el clip pasa, manda una copia recomprimida:
-    peor que el original pero perfectamente subible (las plataformas recodifican
-    igual). El original nunca se toca."""
+    """Recomprime el clip para que quepa en el limite del servidor de avisos.
+
+    El limite lo fija 'limite_adjunto_mb'. Con ntfy.sh anonimo son 2MB y un
+    vertical de 30s no cabe con calidad publicable, asi que devuelve None y el
+    aviso sale en texto con el enlace; por eso 'adjuntar_video' viene en false.
+    Tiene sentido con un ntfy propio de limite mayor. El original nunca se toca.
+    """
     limite = float(NOTIF.get("limite_adjunto_mb", 14)) * 1024 * 1024
     if mp4.stat().st_size <= limite:
         return mp4

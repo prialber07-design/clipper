@@ -255,20 +255,27 @@ class ChatTwitch(threading.Thread):
 
 # --- energia de audio por segmento --------------------------------------------
 
+RE_RMS_DB = re.compile(r"RMS level dB:\s*(-?\d+(?:\.\d+)?|-inf)")
+
+
 def rms_segmento(ruta: Path) -> float:
+    """RMS del segmento en la escala de int16, como antes.
+
+    Lo calcula ffmpeg en vez de Python: sumar 160.000 muestras por segmento y
+    por canal bloqueaba el bucle de vigilancia para obtener un dato que astats
+    ya da hecho. El resultado se devuelve en la misma escala para que el
+    historial de z-scores siga siendo comparable.
+    """
     proc = subprocess.run(
-        [FFMPEG, "-hide_banner", "-loglevel", "error", "-i", str(ruta),
-         "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", "pipe:1"],
-        capture_output=True)
-    import array
-    m = array.array("h")
-    try:
-        m.frombytes(proc.stdout[:len(proc.stdout) // 2 * 2])
-    except ValueError:
+        [FFMPEG, "-hide_banner", "-nostats", "-i", str(ruta),
+         "-vn", "-ac", "1", "-af", "astats=metadata=1:reset=0",
+         "-f", "null", "-"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace")
+    valores = RE_RMS_DB.findall(proc.stderr or "")
+    if not valores or valores[-1] == "-inf":
         return 0.0
-    if not m:
-        return 0.0
-    return math.sqrt(sum(float(x) * x for x in m) / len(m))
+    # astats da dBFS; el resto del detector trabaja en amplitud lineal.
+    return 32768.0 * (10 ** (float(valores[-1]) / 20))
 
 
 def zscore(valor: float, historial) -> float:
@@ -328,10 +335,15 @@ def montar_ventana(cap: Captura, t_video: float, slug: str, antes: float = None)
     lista.write_text("".join(f"file '{p.as_posix()}'\n" for p in trozos), encoding="utf-8")
 
     fuente = d / "source.mp4"
+    # Los .ts del buffer ya vienen en H.264 y AAC desde la plataforma, asi que
+    # unirlos sin recodificar es casi instantaneo. Recodificar la ventana
+    # entera en cada pico era lo mas caro del pipeline y no compraba nada: el
+    # recorte RAW posterior tambien copia, con lo que la precision del corte
+    # sigue atada al keyframe igual que antes.
     clipper.run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
+                 "-fflags", "+genpts",
                  "-f", "concat", "-safe", "0", "-i", str(lista),
-                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
-                 "-c:a", "aac", "-b:a", "128k", str(fuente)])
+                 "-c", "copy", "-avoid_negative_ts", "make_zero", str(fuente)])
     clipper.run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error", "-i", str(fuente),
                  "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(d / "audio.wav")])
 

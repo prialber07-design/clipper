@@ -159,10 +159,10 @@
                            "activo":  true,
                            "ntfy_topic":  "cambia-esto-por-un-topic-aleatorio",
                            "prioridad":  "high",
-                           "adjuntar_video":  true,
+                           "adjuntar_video":  false,
                            "limite_adjunto_mb":  2,
                            "carpeta_sincronizada":  "",
-                           "_nota":  "ntfy.sh anonimo solo admite 2MB por adjunto (comprobado en su API), asi que un clip vertical de 30s NO cabe con calidad decente: el aviso cae a texto solo. El video llega al movil por carpeta_sincronizada (OneDrive), no por ntfy."
+                           "_nota":  "adjuntar_video en false a proposito: ntfy.sh anonimo solo admite 2MB por adjunto (comprobado en su API) y un vertical de 30s no cabe ahi con calidad publicable, asi que el adjunto nunca llegaba a enviarse. El video llega al movil por carpeta_sincronizada (OneDrive) o por el enlace del aviso, no por ntfy. Solo ponlo en true si usas un ntfy propio con un limite mayor, y ten en cuenta que entonces cada clip se sube a ese servidor."
                        },
     "live":  {
                  "segmento_s":  10,
