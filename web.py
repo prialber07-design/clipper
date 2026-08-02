@@ -20,6 +20,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 import clipper
+import raw
 
 DATA = clipper.DATA
 OUT = clipper.OUT
@@ -64,6 +65,21 @@ def _leer_motivos(path: Path) -> tuple[str, dict, str]:
     if encontrado:
         gancho = encontrado.group(1).strip()
     return motivo.strip(), llm, gancho
+
+
+def _leer_ficha_publicable(path: Path) -> tuple[str, list[str]]:
+    """Lee el formato nuevo sin interpretar HTML ni datos de control."""
+    try:
+        contenido = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return "", []
+    partes = contenido.split("\n\n", 1)
+    descripcion = partes[0].strip()
+    if descripcion.upper().startswith((
+            "TITULO /", "TÍTULO /", "DESCRIPCION SUGERIDA", "DESCRIPCIÓN SUGERIDA")):
+        return "", []
+    hashtags = partes[1].split() if len(partes) == 2 else []
+    return descripcion, [tag for tag in hashtags if tag.startswith("#")]
 
 HTML_TEMPLATE = r"""<!doctype html>
 <html lang="es">
@@ -356,6 +372,11 @@ HTML_TEMPLATE = r"""<!doctype html>
       color: var(--muted);
       background: transparent;
       border-color: var(--line);
+    }
+
+    .button:disabled {
+      cursor: wait;
+      opacity: .5;
     }
 
     .shell {
@@ -687,6 +708,11 @@ HTML_TEMPLATE = r"""<!doctype html>
       background: var(--amber);
     }
 
+    .media-tag.raw {
+      color: var(--text);
+      background: #7d8cff;
+    }
+
     .duration-tag {
       position: absolute;
       right: 10px;
@@ -795,6 +821,51 @@ HTML_TEMPLATE = r"""<!doctype html>
       margin: 5px 0 0;
       color: var(--muted);
       font-size: 12px;
+    }
+
+    .description-panel {
+      margin-top: 12px;
+      padding: 11px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+    }
+
+    .raw-status {
+      display: grid;
+      gap: 5px;
+      margin-top: 14px;
+      padding: 11px;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-left: 3px solid #7d8cff;
+    }
+
+    .raw-status-value {
+      color: #aeb7ff;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 12px;
+      letter-spacing: .08em;
+    }
+
+    .raw-error {
+      margin: 4px 0 0;
+      color: var(--red);
+      font-size: 12px;
+    }
+
+    .clip-description {
+      margin: 6px 0 0;
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
+    .description-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 9px;
     }
 
     .card-actions {
@@ -1343,6 +1414,20 @@ HTML_TEMPLATE = r"""<!doctype html>
         <span id="tabCountRevisar" class="tab-count">0</span>
       </button>
       <button
+        id="tab-raw"
+        class="tab"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="panel-raw"
+        data-tab="raw">
+        <span class="nav-label">
+          <svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg>
+          RAW
+        </span>
+        <span id="tabCountRaw" class="tab-count">0</span>
+      </button>
+      <button
         id="tab-explorador"
         class="tab"
         type="button"
@@ -1477,6 +1562,46 @@ HTML_TEMPLATE = r"""<!doctype html>
     </section>
 
     <section
+      id="panel-raw"
+      class="panel"
+      role="tabpanel"
+      aria-labelledby="tab-raw"
+      hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Validación manual</p>
+          <h3>Candidatos RAW</h3>
+        </div>
+        <span id="rawNote" class="section-note">Cargando…</span>
+      </div>
+      <div class="review-summary raw-summary">
+        <strong>PAUSA</strong>
+        <span>
+          El MP4 está limpio, sin hook ni subtítulos. Elige Gemini para añadir
+          análisis visual a Luna o procesa solo con Luna.
+        </span>
+      </div>
+      <div class="toolbar">
+        <label class="search-wrap" for="searchRaw">
+          <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+          <input
+            id="searchRaw"
+            type="search"
+            placeholder="Buscar por canal, motivo o archivo"
+            autocomplete="off">
+        </label>
+      </div>
+      <div
+        id="rawGrid"
+        class="clip-grid"
+        aria-live="polite"
+        aria-busy="true">
+        <div class="skeleton" aria-hidden="true"></div>
+        <div class="skeleton" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <section
       id="panel-explorador"
       class="panel"
       role="tabpanel"
@@ -1549,7 +1674,8 @@ HTML_TEMPLATE = r"""<!doctype html>
         path: "",
         clips: {
           listos: [],
-          revisar: []
+          revisar: [],
+          raw: []
         },
         signature: "",
         modalFocus: null
@@ -1701,13 +1827,109 @@ HTML_TEMPLATE = r"""<!doctype html>
         return panel;
       }
 
+      function descriptionPanel(clip) {
+        const panel = text("section", "description-panel");
+        panel.setAttribute("aria-label", "Descripción recomendada");
+        panel.appendChild(text("span", "llm-kicker", "Descripción recomendada"));
+        panel.appendChild(
+          text(
+            "p",
+            "clip-description",
+            clip.description || "Sin descripción recomendada."
+          )
+        );
+        if (Array.isArray(clip.hashtags) && clip.hashtags.length) {
+          panel.appendChild(
+            text("p", "clip-description", clip.hashtags.join(" "))
+          );
+        }
+
+        const actions = text("div", "description-actions");
+        if (clip.description) {
+          const copy = text("button", "text-link", "Copiar descripción");
+          copy.type = "button";
+          copy.addEventListener("click", async () => {
+            const tags = Array.isArray(clip.hashtags) ? clip.hashtags.join(" ") : "";
+            try {
+              await navigator.clipboard.writeText(
+                clip.description + "\n\n" + tags
+              );
+              notify("Descripción y hashtags copiados", false);
+            } catch (_error) {
+              notify("No se pudo copiar el texto", true);
+            }
+          });
+          actions.appendChild(copy);
+        }
+        if (clip.txt_url) {
+          const ficha = text("a", "text-link", "Descargar TXT");
+          ficha.href = safeFileUrl(clip.txt_url);
+          ficha.download = "";
+          actions.appendChild(ficha);
+        }
+        if (actions.childNodes.length) {
+          panel.appendChild(actions);
+        }
+        return panel;
+      }
+
+      function rawStatusPanel(clip) {
+        const panel = text("section", "raw-status");
+        panel.setAttribute("aria-label", "Estado de validación RAW");
+        panel.appendChild(text("span", "llm-kicker", "Estado RAW"));
+        panel.appendChild(text("strong", "raw-status-value", String(clip.status || "pendiente").toUpperCase()));
+        if (clip.last_attempt_at) {
+          panel.appendChild(text("p", "clip-reason", "Último intento: " + clip.last_attempt_at));
+        }
+        if (clip.gemini_latency_ms) {
+          panel.appendChild(text("p", "clip-reason", "Gemini: " + clip.gemini_latency_ms + " ms"));
+        }
+        if (clip.luna_latency_ms) {
+          panel.appendChild(text("p", "clip-reason", "Luna: " + clip.luna_latency_ms + " ms"));
+        }
+        if (clip.last_error) {
+          panel.appendChild(text("p", "raw-error", clip.last_error));
+        }
+        if (clip.destination) {
+          const link = text("a", "text-link", "Abrir salida final");
+          link.href = safeFileUrl(clip.destination);
+          link.target = "_blank";
+          link.rel = "noopener";
+          panel.appendChild(link);
+        }
+        return panel;
+      }
+
+      async function processRaw(rawId, mode) {
+        try {
+          const response = await fetch("/api/raw/process", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: rawId, mode })
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw Error(data.error || "HTTP " + response.status);
+          }
+          notify(mode === "gemini" ? "Gemini encolado" : "Luna encolada", false);
+          cargarClips(true);
+        } catch (error) {
+          notify("No se pudo encolar: " + error.message, true);
+          cargarClips(true);
+        }
+      }
+
       function makeCard(clip, kind) {
         const article = text("article", "clip-card");
         article.dataset.search = [
           clip.canal,
           clip.nombre,
           clip.gancho,
-          clip.motivo
+          clip.motivo,
+          clip.status,
+          clip.last_error,
+          clip.description,
+          (clip.hashtags || []).join(" ")
         ]
           .join(" ")
           .toLowerCase();
@@ -1733,8 +1955,8 @@ HTML_TEMPLATE = r"""<!doctype html>
         media.appendChild(
           text(
             "span",
-            "media-tag " + (kind === "revisar" ? "review" : ""),
-            kind === "revisar" ? "REVISAR" : "LISTO"
+            "media-tag " + (kind === "revisar" ? "review" : kind === "raw" ? "raw" : ""),
+            kind === "revisar" ? "REVISAR" : kind === "raw" ? "RAW" : "LISTO"
           )
         );
         media.appendChild(
@@ -1746,23 +1968,28 @@ HTML_TEMPLATE = r"""<!doctype html>
         const meta = text("div", "card-meta");
         meta.append(
           text("span", "channel", clip.canal || "CANAL DESCONOCIDO"),
-          text("span", "card-file", clipTime(clip.nombre))
+          text("span", "card-file", clipTime(clip.nombre, clip.timestamp))
         );
         body.appendChild(meta);
         body.appendChild(
           text(
             "h4",
             "clip-title",
-            clip.gancho || clip.nombre || "Clip sin título"
+            clip.gancho || (kind === "raw" ? "Candidato RAW" : clip.nombre || "Clip sin título")
           )
         );
         if (clip.motivo) {
           body.appendChild(text("p", "clip-reason", clip.motivo));
         }
 
-        const panel = llmPanel(clip);
-        if (panel) {
-          body.appendChild(panel);
+        if (kind === "raw") {
+          body.appendChild(rawStatusPanel(clip));
+        } else {
+          const panel = llmPanel(clip);
+          if (panel) {
+            body.appendChild(panel);
+          }
+          body.appendChild(descriptionPanel(clip));
         }
 
         const actions = text("div", "card-actions");
@@ -1789,6 +2016,22 @@ HTML_TEMPLATE = r"""<!doctype html>
         download.innerHTML = icon("download") + "<span>Descargar</span>";
         actions.appendChild(download);
 
+        if (kind === "raw" && clip.status !== "completado") {
+          const activo = String(clip.status || "pendiente").startsWith("procesando_");
+          const reintento = ["error_gemini", "error_luna", "error_render"].includes(clip.status);
+          const gemini = text("button", "button primary", clip.status === "error_gemini" ? "Reintentar Gemini" : "Analizar con Gemini");
+          gemini.type = "button";
+          gemini.disabled = activo;
+          gemini.addEventListener("click", () => processRaw(clip.id, "gemini"));
+          actions.appendChild(gemini);
+
+          const luna = text("button", "button quiet", reintento ? "Procesar solo con Luna" : "Procesar con Luna");
+          luna.type = "button";
+          luna.disabled = activo;
+          luna.addEventListener("click", () => processRaw(clip.id, "luna"));
+          actions.appendChild(luna);
+        }
+
         body.appendChild(actions);
         article.appendChild(body);
         return article;
@@ -1796,7 +2039,7 @@ HTML_TEMPLATE = r"""<!doctype html>
 
       function emptyState(kind) {
         const box = text("div", "empty-state");
-        box.appendChild(iconNode(kind === "revisar" ? "clock" : "grid"));
+        box.appendChild(iconNode(kind === "revisar" || kind === "raw" ? "clock" : "grid"));
 
         const copy = text("div");
         copy.appendChild(
@@ -1805,6 +2048,8 @@ HTML_TEMPLATE = r"""<!doctype html>
             "",
             kind === "revisar"
               ? "La bandeja está despejada"
+              : kind === "raw"
+                ? "No hay candidatos en RAW"
               : "Todavía no hay clips listos"
           )
         );
@@ -1814,6 +2059,8 @@ HTML_TEMPLATE = r"""<!doctype html>
             "",
             kind === "revisar"
               ? "Cuando el pipeline encuentre un candidato aparecerá aquí con la lectura de Luna."
+              : kind === "raw"
+                ? "Los candidatos pausados después de Whisper aparecerán aquí."
               : "Los cortes promovidos desde REVISAR aparecerán aquí automáticamente."
           )
         );
@@ -1839,7 +2086,11 @@ HTML_TEMPLATE = r"""<!doctype html>
       }
 
       function render(kind) {
-        const grid = kind === "listos" ? $("#listosGrid") : $("#revisarGrid");
+        const grid = {
+          listos: $("#listosGrid"),
+          revisar: $("#revisarGrid"),
+          raw: $("#rawGrid")
+        }[kind];
         if (!grid) {
           return;
         }
@@ -1860,8 +2111,11 @@ HTML_TEMPLATE = r"""<!doctype html>
       }
 
       function filter(kind) {
-        const grid =
-          kind === "listos" ? $("#listosGrid") : $("#revisarGrid");
+        const grid = {
+          listos: $("#listosGrid"),
+          revisar: $("#revisarGrid"),
+          raw: $("#rawGrid")
+        }[kind];
         const input = $("#search" + kind[0].toUpperCase() + kind.slice(1));
         const query = String(input?.value || "").trim().toLowerCase();
         const active =
@@ -1917,7 +2171,8 @@ HTML_TEMPLATE = r"""<!doctype html>
       function summary() {
         const listos = state.clips.listos || [];
         const revisar = state.clips.revisar || [];
-        const all = listos.concat(revisar);
+        const raw = state.clips.raw || [];
+        const all = listos.concat(revisar, raw);
         const channels = new Set(
           all.map((clip) => clip.canal).filter(Boolean)
         );
@@ -1933,6 +2188,7 @@ HTML_TEMPLATE = r"""<!doctype html>
         setText("#tabCountListos", listos.length);
         setText("#countRevisar", revisar.length);
         setText("#tabCountRevisar", revisar.length);
+        setText("#tabCountRaw", raw.length);
         setText("#reviewTotal", revisar.length);
         setText("#countCanales", channels.size);
         setText(
@@ -1966,6 +2222,7 @@ HTML_TEMPLATE = r"""<!doctype html>
           "#revisarNote",
           revisar.length + " archivos · revisión humana"
         );
+        setText("#rawNote", raw.length + " candidatos · pausa tras Whisper");
       }
 
       function cargarClips(force) {
@@ -1979,7 +2236,8 @@ HTML_TEMPLATE = r"""<!doctype html>
           .then((data) => {
             const clean = {
               listos: Array.isArray(data.listos) ? data.listos : [],
-              revisar: Array.isArray(data.revisar) ? data.revisar : []
+              revisar: Array.isArray(data.revisar) ? data.revisar : [],
+              raw: Array.isArray(data.raw) ? data.raw : []
             };
             const signature = JSON.stringify(clean);
             const changed = force || signature !== state.signature;
@@ -1991,6 +2249,7 @@ HTML_TEMPLATE = r"""<!doctype html>
             if (changed) {
               render("listos");
               render("revisar");
+              render("raw");
             }
             connection(
               "live",
@@ -2008,8 +2267,10 @@ HTML_TEMPLATE = r"""<!doctype html>
             setText("#systemDetail", "La galería no responde ahora");
             $("#listosGrid").setAttribute("aria-busy", "false");
             $("#revisarGrid").setAttribute("aria-busy", "false");
+            $("#rawGrid").setAttribute("aria-busy", "false");
             $("#listosGrid").replaceChildren(errorState(error.message));
             $("#revisarGrid").replaceChildren(errorState(error.message));
+            $("#rawGrid").replaceChildren(errorState(error.message));
             notify("No se pudieron cargar los clips.", true);
           });
       }
@@ -2274,6 +2535,7 @@ HTML_TEMPLATE = r"""<!doctype html>
 
       $("#searchListos").addEventListener("input", () => filter("listos"));
       $("#searchRevisar").addEventListener("input", () => filter("revisar"));
+      $("#searchRaw").addEventListener("input", () => filter("raw"));
 
       $("#refreshButton").addEventListener("click", () => {
         cargarClips(true);
@@ -2353,17 +2615,16 @@ class Handler(SimpleHTTPRequestHandler):
         if not self._autorizado():
             return self._pedir_credenciales()
         if path.startswith("/files/"):
-            root = DATA.resolve()
-            target = (root / unquote(path[7:])).resolve()
-            if not target.is_relative_to(root) or not target.is_file():
+            target = self._archivo_publico(unquote(path[7:]))
+            if target is None:
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
-            self.path = "/" + target.relative_to(root).as_posix()
+            self.path = "/" + target.relative_to(DATA.resolve()).as_posix()
         super().do_HEAD()
 
-    def _responder_json(self, data):
+    def _responder_json(self, data, status=HTTPStatus.OK):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
-        self.send_response(HTTPStatus.OK)
+        self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-cache")
@@ -2378,6 +2639,53 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
         self.wfile.write(body)
+
+    def _origen_valido(self) -> bool:
+        origen = self.headers.get("Origin", "").strip()
+        if not origen:
+            return True
+        parsed = urlparse(origen)
+        host = self.headers.get("Host", "").split(":", 1)[0].lower()
+        dominio = os.environ.get("CLIPPER_DOMINIO", "").strip().lower()
+        return parsed.scheme in {"http", "https"} and (
+            parsed.hostname == host or parsed.netloc.lower() == dominio
+        )
+
+    def _archivo_publico(self, rel_path: str) -> Path | None:
+        root = DATA.resolve()
+        target = (root / rel_path).resolve()
+        if not target.is_relative_to(root) or not target.is_file():
+            return None
+        try:
+            out_root = OUT.resolve()
+            if not target.is_relative_to(out_root):
+                return None
+            relative = target.relative_to(out_root)
+        except (OSError, ValueError):
+            return None
+        if not relative.parts or relative.parts[0] not in {"LISTOS", "REVISAR", "RAW"}:
+            return None
+        if target.suffix.lower() not in {".mp4", ".txt"}:
+            return None
+        return target
+
+    def _leer_json_post(self) -> dict:
+        try:
+            length = int(self.headers.get("Content-Length", "-1"))
+        except ValueError as error:
+            raise ValueError("Content-Length inválido") from error
+        if length < 0 or length > 8192:
+            raise ValueError("cuerpo demasiado grande")
+        content_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+        if content_type != "application/json":
+            raise ValueError("Content-Type debe ser application/json")
+        try:
+            data = json.loads(self.rfile.read(length).decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError("JSON inválido") from error
+        if not isinstance(data, dict):
+            raise ValueError("JSON debe ser un objeto")
+        return data
 
     def do_GET(self):
         if self.path == "/salud":
@@ -2410,15 +2718,49 @@ class Handler(SimpleHTTPRequestHandler):
             return self._handle_api_logs()
 
         if path.startswith("/files/"):
-            rel_path = unquote(path[7:])
-            root = DATA.resolve()
-            target = (root / rel_path).resolve()
-            if not target.is_relative_to(root) or not target.is_file():
+            target = self._archivo_publico(unquote(path[7:]))
+            if target is None:
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
-            self.path = "/" + target.relative_to(root).as_posix()
+            self.path = "/" + target.relative_to(DATA.resolve()).as_posix()
 
         super().do_GET()
+
+    def do_POST(self):
+        if not self._autorizado():
+            return self._pedir_credenciales()
+        if not self._origen_valido():
+            self._responder_json({"error": "origen no permitido"}, HTTPStatus.FORBIDDEN)
+            return
+        if urlparse(self.path).path != "/api/raw/process":
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        try:
+            data = self._leer_json_post()
+            raw_id = raw.validar_id(data.get("id"))
+            modo_solicitado = str(data.get("mode", ""))
+            if modo_solicitado not in {"gemini", "luna"}:
+                raise ValueError("mode debe ser gemini o luna")
+            manifest = raw.enqueue(raw_id, modo_solicitado)
+        except raw.RawActivo as error:
+            self._responder_json({"error": str(error)}, HTTPStatus.CONFLICT)
+            return
+        except (raw.RawError, ValueError, TypeError) as error:
+            mensaje = str(error)[:160] or "petición inválida"
+            estado = (HTTPStatus.NOT_FOUND if "no disponible" in mensaje
+                      else HTTPStatus.BAD_REQUEST)
+            self._responder_json({"error": mensaje}, estado)
+            return
+        except Exception:
+            self._responder_json({"error": "no se pudo encolar el trabajo"},
+                                 HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+        self._responder_json({
+            "ok": True,
+            "id": manifest["id"],
+            "mode": modo_solicitado,
+            "status": manifest["status"],
+        }, HTTPStatus.ACCEPTED)
 
     def _handle_api_clips(self):
         listos_dir = OUT / "LISTOS"
@@ -2427,7 +2769,8 @@ class Handler(SimpleHTTPRequestHandler):
         listos = self._obtener_clips_dir(listos_dir, es_revisar=False)
         revisar = self._obtener_clips_dir(revisar_dir, es_revisar=True)
 
-        self._responder_json({"listos": listos, "revisar": revisar})
+        self._responder_json({"listos": listos, "revisar": revisar,
+                              "raw": raw.listar_api()})
 
     def _obtener_clips_dir(self, dir_path: Path, es_revisar: bool) -> list:
         clips = []
@@ -2457,7 +2800,18 @@ class Handler(SimpleHTTPRequestHandler):
                 if m:
                     gancho = m.group(1).strip()
 
+            descripcion, hashtags = _leer_ficha_publicable(txt_file) if txt_file.exists() else ("", [])
+            if llm:
+                descripcion = llm.get("social_description") or descripcion
+                hashtags = llm.get("hashtags") or hashtags
+
             rel_url = f"/files/out/{'REVISAR' if es_revisar else 'LISTOS'}/{quote(mp4.name, safe='')}"
+            txt_url = (f"/files/out/{'REVISAR' if es_revisar else 'LISTOS'}/{quote(txt_file.name, safe='')}"
+                       if txt_file.exists() else "")
+            try:
+                txt_size = txt_file.stat().st_size if txt_file.exists() else None
+            except OSError:
+                txt_size = None
             duracion = _duracion_video(mp4)
 
             clips.append({
@@ -2468,7 +2822,11 @@ class Handler(SimpleHTTPRequestHandler):
                 "gancho": gancho or mp4.stem,
                 "motivo": motivo,
                 "llm": llm,
-                "url": rel_url
+                "description": descripcion,
+                "hashtags": hashtags,
+                "url": rel_url,
+                "txt_url": txt_url,
+                "txt_size": txt_size,
             })
         return clips
 
@@ -2498,7 +2856,8 @@ class Handler(SimpleHTTPRequestHandler):
         logs_dir = DATA / "logs"
         log_text = ""
         if logs_dir.exists():
-            for log_file in sorted(logs_dir.glob("*.log"), reverse=True):
+            archivos = list(logs_dir.glob("*.log")) + list(logs_dir.glob("*.jsonl"))
+            for log_file in sorted(archivos, reverse=True):
                 try:
                     contenido = log_file.read_text(encoding="utf-8", errors="replace")
                     lineas = contenido.splitlines()[-60:]
@@ -2538,6 +2897,7 @@ def arrancar(puerto: int = None, en_hilo: bool = False):
 
     DATA.mkdir(parents=True, exist_ok=True)
     OUT.mkdir(parents=True, exist_ok=True)
+    raw.recuperar_huerfanos()
 
     Handler.usuario, Handler.clave = usuario, clave
     handler = partial(Handler)

@@ -106,6 +106,9 @@ certificado automático, así que **no necesitas Caddy ni el docker-compose**.
    CLIPPER_URL_PUBLICA=https://clips.tudominio.com
    CLIPPER_MODELO=small
    CLIPPER_COMPUTE=int8
+   CLIPPER_RAW_MODO=manual
+   CLIPPER_ANTIGRAVITY_ACTIVO=0
+   CLIPPER_AGY_BIN=agy
    ```
 
 4. **Volumes**: volumen persistente montado en **`/app/clips`**. Sin esto pierdes
@@ -198,9 +201,11 @@ trabajo. El buffer se poda tambien mientras hay una transcripcion o un render
 en curso. La limpieza automatica conserva el comportamiento intencional de
 siete dias y expira tambien trabajos, logs, contadores e indices antiguos.
 
-Los ganchos automaticos se mandan a `REVISAR` para revision humana. La galeria
-web exige `CLIPPER_WEB_CLAVE`; no existe una credencial por defecto. El panel
-refresca clips y logs cada 15 segundos.
+Luna decide cada candidato una sola vez. Solo `publicar`, score mínimo 80,
+confianza mínima 0,75 y todos los controles locales llegan a `LISTOS`; los
+demás van a `REVISAR` sin borrarse. La galería web exige `CLIPPER_WEB_CLAVE`;
+no existe una credencial por defecto. El panel refresca clips y logs cada 15
+segundos.
 
 ### Variables (`.env`)
 
@@ -213,6 +218,60 @@ refresca clips y logs cada 15 segundos.
 | `CLIPPER_CARPETA_SINCRONIZADA` | Ruta de sincronización; vacía en contenedor |
 | `CLIPPER_DOCKERFILE` | `Dockerfile` o `Dockerfile.gpu` |
 | `CLIPPER_WEB_CLAVE` | Obligatoria; usa una clave larga y aleatoria |
+| `CLIPPER_LLM_ACTIVO` | Activa la evaluación editorial estricta de Luna |
+| `OPENAI_API_KEY` | Clave del servidor; nunca la subas al repositorio |
+| `CLIPPER_LLM_MODELO` | Por defecto `gpt-5.6-luna` |
+| `CLIPPER_RAW_MODO` | `manual` en el despliegue; `gemini_auto` solo preparado |
+| `CLIPPER_ANTIGRAVITY_ACTIVO` | Enriquecimiento visual opcional; `0` por defecto |
+| `CLIPPER_AGY_BIN` | Ruta del binario oficial `agy`; por defecto `agy` |
+
+### Cola RAW y validación manual
+
+Con `CLIPPER_RAW_MODO=manual`, cada candidato válido tras Whisper se guarda en
+`/app/clips/out/RAW/` como MP4 limpio más manifiesto privado y el vigilante se
+detiene. La galería añade la pestaña **RAW** con los botones **Analizar con
+Gemini** y **Procesar con Luna**. El POST solo encola el trabajo y devuelve
+inmediatamente; el estado, error y latencias quedan en el manifiesto y en
+`/app/clips/logs/raw-processing.jsonl`.
+
+Gemini recibe el MP4 RAW directo, Whisper y chat; Luna recibe solo texto y, en
+la ruta Gemini, el análisis visual validado como contexto no confiable. Un
+fallo conserva el candidato en RAW. `gemini_auto` existe como preparación, pero
+no se debe activar durante esta fase.
+
+Para consultar el despliegue por SSH:
+
+```bash
+docker logs -f <contenedor-clipper>
+tail -f /ruta-del-volumen/clips/logs/raw-processing.jsonl
+find /ruta-del-volumen/clips/out/RAW -maxdepth 1 -type f -printf '%f\n'
+```
+
+### Antigravity (opcional)
+
+El análisis visual usa el CLI oficial de Antigravity en modo no interactivo,
+con `Gemini 3.5 Flash (Low)`, un candidato MP4 exacto y un timeout de 120 s.
+Clipper valida el JSON y, ante cualquier fallo, deja el manifiesto en
+`error_gemini` sin llamar a Luna ni renderizar. No se usa
+`--dangerously-skip-permissions`.
+
+Instala `agy` siguiendo su instalador oficial, completa OAuth manualmente y
+activa después el botón de Gemini en RAW. En el perfil de Antigravity deja
+los overages desactivados y confirma explícitamente `useG1Credits: false` antes
+de usarlo; si la clave no se puede confirmar, Clipper no realiza la llamada.
+No pongas
+tokens ni credenciales en el repositorio ni en variables que se copien al
+proceso.
+
+Las imágenes Docker instalan el binario oficial en `/usr/local/bin/agy` y usan
+`/app/clips/antigravity` como `HOME`, dentro del volumen persistente. El
+workspace exacto que usa Clipper es `/app/clips/antigravity-workspace`. Tras un
+build nuevo, abre la terminal del contenedor, cambia a esa ruta y completa allí
+el OAuth y la confianza de workspace; después verifica la configuración efectiva
+antes de pulsar Gemini. Clipper solo limpia `candidate.mp4` y sus salidas
+temporales, nunca la configuración ni la confianza. La variable
+`CLIPPER_RAW_MODO` debe permanecer en `manual`; el binario del host instalado por
+SSH no está dentro del contenedor que ya está ejecutándose.
 
 Los canales se eligen en `config.json`, o al arrancar:
 `command: python servidor.py --canales elcalvolol,lopezfnx`

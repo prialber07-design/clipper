@@ -87,6 +87,41 @@ def _gancho_flojo(hook: str) -> str | None:
     return None
 
 
+def _puerta_editorial(clip: dict, q: dict) -> list[str]:
+    """La única puerta hacia LISTOS: Luna válida y umbrales configurables."""
+    llm = clip.get("llm")
+    if not isinstance(llm, dict):
+        return ["evaluación editorial de Luna no disponible"]
+
+    decision = llm.get("decision")
+    score = llm.get("score")
+    confidence = llm.get("confidence")
+    reason = (str(llm.get("reason", "")).strip() or "sin explicación")
+    fallos = []
+    if decision != "publicar":
+        fallos.append(f"Luna decidió {decision or 'sin decisión'}: {reason}")
+    if isinstance(score, bool) or not isinstance(score, int):
+        fallos.append("puntuación de Luna inválida")
+    elif score < int(q.get("llm_score_minimo", 80)):
+        fallos.append(f"puntuación de Luna insuficiente ({score}/100)")
+    if (isinstance(confidence, bool) or
+            not isinstance(confidence, (int, float))):
+        fallos.append("confianza de Luna inválida")
+    elif confidence < float(q.get("llm_confianza_minima", 0.75)):
+        fallos.append(f"confianza de Luna insuficiente ({confidence:.2f})")
+
+    descripcion = (llm.get("social_description") or
+                   clip.get("social_description") or "").strip()
+    if not descripcion:
+        fallos.append("descripción editorial vacía")
+    hashtags = llm.get("hashtags") or clip.get("hashtags") or []
+    if (not isinstance(hashtags, list) or not 4 <= len(hashtags) <= 6 or
+            any(not isinstance(tag, str) or not tag.startswith("#") or
+                any(char.isspace() for char in tag) for tag in hashtags)):
+        fallos.append("hashtags editoriales inválidos (se esperan 4-6)")
+    return fallos
+
+
 def evaluar(mp4: Path, clip: dict, segmentos: list,
             limites: tuple[float, float] | None = None) -> tuple[bool, list[str]]:
     """Devuelve (apto, motivos). Motivos vacio = listo para publicar.
@@ -112,14 +147,7 @@ def evaluar(mp4: Path, clip: dict, segmentos: list,
         fallos.append(f"poco dialogo ({palabras} palabras, {por_seg:.1f}/s)")
 
     hook = (clip.get("hook") or "").strip()
-    # El extractor automatico acierta el momento pero no el gancho: de 10
-    # candidatos, dos pasaron todos los controles de forma y aun asi no valian.
-    # Un gancho extraido a maquina no se publica solo; se revisa.
-    if clip.get("hook_auto") and not q.get("publicar_con_gancho_automatico", False):
-        fallos.append("gancho automatico: hay que escribirlo antes de publicar")
-
-    if (clip.get("llm") or {}).get("mode") == "prueba":
-        fallos.append("LLM en modo prueba: revision humana obligatoria")
+    fallos.extend(_puerta_editorial(clip, q))
 
     if not hook or hook.startswith("ESCRIBE"):
         fallos.append("sin gancho")
@@ -146,6 +174,9 @@ def apartar(mp4: Path, motivos: list[str], meta: dict) -> Path:
     destino_dir.mkdir(parents=True, exist_ok=True)
     destino = destino_dir / mp4.name
     destino.write_bytes(mp4.read_bytes())
+    txt = mp4.with_suffix(".txt")
+    if txt.exists():
+        destino.with_suffix(".txt").write_bytes(txt.read_bytes())
     (destino.with_suffix(".motivos.txt")).write_text(
         "NO PUBLICAR. Motivos:\n- " + "\n- ".join(motivos) +
         f"\n\ngancho: {meta.get('hook','')}\ncanal: {meta.get('canal','')}\n",

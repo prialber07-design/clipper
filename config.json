@@ -142,10 +142,8 @@
                    "palabras_por_bloque":  3,
                    "color_resaltado":  "\u0026H0000FFFF\u0026",
                    "escala_palabra_activa":  112,
-                   "hook_y":  520,
+                   "hook_y":  346,
                    "hook_size":  58,
-                   "hook_persistente":  true,
-                   "hook_duracion_s":  3.0,
                    "_nota":  "layout completo: el video entra entero, sin recortar nada. El bloque gancho-video-subtitulos queda centrado en la pantalla y por encima de la interfaz de TikTok/Reels. \u0027zoom\u0027 amplia y recorta los lados; \u0027crop\u0027 recorta a saco.",
                    "irl":  {
                                "margen_px":  24,
@@ -191,8 +189,8 @@
                     "hook_min_chars":  18,
                     "volumen_min_db":  -40,
                     "negro_max_s":  2,
-                    "publicar_con_gancho_automatico":  false,
-                    "gancho_puntuacion_minima":  3
+                     "llm_score_minimo":  80,
+                     "llm_confianza_minima":  0.75
                 },
     "duraciones":  {
                        "corto":  {

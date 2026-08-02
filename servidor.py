@@ -163,6 +163,7 @@ def limpiar_archivos_antiguos(dias: int = 7):
     carpetas_a_revisar = [
         OUT / "LISTOS",
         OUT / "REVISAR",
+        OUT / "RAW",
         DATA / "logs",
         DATA / "work"
     ]

@@ -9,7 +9,7 @@ Que hace:
   2. Al arrancar el directo, graba a buffer rodante en segmentos de 10s (copy, sin recodificar).
   3. Escucha el chat de Twitch por IRC anonimo y mide mensajes/segundo.
   4. Mide energia de audio por segmento.
-  5. Pico combinado -> espera la cola -> monta la ventana -> transcribe -> renderiza 9:16.
+  5. Pico combinado -> espera la cola -> monta la ventana -> transcribe -> guarda RAW.
 
 El gancho en modo automatico es la frase textual mas fuerte del propio clip, no una
 plantilla: extrae, no inventa. Revisalo antes de publicar.
@@ -35,6 +35,7 @@ import bloqueo
 import calidad
 import clipper
 import notify
+import raw
 from clipper import CONFIG, DATA, FFMPEG, WORK
 from registro import obtener
 
@@ -452,8 +453,6 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
     slug = f"{canal}-{time.strftime('%Y%m%d-%H%M%S')}"
     LOG.info("⚡ PICO DETECTADO\n   CANAL: %s\n   MOTIVO: %s\n   TIEMPO: %.0fs\n   JOB: %s",
              canal, motivo.upper(), t_video, slug)
-    t_ini = time.time()
-
     modo, dur = elegir_duracion(canal)
     rc = CONFIG["render"]
     rc["duracion_min_s"], rc["duracion_max_s"] = dur["min"], dur["max"]
@@ -462,7 +461,7 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
     LOG.info("🪟 VENTANA PREPARADA\n   JOB: %s\n   MODO: %s\n   DURACIÓN: %s-%ss\n   CONTEXTO ANTES: %.0fs",
              slug, modo.upper(), dur["min"], dur["max"], antes)
 
-    _, t_pico = montar_ventana(cap, t_video, slug, antes=antes)
+    fuente, t_pico = montar_ventana(cap, t_video, slug, antes=antes)
 
     args = argparse.Namespace(slug=slug, n=1, device=device, func=None, defer_clips=True)
     # Una unica cola de Whisper entre todos los vigilantes del servidor.
@@ -499,58 +498,31 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
         return
 
     dentro = [s for s in segs if ini <= s["start"] < fin]
-    gancho = gancho_automatico(dentro, t_pico, chat)
     duracion = fin - ini
-    segmentos_llm, pico_llm = contexto_editorial(dentro, ini, fin, t_pico)
-    gancho, llm = clipper.evaluar_editorial(
+    segmentos_raw, pico_raw = contexto_editorial(dentro, ini, fin, t_pico)
+    palabras_raw = raw._normalizar_words(datos.get("words", []), ini, fin)
+    raw_id = f"{slug}-01"
+    manifest = raw.crear(
+        fuente=fuente,
+        inicio=ini,
+        fin=fin,
+        raw_id=raw_id,
         canal=canal,
         motivo=motivo,
-        segmentos=segmentos_llm,
+        pico=pico_raw,
+        segmentos=segmentos_raw,
+        words=palabras_raw,
         chat=chat or [],
-        duracion=duracion,
-        pico=pico_llm,
-        fallback=gancho,
+        limites=(dur["min"], dur["max"]),
     )
-    clip = {
-        "id": "01",
-        "start": round(ini, 2),
-        "end": round(fin, 2),
-        "hook": gancho or "ESCRIBE AQUI EL GANCHO",
-        "hook_auto": True,
-        "title": " ".join(s["text"] for s in dentro)[:90],
-        "hashtags": [f"#{canal}", "#clips", "#envivo"],
-    }
-    if llm:
-        clip["llm"] = llm
-    (d / "clips.json").write_text(json.dumps({"clips": [clip]}, ensure_ascii=False, indent=2),
-                                  encoding="utf-8")
-
-    render_args = argparse.Namespace(slug=slug, only=None, layout=None, func=None)
-    if CONFIG.get("cpu", {}).get("una_tarea_pesada_a_la_vez", True):
-        with bloqueo.exclusivo(DATA / ".cpu.lock", etiqueta=f"render de {canal}"):
-            clipper.cmd_render(render_args)
-    else:
-        clipper.cmd_render(render_args)
-
-    mp4 = clipper.OUT / slug / f"{slug}-01.mp4"
-    if mp4.exists():
-        meta = {"canal": canal, "motivo": motivo, "hook": clip["hook"],
-                "duracion": round(clip["end"] - clip["start"]), "llm": clip.get("llm")}
-        apto, fallos = calidad.evaluar(mp4, clip, segs, limites=(dur["min"], dur["max"]))
-        if apto:
-            destino = notify.publicar(mp4, meta)
-            resultado = "listo"
-            LOG.info("✅ JOB TERMINADO · CLIP LISTO\n   JOB: %s\n   ARCHIVO: %s", slug, destino)
-        else:
-            destino = calidad.apartar(mp4, fallos, meta)
-            resultado = "revisar"
-            LOG.warning("🟡 JOB TERMINADO · EN REVISIÓN\n   JOB: %s\n   MOTIVOS: %s\n   ARCHIVO: %s",
-                        slug, "; ".join(fallos), destino)
-    else:
-        resultado = "sin_archivo"
-        LOG.error("❌ JOB TERMINADO · SIN ARCHIVO\n   JOB: %s\n   RENDER NO PRODUJO: %s", slug, mp4)
-    LOG.info("🏁 PROCESAMIENTO FINALIZADO\n   JOB: %s\n   ESTADO: %s\n   TIEMPO: %.0fs\n   GANCHO: %r",
-             slug, resultado.upper(), time.time() - t_ini, clip["hook"])
+    LOG.info("🧊 CANDIDATO DETENIDO EN RAW\n   JOB: %s\n   RAW: %s\n   MODO: %s",
+             slug, manifest["nombre"], raw.modo().upper())
+    if raw.modo() == "gemini_auto":
+        try:
+            raw.enqueue(raw_id, "gemini")
+        except Exception as error:
+            LOG.error("❌ RAW AUTO NO ENCOLADO\n   ID: %s\n   MOTIVO: %s",
+                      raw_id, str(error)[:160])
 
 
 # --- bucle principal ----------------------------------------------------------

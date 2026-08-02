@@ -40,13 +40,18 @@ class _RespuestaOpenAI:
         return json.dumps(self.cuerpo).encode("utf-8")
 
 
-def _respuesta_editorial(titulo="Título sólido"):
+def _respuesta_editorial(titulo="Título sólido", descripcion="Una reacción clara.",
+                         hashtags=None, decision="publicar", score=80,
+                         confidence=0.75):
+    hashtags = hashtags or ["#canal", "#clips", "#directo", "#reaccion"]
     resultado = {
-        "decision": "publicar",
-        "score": 78,
-        "confidence": 0.86,
+        "decision": decision,
+        "score": score,
+        "confidence": confidence,
         "reason": "El momento tiene una reacción clara.",
         "screen_title": titulo,
+        "social_description": descripcion,
+        "hashtags": hashtags,
     }
     return {
         "output": [{
@@ -136,6 +141,10 @@ class EstabilidadTests(unittest.TestCase):
             carpeta = Path(tmp)
             mp4 = carpeta / "elcalvolol-20260801-193235-01.mp4"
             mp4.write_bytes(b"video")
+            mp4.with_suffix(".txt").write_text(
+                "<script>alert(1)</script>\n\n#uno #dos #tres #cuatro\n",
+                encoding="utf-8",
+            )
             handler = object.__new__(web.Handler)
             web._duracion_video_cache.cache_clear()
             with patch.object(clipper, "run", return_value=SimpleNamespace(stdout="33.7")) as ejecutar:
@@ -143,7 +152,11 @@ class EstabilidadTests(unittest.TestCase):
                 handler._obtener_clips_dir(carpeta, es_revisar=True)
             self.assertEqual(clips[0]["canal"], "elcalvolol")
             self.assertEqual(clips[0]["duracion"], 34)
+            self.assertEqual(clips[0]["description"], "<script>alert(1)</script>")
+            self.assertEqual(clips[0]["txt_size"], mp4.with_suffix(".txt").stat().st_size)
             self.assertEqual(ejecutar.call_count, 1)
+        self.assertIn("function descriptionPanel", web.HTML_TEMPLATE)
+        self.assertIn("textContent", web.HTML_TEMPLATE)
 
     def test_web_expone_timestamp_real_en_listos(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -157,6 +170,15 @@ class EstabilidadTests(unittest.TestCase):
                 clips = handler._obtener_clips_dir(carpeta, es_revisar=False)
         self.assertEqual(clips[0]["nombre"], mp4.name)
         self.assertEqual(clips[0]["timestamp"], esperado)
+
+    def test_web_tolera_txt_legacy_sin_mostrarlo_como_descripcion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ficha = Path(tmp) / "clip.txt"
+            ficha.write_text(
+                "TITULO / PRIMERA LINEA\nHook antiguo\n\nHASHTAGS\n#clips\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(web._leer_ficha_publicable(ficha), ("", []))
 
     def test_web_reintento_fuerza_render_tras_error(self):
         cargar = web.HTML_TEMPLATE.split("function cargarClips", 1)[1]
@@ -176,16 +198,17 @@ class EstabilidadTests(unittest.TestCase):
             try:
                 clipper.OUT = root / "out"
                 web.OUT = clipper.OUT
-                destino = calidad.apartar(origen, ["LLM en modo prueba"], {
+                destino = calidad.apartar(origen, ["Luna decidió descartar"], {
                     "canal": "canal",
                     "hook": "Título de prueba",
                     "llm": {
                         "model": "gpt-5.6-luna",
-                        "mode": "prueba",
                         "decision": "descartar",
                         "score": 12,
                         "confidence": 0.91,
                         "reason": "No hay un momento claro.",
+                        "social_description": "Sin momento claro.",
+                        "hashtags": ["#canal", "#clips", "#directo", "#reaccion"],
                     },
                 })
                 handler = object.__new__(web.Handler)
@@ -249,7 +272,6 @@ class EstabilidadTests(unittest.TestCase):
             "CLIPPER_LLM_ACTIVO": "1",
             "OPENAI_API_KEY": "sk-test-no-log",
             "CLIPPER_LLM_MODELO": "gpt-5.6-luna",
-            "CLIPPER_LLM_MODO": "prueba",
         }
         with patch.dict(os.environ, entorno):
             with patch.object(
@@ -265,6 +287,8 @@ class EstabilidadTests(unittest.TestCase):
         self.assertEqual(gancho, "Título sólido")
         self.assertEqual(segmentos, copia)
         self.assertEqual(meta["decision"], "publicar")
+        self.assertEqual(meta["social_description"], "Una reacción clara.")
+        self.assertEqual(meta["hashtags"], ["#canal", "#clips", "#directo", "#reaccion"])
         self.assertEqual(meta["input_tokens"], 123)
         self.assertEqual(meta["output_tokens"], 22)
         self.assertGreaterEqual(meta["latency_ms"], 0)
@@ -281,7 +305,6 @@ class EstabilidadTests(unittest.TestCase):
         with patch.dict(os.environ, {
             "CLIPPER_LLM_ACTIVO": "1",
             "OPENAI_API_KEY": "sk-test-no-log",
-            "CLIPPER_LLM_MODO": "prueba",
         }):
             with patch.object(
                 clipper.urllib.request,
@@ -306,11 +329,10 @@ class EstabilidadTests(unittest.TestCase):
             self.assertLessEqual(segmento["end"], 34.0)
         self.assertEqual(segmentos[0]["start"], 100.0)
 
-    def test_llm_modo_desconocido_se_fuerza_a_prueba(self):
+    def test_llm_no_guarda_modo_en_metadatos(self):
         with patch.dict(os.environ, {
             "CLIPPER_LLM_ACTIVO": "1",
             "OPENAI_API_KEY": "sk-test-no-log",
-            "CLIPPER_LLM_MODO": "produccion",
         }):
             with patch.object(
                 clipper.urllib.request,
@@ -320,17 +342,17 @@ class EstabilidadTests(unittest.TestCase):
                 _, meta = clipper.evaluar_editorial(
                     "canal", "motivo", [], [], 34.0, 12.0, "Gancho heurístico",
                 )
-        self.assertEqual(meta["mode"], "prueba")
+        self.assertNotIn("mode", meta)
+        self.assertEqual(meta["decision"], "publicar")
 
     def test_llm_falla_sin_perder_candidato_ni_reintentar(self):
         entorno = {
             "CLIPPER_LLM_ACTIVO": "1",
             "OPENAI_API_KEY": "sk-test-no-log",
             "CLIPPER_LLM_MODELO": "gpt-5.6-luna",
-            "CLIPPER_LLM_MODO": "prueba",
         }
         casos = (
-            ("título vacío", _RespuestaOpenAI(_respuesta_editorial("")), "título vacío"),
+            ("título vacío", _RespuestaOpenAI(_respuesta_editorial("")), "screen_title"),
             ("JSON inválido", _RespuestaOpenAI({
                 "output": [{"content": [{"type": "output_text", "text": "no-json"}]}],
             }), "JSON inválida"),
@@ -369,27 +391,172 @@ class EstabilidadTests(unittest.TestCase):
         self.assertIn("OPENAI_API_KEY", meta["reason"])
         self.assertEqual(llamada.call_count, 0)
 
-    def test_modo_prueba_no_descarta_recomendacion_de_luna(self):
+    def test_llm_rechaza_descripcion_y_hashtags_invalidos(self):
+        entorno = {
+            "CLIPPER_LLM_ACTIVO": "1",
+            "OPENAI_API_KEY": "sk-test-no-log",
+        }
+        for respuesta, esperado in (
+            (_respuesta_editorial(descripcion=""), "social_description"),
+            (_respuesta_editorial(hashtags=["#uno"]), "hashtags"),
+        ):
+            with self.subTest(esperado=esperado):
+                with patch.dict(os.environ, entorno):
+                    with patch.object(
+                        clipper.urllib.request,
+                        "urlopen",
+                        return_value=_RespuestaOpenAI(respuesta),
+                    ):
+                        hook, meta = clipper.evaluar_editorial(
+                            "canal", "motivo", [], [], 30.0, 12.0, "Gancho heurístico"
+                        )
+                self.assertEqual(hook, "Gancho heurístico")
+                self.assertIn(esperado, meta["reason"])
+
+    def test_puerta_estricta_publica_en_umbral(self):
         clip = {
             "start": 0,
             "end": 30,
             "hook": "Nadie esperaba esta reacción brutal",
             "hook_auto": True,
-            "llm": {"decision": "descartar", "mode": "prueba"},
+            "social_description": "Una reacción clara del directo.",
+            "hashtags": ["#canal", "#clips", "#directo", "#reaccion"],
+            "llm": {
+                "decision": "publicar",
+                "score": 80,
+                "confidence": 0.75,
+                "reason": "Momento claro.",
+                "social_description": "Una reacción clara del directo.",
+                "hashtags": ["#canal", "#clips", "#directo", "#reaccion"],
+            },
         }
-        segmentos = [{"start": 0, "end": 30, "text": "Una frase de prueba"}]
+        segmentos = [{"start": 0, "end": 30, "text": "Una frase con bastante diálogo para superar el control"}]
         with tempfile.TemporaryDirectory() as tmp:
             video = Path(tmp) / "clip.mp4"
             video.write_bytes(b"video")
             with patch.dict(calidad.CONFIG["calidad"], {
-                "publicar_con_gancho_automatico": True,
                 "palabras_por_segundo_min": 0,
             }):
                 with patch.object(calidad, "_analizar_calidad_av", return_value=(-10, 0)):
                     apto, motivos = calidad.evaluar(video, clip, segmentos, (26, 34))
+        self.assertTrue(apto, motivos)
+
+    def test_puerta_estricta_rechaza_score_y_confianza_bajos(self):
+        base = {
+            "start": 0,
+            "end": 30,
+            "hook": "Nadie esperaba esta reacción brutal",
+            "social_description": "Una reacción clara.",
+            "hashtags": ["#canal", "#clips", "#directo", "#reaccion"],
+            "llm": {
+                "decision": "publicar",
+                "score": 79,
+                "confidence": 0.75,
+                "reason": "Momento claro.",
+                "social_description": "Una reacción clara.",
+                "hashtags": ["#canal", "#clips", "#directo", "#reaccion"],
+            },
+        }
+        with patch.object(calidad, "_analizar_calidad_av", return_value=(-10, 0)):
+            with patch.dict(calidad.CONFIG["calidad"], {"palabras_por_segundo_min": 0}):
+                apto, motivos = calidad.evaluar(
+                    Path("clip.mp4"), base, [{"start": 0, "text": "palabras"}], (26, 34)
+                )
         self.assertFalse(apto)
-        self.assertTrue(any("LLM en modo prueba" in motivo for motivo in motivos))
-        self.assertEqual(clip["llm"]["decision"], "descartar")
+        self.assertTrue(any("puntuación" in motivo for motivo in motivos))
+
+        base["llm"]["score"] = 80
+        base["llm"]["confidence"] = 0.74
+        with patch.object(calidad, "_analizar_calidad_av", return_value=(-10, 0)):
+            with patch.dict(calidad.CONFIG["calidad"], {"palabras_por_segundo_min": 0}):
+                apto, motivos = calidad.evaluar(
+                    Path("clip.mp4"), base, [{"start": 0, "text": "palabras"}], (26, 34)
+                )
+        self.assertFalse(apto)
+        self.assertTrue(any("confianza" in motivo for motivo in motivos))
+
+    def test_revision_descartado_y_editorial_invalida_van_a_revision(self):
+        for decision in ("revisar", "descartar"):
+            with self.subTest(decision=decision):
+                clip = {
+                    "start": 0,
+                    "end": 30,
+                    "hook": "Nadie esperaba esta reacción brutal",
+                    "social_description": "Una reacción clara.",
+                    "hashtags": ["#canal", "#clips", "#directo", "#reaccion"],
+                    "llm": {
+                        "decision": decision,
+                        "score": 99,
+                        "confidence": 1.0,
+                        "reason": "Requiere revisión.",
+                        "social_description": "Una reacción clara.",
+                        "hashtags": ["#canal", "#clips", "#directo", "#reaccion"],
+                    },
+                }
+                with patch.object(calidad, "_analizar_calidad_av", return_value=(-10, 0)):
+                    with patch.dict(calidad.CONFIG["calidad"], {"palabras_por_segundo_min": 0}):
+                        apto, motivos = calidad.evaluar(
+                            Path("clip.mp4"), clip, [{"start": 0, "text": "palabras"}], (26, 34)
+                        )
+                self.assertFalse(apto)
+                self.assertTrue(any(decision in motivo for motivo in motivos))
+
+        clip = {
+            "start": 0,
+            "end": 30,
+            "hook": "Nadie esperaba esta reacción brutal",
+            "llm": {"decision": "revisar", "score": 0, "confidence": 0,
+                    "reason": "timeout"},
+        }
+        with patch.object(calidad, "_analizar_calidad_av", return_value=(-10, 0)):
+            with patch.dict(calidad.CONFIG["calidad"], {"palabras_por_segundo_min": 0}):
+                apto, motivos = calidad.evaluar(
+                    Path("clip.mp4"), clip, [{"start": 0, "text": "palabras"}], (26, 34)
+                )
+        self.assertFalse(apto)
+        self.assertTrue(any("descripción" in motivo for motivo in motivos))
+
+    def test_ficha_txt_solo_contiene_publicacion(self):
+        ficha = clipper._ficha_texto("canal-20260801-193235", {
+            "social_description": "Una descripción lista.",
+            "hashtags": ["#uno", "#dos", "#tres", "#cuatro"],
+            "start": 1,
+            "end": 31,
+        })
+        self.assertEqual(ficha, "Una descripción lista.\n\n#uno #dos #tres #cuatro\n")
+        self.assertNotIn("origen", ficha.lower())
+        self.assertNotIn("duración", ficha.lower())
+
+    def test_ass_hook_permanente_tiktok_y_emoji(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ass = Path(tmp) / "subs.ass"
+            ass_sin_emoji = Path(tmp) / "subs-sin-emoji.ass"
+            anterior = clipper.CONFIG["render"]
+            try:
+                clipper.CONFIG["render"] = dict(anterior, hook_y=346)
+                clipper._build_ass([], {
+                    "start": 0,
+                    "end": 30,
+                    "hook": "Nadie esperaba esto 🔥",
+                }, ass)
+                clipper._build_ass([], {
+                    "start": 0,
+                    "end": 30,
+                    "hook": "Nadie esperaba esto",
+                }, ass_sin_emoji)
+            finally:
+                clipper.CONFIG["render"] = anterior
+            texto = ass.read_text(encoding="utf-8")
+            texto_sin_emoji = ass_sin_emoji.read_text(encoding="utf-8")
+        self.assertIn("Hook,TikTok Sans", texto)
+        self.assertIn("&H00000000", texto)
+        self.assertIn("&H00FFFFFF", texto)
+        self.assertIn(r"\pos(540,346)", texto)
+        self.assertIn("0:30.00,Hook", texto)
+        self.assertNotIn("\\fad", texto)
+        self.assertIn("🔥", texto)
+        self.assertIn(r"{\fnNoto Emoji}", texto)
+        self.assertNotIn(r"{\fnNoto Emoji}", texto_sin_emoji)
 
 
 if __name__ == "__main__":

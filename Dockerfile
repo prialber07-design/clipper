@@ -2,7 +2,7 @@
 FROM python:3.12-slim AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        ffmpeg ca-certificates tini procps tzdata \
+        ffmpeg fontconfig ca-certificates tini procps tzdata curl bash \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -11,18 +11,30 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# CLI oficial opcional para el análisis visual. Se deja instalado, pero el
+# flujo lo mantiene desactivado hasta que se complete OAuth y se configure.
+RUN curl -fsSL https://antigravity.google/cli/install.sh | bash \
+    && install -m 0755 /root/.local/bin/agy /usr/local/bin/agy \
+    && rm -rf /root/.local
+
 COPY *.py *.sh config.json ./
+COPY fonts ./fonts
+RUN mkdir -p /usr/local/share/fonts/clipper \
+    && cp fonts/*.ttf /usr/local/share/fonts/clipper/ \
+    && fc-cache -f
 RUN chmod +x *.sh
 
 # El codigo va como root y de solo lectura; los datos, de un usuario sin
 # privilegios sobre el volumen.
 RUN useradd --system --uid 10001 clipper \
-    && mkdir -p /app/clips/modelos && chown -R clipper:clipper /app/clips
+    && mkdir -p /app/clips/modelos /app/clips/antigravity \
+    && chown -R clipper:clipper /app/clips
 
 ENV CLIPPER_DATA=/app/clips \
     HF_HOME=/app/clips/modelos \
     PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8 \
+    HOME=/app/clips/antigravity \
     TZ=Europe/Madrid \
     OMP_NUM_THREADS=8 \
     MKL_NUM_THREADS=8 \

@@ -16,7 +16,9 @@ detector: velocidad y contenido del chat + energía de audio
         ↓
 pico → ventana → faster-whisper (timestamps por palabra)
         ↓
-gancho + filtro de calidad → ffmpeg (9:16 + subtítulos + gancho)
+out/RAW (MP4 limpio + manifiesto) → botón Gemini o Luna
+        ↓
+Luna + filtro de calidad → ffmpeg (9:16 + subtítulos + gancho)
         ↓
 bandeja numerada + aviso al móvil (ntfy)
 ```
@@ -34,9 +36,10 @@ dispara al instante, sin esperar a ninguna línea base.
 vocabulario con lo que estaba diciendo el chat: casi siempre es la que provocó
 la reacción. Nunca inventa texto.
 
-**Filtro de calidad antes de publicar.** Duración, densidad de diálogo, volumen,
-pantalla en negro y solidez del gancho. Lo que no pasa va a `out/REVISAR/` con
-el motivo escrito, no a tu móvil.
+**Puerta editorial antes de publicar.** Luna debe devolver `publicar`, al menos
+80/100, confianza 0,75 y hook, descripción y 4-6 hashtags válidos. Además pasan
+los controles locales de duración, diálogo, audio, pantalla en negro y gancho.
+Todo lo demás va a `out/REVISAR/` con el motivo escrito; nunca se borra solo.
 
 **Dos montajes.** `reaccion` (webcam arriba, contenido abajo) y `irl` (una sola
 cámara). Se elige por canal.
@@ -64,15 +67,60 @@ python servidor.py --estado
 ```
 
 El supervisor mantiene una sola cola de Whisper: los trabajos se procesan en
-serie y el modelo se libera al terminar cada transcripcion para no acumular una
-copia por canal. Los clips con gancho automatico van a `out/REVISAR/` hasta que
-se revisan manualmente; los nombres nuevos incluyen fecha para no colisionar.
+serie y el modelo se libera al terminar cada transcripción para no acumular una
+copia por canal. La evaluación de Luna también es única por candidato y genera
+hook, descripción y hashtags; los nombres nuevos incluyen fecha para no
+colisionar.
 El buffer se poda tambien mientras Whisper o ffmpeg estan trabajando y los
 datos se conservan siete dias.
 
 Kick usa el chat real cuando `aiohttp` esta instalado. La galeria web exige
 `CLIPPER_WEB_CLAVE`, refresca los clips automaticamente y es la interfaz unica
 de revision.
+
+## Validación manual RAW
+
+El despliegue usa `CLIPPER_RAW_MODO=manual`: después de Whisper cada candidato
+queda en `out/RAW/` con su MP4 limpio y un manifiesto privado. El pipeline se
+detiene ahí; no llama a Gemini, Luna ni renderiza por su cuenta.
+
+En la pestaña **RAW** de la galería puedes previsualizarlo y elegir **Analizar
+con Gemini** (MP4 directo + Whisper + chat, seguido de una sola llamada a Luna)
+o **Procesar con Luna** (sin vídeo). Los fallos quedan visibles en RAW y no se
+mueven silenciosamente a REVISAR. `gemini_auto` está preparado para una fase
+posterior, pero no debe activarse todavía.
+
+El análisis de Gemini exige confirmar `useG1Credits=false` antes de invocar el
+CLI y usa un timeout de 120 segundos. No se registran prompts, transcripciones,
+chat, tokens ni análisis completos en los logs. OAuth y la confianza de agy se
+configuran desde el workspace estable `CLIPPER_DATA/antigravity-workspace`
+(en Docker, `/app/clips/antigravity-workspace`); no se debe usar otra carpeta.
+
+## Sincronizacion automatica para Windows
+
+El paquete [windows-sync](windows-sync/) descarga solo `LISTOS` a una carpeta
+local cada 10 minutos, sin instalar Python ni dependencias externas.
+
+1. Copia o descomprime `windows-sync/` en el equipo Windows.
+2. Ejecuta `Instalar.bat`.
+3. Introduce la URL HTTPS de Clipper, tu usuario y contrasena, y elige la
+   carpeta de destino.
+
+La contrasena se guarda cifrada con DPAPI para el usuario actual de Windows.
+La tarea se ejecuta solo con ese usuario, no solapa ejecuciones y deja las
+parejas `clip.mp4` + `clip.txt` directamente en la carpeta elegida. Exige ambos
+archivos, compara el tamaño, usa temporales `.part` y renombrado atómico, y
+nunca borra clips locales. Los pendientes de `REVISAR` no se sincronizan.
+
+Para comprobar el paquete sin conectarte al servidor, abre Windows PowerShell
+5.1 en la raiz del proyecto y ejecuta:
+
+```powershell
+.\windows-sync\Sincronizar-Clips.ps1 -SelfTest
+```
+
+Para actualizarlo, vuelve a ejecutar `Instalar.bat`. Para quitar la tarea y la
+configuracion sin tocar los clips descargados, ejecuta `Desinstalar.bat`.
 
 Docker:
 
