@@ -1,7 +1,71 @@
 # Cómo escriben los canales de clips
 
-Sacado de las 20 últimas publicaciones de `@mastuerzosfamily` (agosto 2026),
-uno de los canales de clips en español con más tracción.
+Hay **dos estilos distintos**, y confundirlos es la diferencia entre 1.000 y
+200.000 visitas. Los dos están medidos sobre publicaciones reales.
+
+## Primero, la métrica que importa
+
+El clip de referencia que más ha rendido de todos los analizados:
+
+| | @xdrake797, clip de Peereira |
+|---|---|
+| Reproducciones | **215.600** |
+| Likes | 35.300 (16,4 %) |
+| **Compartidos** | **20.100 (9,3 %)** |
+| Seguidores de la cuenta | **1.742** |
+| Duración | 28 s |
+
+Dos conclusiones que cambian cómo hay que trabajar:
+
+**El alcance no depende del tamaño de la cuenta.** 1.742 seguidores, 215.000
+visitas. Que un clip nuestro se quede en 1.000 no es porque el canal sea nuevo:
+es porque el clip no da motivos para pasarlo.
+
+**Lo que dispara el alcance es que lo compartan, no que lo vean.** Casi 1 de
+cada 10 espectadores lo reenvió. TikTok lo mide y lo empuja. Un clip informativo
+se ve y se olvida; un chiste interno **se le manda a un amigo que también lo
+sigue**. Ahí está toda la diferencia.
+
+## Los dos estilos
+
+### A) Titular de noticia — para opinión y polémica
+
+Sirve cuando el clip **cuenta algo**: una bronca, una postura, una reacción a la
+actualidad. El espectador no tiene que conocer al creador para entenderlo.
+
+**SUJETO + VERBO CON CARGA + QUÉ/QUIÉN** → ver la sección siguiente.
+
+### B) Comentario cómplice — para humor y momentos internos
+
+Sirve cuando el clip **no cuenta nada**, solo es gracioso. Aquí el titular mata
+el chiste. Lo que funciona es **citar al streamer y contestarle**, con la voz del
+propio chat.
+
+```
+te sigo sigo lo juro por mi madre (ya jurastes)
+```
+
+Cómo está construido:
+
+1. **La cita literal del streamer**, en minúsculas y tal y como suena.
+2. **Un paréntesis con la respuesta del que clipea** — la coletilla que pondría
+   el chat. Es el remate, y es lo que se comparte.
+3. **Falta de ortografía a propósito** (*jurastes*, no *juraste*). Suena a chat,
+   no a periódico.
+
+Y aquí, al contrario que en el estilo A, **sí se cita la frase del directo**. La
+regla de "nunca copies una frase" vale para los titulares, no para esto: el
+chiste *es* la frase, y la aportación del que clipea es el paréntesis.
+
+#### Cuándo usar cada uno
+
+| El clip es… | Estilo | Ejemplo |
+|---|---|---|
+| Una opinión, una bronca, actualidad | A, titular | *Xokas carga contra la gestión del Gobierno en Ceuta* |
+| Un grito, un susto, una tontería entre amigos | B, cómplice | *cien por cien mil por mil (calvo, ya estás avisado)* |
+
+Regla práctica: **si hay que explicar el contexto, es A. Si el contexto sobra
+porque la gracia se ve, es B.**
 
 ## La fórmula del título
 
@@ -85,6 +149,39 @@ hacen aparecer cuando alguien busca ese tema, y el genérico da alcance. Llenar
 la descripción de `#parati #fyp #clips #shorts` no descubre a nada: los pone
 todo el mundo, así que no distinguen.
 
+### El matiz que sale del clip de 215.000 visitas
+
+Sus cinco hashtags **no llevan ni uno genérico**:
+
+```
+#pereira  #pereiracastor🦫  #twitchespañol  #meme  #humor
+```
+
+- **`#pereiracastor🦫` es el apodo que le puso su comunidad**, con emoji
+  incluido. No lo busca nadie de fuera, y por eso funciona: lo busca justo el
+  que ya está dentro y va a compartirlo.
+- **`#meme` y `#humor` en vez de `#viral`**. Lo mete en la categoría por la que
+  compite de verdad. `#viral` lo pone todo el mundo y no significa nada.
+- **`#twitchespañol`** delimita el nicho: gente que ve streamers en español.
+
+Conclusión: cuando el clip es de estilo B, el hashtag genérico se cambia por uno
+de categoría (`#meme`, `#humor`, `#futbol`) y **se aprovecha el apodo interno**
+del creador si lo tiene.
+
+### La jerga de cada canal
+
+Para escribir en estilo B hace falta saber cómo habla esa comunidad. Sacado de
+los clips que su propia gente sube a Twitch:
+
+| Canal | Nombres y coletillas que usan |
+|---|---|
+| **peereira7** | Urko, Pepe, Kata, Willy · *vqmoooooooss*, *MY BAD 🙏*, *peillo* · fútbol de España |
+| **elxokas** | el pique con Argentina · *caresapo* · Riot y la SoloQ |
+| **lopezfnx** | Iratxe, Gael, El Calvo · la Velada |
+
+Esto va en el campo `jerga` de cada canal en `config.json`. No son hashtags ni
+temas: son **las palabras con las que hay que escribir el paréntesis**.
+
 ### Cómo lo hace el sistema
 
 Cada canal tiene dos listas separadas en `config.json`:
@@ -98,12 +195,19 @@ Los de contexto se sacan de `etiquetas` cruzando con lo que se dice en el clip.
 
 ## Lo que NO hay que hacer
 
-- **Copiar una frase literal del directo.** Suena a transcripción, no a título.
-  Es lo que hacía el extractor automático y por eso salía flojo.
+- **Copiar una frase literal del directo *en un titular de estilo A*.** Suena a
+  transcripción. (En estilo B es justo al revés: la cita es el chiste.)
 - **Repetir el gancho como descripción.** Se desperdicia el espacio de búsqueda.
-- **Prometer lo que el clip no da.** Se paga en retención.
+- **Prometer lo que el clip no da.** Se paga en retención. Y peor: **cortar
+  fuera lo que el gancho promete.** Pasó con el clip 036 de LopezFNX — el gancho
+  decía *"le preguntan"* y el corte empezaba en la respuesta, sin la pregunta.
+  Antes de publicar hay que comprobar que lo que anuncia el gancho **está dentro
+  del corte**, no solo en la transcripción del directo.
 - **Titular con la reacción en crudo** (`EEEE`, `QUE SUSTO`). Eso lo hace la
   comunidad en Twitch, pero no funciona para ganar el scroll en TikTok.
+- **Estirar el clip.** Los que revientan son cortos: el de 215.000 visitas dura
+  **28 s**. Los de más de un minuto solo se justifican cuando hay una parrafada
+  que aguanta sola; si el momento son 20 s, el clip son 20 s.
 
 ## Nota sobre el gancho automático
 

@@ -213,7 +213,14 @@ def cmd_transcribe(args):
         segs, words = [], []
         try:
             for s in segments:  # el generador es perezoso: aqui es donde peta CUDA
-                segs.append({"start": s.start, "end": s.end, "text": s.text.strip()})
+                # no_speech_prob y avg_logprob se guardan porque son la unica
+                # pista barata de que lo transcrito no es habla del streamer
+                # sino musica de fondo. Publicar musica con copyright hace que
+                # Content ID silencie o desmonetice el clip. Ver calidad.py.
+                segs.append({"start": s.start, "end": s.end, "text": s.text.strip(),
+                             "no_speech": round(float(getattr(s, "no_speech_prob", 0.0)), 4),
+                             "logprob": round(float(getattr(s, "avg_logprob", 0.0)), 4),
+                             "compresion": round(float(getattr(s, "compression_ratio", 0.0)), 3)})
                 for w in (s.words or []):
                     words.append({"start": w.start, "end": w.end, "word": w.word.strip()})
                 print(f"\r    {s.end/60:5.1f} min transcritos", end="", flush=True)
@@ -606,13 +613,32 @@ def hashtags_para(canal: str, extra=None, texto: str = "") -> list:
     contexto = list(extra or [])
     if texto:
         bajo = texto.lower()
+        # La etiqueta va pegada (#elcalvo) pero en el directo se dice separado
+        # ("el calvo"), asi que tambien se busca sobre el texto sin espacios.
+        # Sin esto se perdian etiquetas de nombres compuestos.
+        pegado = re.sub(r"\s+", "", bajo)
         ficha = next((c for c in CONFIG.get("canales", []) if c.get("canal") == canal), {})
         for t in ficha.get("etiquetas", []):
-            if t.lower() in bajo:
-                contexto.append(re.sub(r"[^\wáéíóúñ]", "", t.lower()))
+            clave = t.lower()
+            if clave in bajo or re.sub(r"\s+", "", clave) in pegado:
+                contexto.append(re.sub(r"[^\wáéíóúñ]", "", clave))
+
+    # El generico depende del estilo del canal. En un clip de humor, #viral no
+    # significa nada porque lo pone todo el mundo; el clip de 215.000 visitas
+    # que analizamos no llevaba ninguno generico y si #meme y #humor, que es la
+    # categoria por la que compite de verdad. Ver ESTILO.md.
+    ficha = next((c for c in CONFIG.get("canales", []) if c.get("canal") == canal), {})
+    estilo = ficha.get("estilo_gancho", "noticia")
+    por_estilo = h.get("generico_por_estilo", {})
+    generico = por_estilo.get(estilo)
+    # Y el generico del OTRO estilo se cae: un clip de humor con #viral pegado
+    # detras delata que la etiqueta se ha puesto por rellenar.
+    otros = {str(v).lstrip("#").lower() for k, v in por_estilo.items() if k != estilo}
+    base = [t for t in h.get("base", []) if str(t).lstrip("#").lower() not in otros]
+    finales = ([generico] if generico else []) + base
 
     salida, vistos = [], set()
-    for grupo in (canal_tags, contexto, h.get("base", [])):
+    for grupo in (canal_tags, contexto, finales):
         for t in grupo:
             t = t if str(t).startswith("#") else f"#{t}"
             if t.lower() not in vistos and len(t) > 2:

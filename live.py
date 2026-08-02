@@ -3,6 +3,7 @@ clipper v2 - captura en directo y clipa el momento mientras sigue el stream.
 
     python live.py watch kingteka --plataforma twitch
     python live.py watch bitraderx --plataforma kick --solo-audio
+    python live.py watch zonagemelosyt --plataforma youtube --solo-audio
 
 Que hace:
   1. Comprueba cada 45s si el canal esta en directo (streamlink, sin API keys).
@@ -72,7 +73,11 @@ def recargar():
 # --- deteccion de estado del canal -------------------------------------------
 
 def canal_url(canal: str, plataforma: str) -> str:
-    return f"https://kick.com/{canal}" if plataforma == "kick" else f"https://www.twitch.tv/{canal}"
+    if plataforma == "kick":
+        return f"https://kick.com/{canal}"
+    if plataforma == "youtube":
+        return f"https://www.youtube.com/@{canal}/live"
+    return f"https://www.twitch.tv/{canal}"
 
 
 def esta_en_directo(url: str) -> bool:
@@ -91,8 +96,8 @@ def esta_en_directo(url: str) -> bool:
 class Captura:
     """streamlink -> ffmpeg segment. Segmento N cubre [N*seg, (N+1)*seg) desde t0."""
 
-    def __init__(self, url: str, destino: Path):
-        self.url, self.destino = url, destino
+    def __init__(self, url: str, destino: Path, plataforma: str = "twitch"):
+        self.url, self.destino, self.plataforma = url, destino, plataforma
         self.t0 = None
         self.sl = self.ff = None
 
@@ -109,9 +114,13 @@ class Captura:
                 raise RuntimeError(
                     f"El buffer {self.destino} esta bloqueado por un proceso anterior. "
                     f"Cierra los ffmpeg/streamlink sueltos y reintenta.")
+        # --twitch-disable-ads es una opcion especifica del plugin de Twitch:
+        # mandarla contra Kick/YouTube no aporta nada, y mejor no depender de
+        # que streamlink la ignore en silencio.
+        extra = ["--twitch-disable-ads"] if self.plataforma == "twitch" else []
         self.sl = subprocess.Popen(
             [sys.executable, "-m", "streamlink", "--stdout", "--retry-streams", "5",
-             "--twitch-disable-ads", self.url, "best"],
+             *extra, self.url, "best"],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, **self._grupo)
         self.ff = subprocess.Popen(
             [FFMPEG, "-hide_banner", "-loglevel", "error", "-i", "pipe:0",
@@ -232,6 +241,28 @@ def rms_segmento(ruta: Path) -> float:
     if not m:
         return 0.0
     return math.sqrt(sum(float(x) * x for x in m) / len(m))
+
+
+def minimo_reaccion(historial) -> int:
+    """Cuantos mensajes hacen falta para que una subida sea de verdad.
+
+    Un numero fijo no vale para todos los canales. Con 12 (el valor que hizo
+    falta para callar el ruido de MarioTaxi) un canal donde el chat promedia 2
+    mensajes por ventana no dispara NUNCA: el detector de chat queda muerto y
+    nadie lo nota. Y al reves, en un canal que promedia 30, doce mensajes son
+    menos de lo normal y disparan con cualquier cosa.
+
+    Asi que se pide un multiplo de la linea base del propio canal, con un suelo
+    para que tres personas escribiendo a la vez no cuenten como reaccion. Se
+    reajusta solo segun el tipo de directo: en una partida el chat baja y el
+    liston baja con el; en una charla sube y el liston sube.
+    """
+    piso = int(LIVE.get("reaccion_minima_absoluta", 8))
+    if len(historial) < 8:
+        return piso
+    orden = sorted(historial)
+    mediana = orden[len(orden) // 2]
+    return max(piso, int(round(LIVE.get("reaccion_factor", 3.5) * mediana)))
 
 
 def zscore(valor: float, historial) -> float:
@@ -651,7 +682,7 @@ def cmd_watch(args):
 
         print(f"\n[>] EN DIRECTO. Arrancando captura.")
         avisar_directo(args.canal, url)
-        cap = Captura(url, BUF / args.canal)
+        cap = Captura(url, BUF / args.canal, args.plataforma)
         cap.arrancar()
 
         eventos = queue.Queue()
@@ -692,9 +723,9 @@ def cmd_watch(args):
                         z_audio = zscore(r, hist_audio)
                         hist_audio.append(r)
 
-                minimo_vis = int(LIVE.get("reaccion_minima_absoluta", 12))
+                minimo = minimo_reaccion(hist_chat)
                 print(f"\r[.] {transcurrido/60:5.1f} min | {n_msgs:3d} msg | reaccion "
-                      f"{reaccion:4d}/{minimo_vis} (z {z_chat:+.1f}) | 'clip' x{n_clip} "
+                      f"{reaccion:4d}/{minimo} (z {z_chat:+.1f}) | 'clip' x{n_clip} "
                       f"| audio z {z_audio:+.1f}   ", end="", flush=True)
 
                 # Que dos o mas espectadores pidan clip a la vez dispara solo:
@@ -704,8 +735,7 @@ def cmd_watch(args):
                 # El z-score por si solo miente en canales tranquilos: con una
                 # media de 2 mensajes por ventana, pasar a 9 da z +3 y no es una
                 # reaccion, son tres personas escribiendo. Hace falta ademas un
-                # minimo absoluto de mensajes.
-                minimo = int(LIVE.get("reaccion_minima_absoluta", 12))
+                # minimo de mensajes, calculado sobre la linea base del canal.
                 hay_reaccion = z_chat >= LIVE["umbral_reaccion_z"] and reaccion >= minimo
                 disparo = (piden_clip or hay_reaccion
                            or z_audio >= LIVE["umbral_audio_z"])
@@ -790,7 +820,7 @@ def main():
 
     w = sub.add_parser("watch", help="vigila un canal y clipa los picos")
     w.add_argument("canal")
-    w.add_argument("--plataforma", default="twitch", choices=["twitch", "kick"])
+    w.add_argument("--plataforma", default="twitch", choices=["twitch", "kick", "youtube"])
     w.add_argument("--solo-audio", action="store_true", help="ignora el chat")
     w.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     w.set_defaults(func=cmd_watch)

@@ -36,6 +36,13 @@
         "lacobra",
         "sevilla",
         "penal"
+      ],
+      "estilo_gancho": "complice",
+      "jerga": [
+        "boca",
+        "river",
+        "messi",
+        "loco"
       ]
     },
     {
@@ -76,6 +83,13 @@
         "inglaterra",
         "seleccion",
         "golazo"
+      ],
+      "estilo_gancho": "complice",
+      "jerga": [
+        "argentina",
+        "messi",
+        "boca",
+        "golazo"
       ]
     },
     {
@@ -108,6 +122,12 @@
         "damian",
         "policia",
         "atraco"
+      ],
+      "estilo_gancho": "complice",
+      "jerga": [
+        "gta",
+        "damian",
+        "policia"
       ]
     },
     {
@@ -136,6 +156,12 @@
         "zombies",
         "callofduty",
         "republicadominicana"
+      ],
+      "estilo_gancho": "complice",
+      "jerga": [
+        "samway",
+        "jade",
+        "city"
       ]
     },
     {
@@ -166,6 +192,12 @@
         "cliente",
         "madrid",
         "semaforo"
+      ],
+      "estilo_gancho": "complice",
+      "jerga": [
+        "cliente",
+        "taxi",
+        "visage"
       ]
     },
     {
@@ -189,6 +221,12 @@
         "yony",
         "furgoneta",
         "citroen",
+        "calle"
+      ],
+      "estilo_gancho": "noticia",
+      "jerga": [
+        "yony",
+        "furgoneta",
         "calle"
       ]
     },
@@ -222,12 +260,22 @@
       "etiquetas": [
         "iratxe",
         "gael",
+        "elcalvo",
+        "velada",
+        "ibai",
         "barcelona",
         "madrid",
         "roblox",
         "sharefestival",
-        "elcalvo",
-        "serie"
+        "twitchespañol"
+      ],
+      "estilo_gancho": "complice",
+      "jerga": [
+        "iratxe",
+        "gael",
+        "calvo",
+        "velada",
+        "bro"
       ]
     },
     {
@@ -289,6 +337,13 @@
         "sevilla",
         "barcelona",
         "valencia"
+      ],
+      "estilo_gancho": "complice",
+      "jerga": [
+        "calvo",
+        "toni",
+        "iratxe",
+        "festival"
       ]
     },
     {
@@ -322,10 +377,17 @@
       "etiquetas": [
         "elcalvo",
         "velada",
+        "ibai",
         "fifa",
         "ometv",
+        "sevilla",
+        "twitchespañol"
+      ],
+      "estilo_gancho": "complice",
+      "jerga": [
+        "calvo",
         "pueblo",
-        "sevilla"
+        "ometv"
       ]
     },
     {
@@ -375,52 +437,89 @@
         "aitana",
         "vinicius",
         "testosterona"
+      ],
+      "estilo_gancho": "noticia",
+      "jerga": [
+        "cortisol",
+        "looksmaxxing",
+        "psl",
+        "gemelo"
       ]
     },
     {
       "nombre": "Elxokas",
       "plataforma": "twitch",
       "canal": "elxokas",
-      "layout": "reaccion",
+      "layout": "completo",
       "permiso_clips": "PENDIENTE",
       "verificado": true,
       "seguidores": null,
       "detector": "reaccion",
       "temas": [
-        "opinion",
-        "polemica",
-        "salseo",
-        "gobierno",
-        "politica",
-        "migracion",
-        "ceuta",
-        "españa",
-        "futbol",
-        "velada",
-        "ibai",
-        "carga",
+        "grito",
+        "susto",
         "flipo",
         "vergüenza",
         "escandalo",
         "denuncia",
-        "streamers",
-        "twitch",
+        "argentina",
+        "argentinos",
+        "perdon",
+        "pique",
+        "polemica",
+        "salseo",
+        "gol",
+        "futbol",
+        "cancha",
+        "penal",
+        "izquierda",
+        "derecha",
+        "gobierno",
+        "politica",
+        "geopolitica",
+        "ceuta",
+        "migracion",
+        "españa",
+        "guerra",
+        "pais",
+        "riot",
+        "soloq",
+        "partida",
+        "muerte",
+        "rage",
+        "explota",
+        "roto",
+        "opinion",
+        "carga",
         "dinero",
         "impuestos"
       ],
       "etiquetas": [
         "ceuta",
         "migracion",
+        "argentina",
+        "geopolitica",
         "politica",
-        "salseo",
+        "izquierda",
+        "españa",
+        "lol",
+        "leagueoflegends",
+        "soloq",
+        "riot",
+        "futbol",
         "ibai",
         "velada",
-        "gobierno",
-        "pedrosanchez",
-        "españa",
-        "futbol"
+        "twitchespañol"
       ],
-      "fuente": "Pedido por el usuario, existencia verificada en twitch.tv"
+      "fuente": "Pedido por el usuario, existencia verificada en twitch.tv",
+      "estilo_gancho": "noticia",
+      "jerga": [
+        "caresapo",
+        "soloq",
+        "riot",
+        "argentina",
+        "geopolitico"
+      ]
     },
     {
       "nombre": "Agustin51",
@@ -445,11 +544,17 @@
       ],
       "etiquetas": [
         "xokas",
-        "salseo",
-        "twitch",
+        "argentina",
+        "twitchespañol",
         "gaming"
       ],
-      "fuente": "Pedido por el usuario, existencia verificada en twitch.tv"
+      "fuente": "Pedido por el usuario, existencia verificada en twitch.tv",
+      "estilo_gancho": "complice",
+      "jerga": [
+        "xokas",
+        "susto",
+        "grito"
+      ]
     },
     {
       "nombre": "Peereira7",
@@ -475,12 +580,115 @@
         "bronca"
       ],
       "etiquetas": [
-        "peereira",
-        "twitch",
-        "reto",
-        "gaming"
+        "urko",
+        "pepe",
+        "kata",
+        "willy",
+        "españa",
+        "portugal",
+        "futbol",
+        "mundial",
+        "seleccion",
+        "twitchespañol"
       ],
-      "fuente": "Pedido por el usuario, existencia verificada en twitch.tv"
+      "fuente": "Pedido por el usuario, existencia verificada en twitch.tv",
+      "estilo_gancho": "complice",
+      "jerga": [
+        "urko",
+        "pepe",
+        "kata",
+        "willy",
+        "vqmos",
+        "my bad",
+        "peillo",
+        "castor"
+      ]
+    },
+    {
+      "nombre": "Zona Gemelos",
+      "plataforma": "kick",
+      "canal": "zonagemelosoficial",
+      "seguidores": 192400,
+      "verificado": true,
+      "detector": "solo_audio",
+      "permiso_clips": "PENDIENTE",
+      "layout": "completo",
+      "_nota_layout": "Canal de los hermanos Ramos (Carlos y Daniel): streams de casting, Slots & Casino y contenido de 'La Casa de los Gemelos'. Planos cambiantes, sin webcam fija que recortar -> completo.",
+      "_nota_contenido": "Emiten tambien contenido de apuestas/casino (Slots & Casino). Filtrar esos tramos igual que se filtra logistica/gameplay rutinario en otros canales: no son el tipo de momento que se clipea.",
+      "temas": [
+        "gemelos",
+        "casa",
+        "gala",
+        "expulsion",
+        "casting",
+        "confirmado",
+        "polemica",
+        "discusion",
+        "risa",
+        "susto",
+        "reto"
+      ],
+      "_temas_nota": "Canal nuevo, sin muestreo aun. Revisar en pocos dias con clips reales (ver CREADORES.md). Ahora mismo el streaming en vivo de esta comunidad esta en YouTube, no aqui: este canal de Kick estaba desconectado (ultima vez hace 6 dias) cuando se anadio.",
+      "etiquetas": [
+        "zonagemelos",
+        "casadelosgemelos",
+        "gemelos",
+        "reality"
+      ],
+      "fuente": "Verificado en kick.com el 2026-08-02: 192,4 mil seguidores, ultimo directo hace 6 dias (casting/Slots & Casino de La Casa de los Gemelos 3).",
+      "estilo_gancho": "noticia",
+      "jerga": [
+        "reality",
+        "casa",
+        "gemelos"
+      ]
+    },
+    {
+      "nombre": "Zona Gemelos (YouTube)",
+      "plataforma": "youtube",
+      "canal": "zonagemelosyt",
+      "seguidores": null,
+      "verificado": true,
+      "detector": "solo_audio",
+      "permiso_clips": "PENDIENTE",
+      "layout": "completo",
+      "_nota_layout": "Mismo formato que zonagemelosoficial/lacasadelosgemelos: reality de convivencia, varias camaras de casa, sin webcam fija -> completo.",
+      "_nota_contenido": "Mismo aviso que el resto de canales de este universo: puede incluir tramos de apuestas/casino y contenido 18+; filtrar igual que logistica rutinaria.",
+      "temas": [
+        "gemelos",
+        "casa",
+        "gala",
+        "expulsion",
+        "expulsado",
+        "nominacion",
+        "salvacion",
+        "votacion",
+        "hermano mayor",
+        "conviviente",
+        "polemica",
+        "discusion",
+        "pelea",
+        "beso",
+        "ligar",
+        "traicion",
+        "llanto"
+      ],
+      "_temas_nota": "Canal nuevo, sin muestreo aun. Revisar en pocos dias con clips reales (ver CREADORES.md).",
+      "etiquetas": [
+        "zonagemelos",
+        "casadelosgemelos",
+        "gemelos",
+        "reality"
+      ],
+      "fuente": "Handle @ZonaGemelosYT confirmado por el usuario (en directo ahora mismo) y verificado con 'streamlink --json' el 2026-08-02: plugin youtube resuelve, autor 'ZonaGemelos', titulo 'LA CASA DE LOS GEMELOS 3 | #CASAGEMELOS12'. YouTube no expone numero de seguidores por esta via, de ahi seguidores=null.",
+      "_nota_youtube": "Soporte YouTube añadido a live.py el 2026-08-02 (canal_url + Captura + argparse). Sin lectura de chat en directo de YouTube todavia (equivalente al solo_audio de Kick), asi que --solo-audio se aplica automaticamente al no ser twitch.",
+      "estilo_gancho": "noticia",
+      "jerga": [
+        "reality",
+        "casa",
+        "gemelos",
+        "nominado"
+      ]
     }
   ],
   "render": {
@@ -563,8 +771,9 @@
     "peso_sorpresa": 2,
     "ventana_antes_largo_s": 115,
     "ventana_antes_corto_s": 30,
-    "reaccion_minima_absoluta": 12,
-    "_nota_reaccion": "El z-score solo no vale en canales tranquilos: con media de 2 mensajes por ventana, pasar a 9 da z +3 y son tres personas escribiendo, no una reaccion. Se exige ademas reaccion >= reaccion_minima_absoluta (puntuacion ponderada, no numero de mensajes). Subelo en canales grandes, bajalo si un canal pequeno se queda sin clips."
+    "reaccion_minima_absoluta": 8,
+    "_nota_reaccion": "El z-score solo no vale en canales tranquilos: con media de 2 mensajes por ventana, pasar a 9 da z +3 y son tres personas escribiendo, no una reaccion. Se exige ademas reaccion >= reaccion_minima_absoluta (puntuacion ponderada, no numero de mensajes). Subelo en canales grandes, bajalo si un canal pequeno se queda sin clips.",
+    "reaccion_factor": 3.5
   },
   "whisper": {
     "modelo": "large-v3-turbo",
@@ -577,7 +786,9 @@
     "volumen_min_db": -40,
     "negro_max_s": 2,
     "publicar_con_gancho_automatico": true,
-    "gancho_puntuacion_minima": 3
+    "gancho_puntuacion_minima": 3,
+    "logprob_musica": -0.2,
+    "_nota_musica": "Por encima de este valor la transcripcion es sospechosamente limpia y suele ser una cancion sonando, no el streamer. No veta: aparta para revisar. Medido: musica -0.12/-0.07, habla -0.35/-0.44/-0.52."
   },
   "duraciones": {
     "corto": {
@@ -649,20 +860,33 @@
       ],
       "elxokas": [
         "#elxokas",
-        "#elxokas"
+        "#xokas"
       ],
       "agustin51": [
         "#agustin51",
-        "#agustin51"
+        "#agustin"
       ],
       "peereira7": [
         "#peereira7",
-        "#peereira7"
+        "#pereiracastor"
+      ],
+      "zonagemelosoficial": [
+        "#zonagemelos",
+        "#casadelosgemelos"
+      ],
+      "zonagemelosyt": [
+        "#zonagemelos",
+        "#casadelosgemelos"
       ]
     },
     "maximo": 5,
     "_nota": "Exactamente 5, como los canales de clips con traccion: 2 del creador, 2 del contexto de ESE clip y 1 generico. Los de contexto salen de los temas que se nombran en la transcripcion y son los que hacen que te encuentren. Llenarlo de #parati #fyp #clips no descubre a nadie: los pone todo el mundo.",
-    "_nota_etiquetas": "Las etiquetas de contexto salen del campo `etiquetas` de cada canal, no de `temas`: temas incluye verbos que detectan bien el gancho pero como hashtag no los busca nadie."
+    "_nota_etiquetas": "Las etiquetas de contexto salen del campo `etiquetas` de cada canal, no de `temas`: temas incluye verbos que detectan bien el gancho pero como hashtag no los busca nadie.",
+    "generico_por_estilo": {
+      "noticia": "#viral",
+      "complice": "#humor"
+    },
+    "_nota_estilo": "Dos estilos de gancho, ver ESTILO.md. 'noticia' = titular con sujeto, verbo con carga y objeto, para opinion y polemica. 'complice' = cita del streamer mas un parentesis con la coletilla del chat, para humor: es el que se comparte, y compartir es lo que dispara el alcance."
   },
   "cpu": {
     "una_tarea_pesada_a_la_vez": true,
