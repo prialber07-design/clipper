@@ -785,10 +785,11 @@
     "hook_min_chars": 18,
     "volumen_min_db": -40,
     "negro_max_s": 2,
-    "publicar_con_gancho_automatico": true,
+    "publicar_con_gancho_automatico": false,
     "gancho_puntuacion_minima": 3,
     "logprob_musica": -0.2,
-    "_nota_musica": "Por encima de este valor la transcripcion es sospechosamente limpia y suele ser una cancion sonando, no el streamer. No veta: aparta para revisar. Medido: musica -0.12/-0.07, habla -0.35/-0.44/-0.52."
+    "_nota_musica": "Por encima de este valor la transcripcion es sospechosamente limpia y suele ser una cancion sonando, no el streamer. No veta: aparta para revisar. Medido: musica -0.12/-0.07, habla -0.35/-0.44/-0.52.",
+    "_nota_gancho": "El extractor acierta el momento pero no el gancho: elige la mejor frase que alguien dijo, y un titular no es una frase dicha, es una frase escrita. De diez ganchos automaticos medidos, ninguno era publicable. Con esto en false el clip se hace igual y espera en REVISAR a que se le escriba el gancho. Ver ESTILO.md."
   },
   "duraciones": {
     "corto": {
