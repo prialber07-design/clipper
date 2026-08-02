@@ -10,6 +10,84 @@ python servidor.py --canales elcalvolol,lopezfnx
 python servidor.py --estado
 ```
 
+## Estado actual del proyecto — 2 de agosto de 2026, 22:10 CEST
+
+Este apartado es la referencia operativa vigente. Los documentos de
+`docs/plans/` conservan las decisiones de diseño, pero no sustituyen este
+estado real.
+
+### Qué está implementado
+
+- Captura continua de Twitch/Kick, buffer rodante y detección por reacción del
+  chat más energía de audio.
+- Una sola cola de Whisper para todos los canales. En el servidor se usa
+  `small` con `int8` porque no hay GPU disponible para el contenedor.
+- `CLIPPER_RAW_MODO=manual`: cada candidato se recorta sin subtítulos, hook,
+  marca de agua ni recodificación y se detiene como pareja `.mp4` + `.json` en
+  `/app/clips/out/RAW/`.
+- Dashboard autenticado con pestañas `RAW`, `LISTOS` y `REVISAR`, vista previa,
+  logs y acciones **Analizar con Gemini** o **Procesar con Luna**.
+- Luna hace una sola evaluación editorial y devuelve decisión, puntuación,
+  confianza, hook, descripción y 4–6 hashtags. Solo `publicar`, score mínimo
+  80, confianza mínima 0,75 y controles técnicos válidos llegan a `LISTOS`.
+- Render vertical 1080×1920 con subtítulos y hook permanente: TikTok Sans Bold,
+  texto negro sobre caja blanca opaca, centrado aproximadamente al 18% de la
+  altura y con cero, uno o dos emojis opcionales al final.
+- Cada salida genera `.mp4` y `.txt`; el TXT contiene únicamente la descripción,
+  una línea en blanco y los hashtags listos para copiar.
+- `windows-sync/` instala una tarea de Windows cada diez minutos. Descarga solo
+  parejas completas de `LISTOS` directamente a la carpeta elegida, usa DPAPI
+  para la contraseña, temporales `.part`, comprobación de tamaño y nunca borra
+  archivos locales.
+- Logs RAW estructurados y persistentes en
+  `/app/clips/logs/raw-processing.jsonl`; no incluyen prompts, transcripciones,
+  chat, secretos ni respuestas completas.
+
+### Estado real del servidor
+
+- EasyPanel mantiene el volumen persistente en
+  `/etc/easypanel/projects/automatizaciones/clips-alberto/volumes/clips/` y el
+  contenedor lo ve como `/app/clips/`.
+- El CLI del host es `agy 1.1.9`, autenticado con OAuth de Google AI Pro.
+- Se eliminó la aplicación gráfica Antigravity 2.0 junto con XFCE, XRDP y
+  Chrome; no son necesarios para el flujo actual.
+- Se validó que `agy` puede abrir un MP4 real directamente con `view_file`. La
+  prueba sintética identificó correctamente el contenido de ambas mitades en
+  aproximadamente un segundo.
+- Tras limpiar el histórico se conservaron cuatro clips con análisis de
+  identidad v2. Como los vigilantes siguen activos, a las 22:10 había siete
+  RAW: cuatro analizados y tres candidatos nuevos pendientes. No había errores
+  en `_gemini/errors/`.
+- En ese momento no había ningún proceso `agy` vivo: la tarea creada con
+  `Schedule` dentro de Antigravity es local a esa sesión y desaparece al cerrar
+  o reiniciar el CLI. Por tanto, **el análisis temporal no está ejecutándose
+  automáticamente ahora mismo**.
+
+### Dos rutas Gemini distintas
+
+1. **Integración de Clipper**: `POST /api/raw/process` con `mode=gemini` encola
+   `MP4 → Antigravity → Luna → render → LISTOS/REVISAR`. El código valida cuota,
+   OAuth, JSON, timeout de 120 s y errores, pero esta ruta no está operativa en
+   producción porque el `agy` autenticado vive en el host y no dentro del
+   contenedor.
+2. **Validación temporal del host**: una tarea interactiva de `agy` lee como
+   máximo tres MP4 por ejecución desde el volumen RAW y escribe
+   `_gemini/<id>.json`. El esquema v2 exige descripción temporal, personas,
+   identidad solo con evidencia contextual y al menos dos URLs independientes,
+   rol, texto visible, lugar, momento clave, hechos editoriales y advertencias.
+
+Los JSON de `_gemini/` son actualmente resultados de validación: `raw.py` no
+los busca ni los entrega a Luna. No debe afirmarse que Gemini está enriqueciendo
+automáticamente los renders hasta conectar explícitamente ese directorio con el
+procesador RAW o hacer operativa la integración dentro del contenedor.
+
+### Próximo paso bloqueante
+
+Hacer persistente una sola ejecución de `agy` sin depender de `Schedule` dentro
+de una sesión interactiva y conectar cada JSON v2 validado con la llamada única
+a Luna. Hasta verificarlo con logs reales, `CLIPPER_RAW_MODO` debe seguir en
+`manual` y `gemini_auto` no debe activarse.
+
 ## Qué hardware hace falta de verdad
 
 Lo que manda es la **transcripción**, no la captura.
@@ -20,9 +98,9 @@ Lo que manda es la **transcripción**, no la captura.
 | Disco (buffer 15 min) | ~1 GB | ~10 GB rodando |
 | RAM | ~300 MB | ~3 GB + 2–4 GB del modelo |
 
-**Transcripción de una ventana de 90 s** con `large-v3-turbo`:
+**Transcripción de una ventana de 90 s**:
 
-- GPU NVIDIA (lo que tienes ahora): ~15 s
+- GPU NVIDIA con `large-v3-turbo`: ~15 s
 - CPU 8 núcleos: ~90–150 s
 - CPU 4 núcleos: no llega; se encolan los picos
 
@@ -247,31 +325,32 @@ tail -f /ruta-del-volumen/clips/logs/raw-processing.jsonl
 find /ruta-del-volumen/clips/out/RAW -maxdepth 1 -type f -printf '%f\n'
 ```
 
-### Antigravity (opcional)
+### Antigravity: integración prevista y prueba temporal
 
-El análisis visual usa el CLI oficial de Antigravity en modo no interactivo,
-con `Gemini 3.5 Flash (Low)`, un candidato MP4 exacto y un timeout de 120 s.
-Clipper valida el JSON y, ante cualquier fallo, deja el manifiesto en
-`error_gemini` sin llamar a Luna ni renderizar. No se usa
+`antigravity.py` implementa la ruta integrada: copia un único candidato a un
+workspace estable, ejecuta `agy -p` con `Gemini 3.5 Flash (Low)`, limita la
+salida a 48 KB, aplica un timeout de 120 s, mata el grupo de procesos en timeout
+y valida estrictamente el JSON antes de enviarlo como contexto no confiable a
+Luna. También elimina secretos del entorno, serializa las ejecuciones y no usa
 `--dangerously-skip-permissions`.
 
-Instala `agy` siguiendo su instalador oficial, completa OAuth manualmente y
-activa después el botón de Gemini en RAW. En el perfil de Antigravity deja
-los overages desactivados y confirma explícitamente `useG1Credits: false` antes
-de usarlo; si la clave no se puede confirmar, Clipper no realiza la llamada.
-No pongas
-tokens ni credenciales en el repositorio ni en variables que se copien al
-proceso.
+Antes de invocar el CLI exige poder confirmar `useG1Credits=false`; si la
+configuración es desconocida o permite créditos adicionales, falla de forma
+segura. OAuth, confianza del workspace y ajustes deben permanecer en el perfil
+privado del usuario y nunca en el repositorio, variables copiadas al proceso o
+logs.
 
-Las imágenes Docker instalan el binario oficial en `/usr/local/bin/agy` y usan
-`/app/clips/antigravity` como `HOME`, dentro del volumen persistente. El
-workspace exacto que usa Clipper es `/app/clips/antigravity-workspace`. Tras un
-build nuevo, abre la terminal del contenedor, cambia a esa ruta y completa allí
-el OAuth y la confianza de workspace; después verifica la configuración efectiva
-antes de pulsar Gemini. Clipper solo limpia `candidate.mp4` y sus salidas
-temporales, nunca la configuración ni la confianza. La variable
-`CLIPPER_RAW_MODO` debe permanecer en `manual`; el binario del host instalado por
-SSH no está dentro del contenedor que ya está ejecutándose.
+Esta integración directa todavía no está operativa en el despliegue actual. El
+OAuth funcional pertenece al `agy 1.1.9` instalado en `/home/fable5/.local/bin`
+del host, mientras Clipper se ejecuta dentro de Docker. El experimento funcional
+es la tarea temporal descrita al principio de este documento, que escribe JSON
+v2 en `/app/clips/out/RAW/_gemini/`; esos archivos aún no son consumidos por
+`raw.py`.
+
+No reinstalar Antigravity 2.0, un escritorio, XFCE, XRDP ni navegador en el
+servidor: el CLI ya demostró que puede inspeccionar MP4. No activar
+`gemini_auto` hasta que exista una ejecución persistente, se conecte el resultado
+v2 con Luna y se verifique el recorrido completo mediante logs.
 
 Los canales se eligen en `config.json`, o al arrancar:
 `command: python servidor.py --canales elcalvolol,lopezfnx`
