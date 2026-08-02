@@ -772,8 +772,9 @@
     "ventana_antes_largo_s": 115,
     "ventana_antes_corto_s": 30,
     "reaccion_minima_absoluta": 8,
-    "_nota_reaccion": "El z-score solo no vale en canales tranquilos: con media de 2 mensajes por ventana, pasar a 9 da z +3 y son tres personas escribiendo, no una reaccion. Se exige ademas reaccion >= reaccion_minima_absoluta (puntuacion ponderada, no numero de mensajes). Subelo en canales grandes, bajalo si un canal pequeno se queda sin clips.",
-    "reaccion_factor": 3.5
+    "_nota_reaccion": "El minimo de mensajes se calcula sobre la linea base del canal, pero con tope: pasado cierto volumen, ese minimo ya no evita nada (solo estaba para que tres personas escribiendo no parecieran una reaccion) y lo unico que hace es tapar subidas reales. A partir del tope decide el z-score.",
+    "reaccion_factor": 3.5,
+    "reaccion_minima_tope": 40
   },
   "whisper": {
     "modelo": "large-v3-turbo",

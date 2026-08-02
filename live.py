@@ -256,13 +256,23 @@ def minimo_reaccion(historial) -> int:
     para que tres personas escribiendo a la vez no cuenten como reaccion. Se
     reajusta solo segun el tipo de directo: en una partida el chat baja y el
     liston baja con el; en una charla sube y el liston sube.
+
+    Pero ese multiplo tiene tope, y hace falta. Con Peereira en directo (mediana
+    46) el liston se ponia en 161 y una subida clarisima de 80 mensajes con
+    z +2,6 no disparaba: el suelo habia dejado de ser un suelo y se habia
+    convertido en un techo. Lo que ese minimo evita es que tres personas
+    escribiendo parezcan una reaccion, y eso deja de ser un riesgo en cuanto el
+    canal mueve volumen. A partir de ahi quien decide es el z-score, que para
+    eso mide la subida contra la variacion normal del propio canal.
     """
     piso = int(LIVE.get("reaccion_minima_absoluta", 8))
     if len(historial) < 8:
         return piso
     orden = sorted(historial)
     mediana = orden[len(orden) // 2]
-    return max(piso, int(round(LIVE.get("reaccion_factor", 3.5) * mediana)))
+    escalado = LIVE.get("reaccion_factor", 3.5) * mediana
+    tope = int(LIVE.get("reaccion_minima_tope", 40))
+    return max(piso, min(int(round(escalado)), tope))
 
 
 def zscore(valor: float, historial) -> float:
