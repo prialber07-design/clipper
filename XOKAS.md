@@ -150,6 +150,33 @@ minimo = max(8, 3,5 x mediana de los últimos 40 tramos)
 
 Se reajusta solo: si se pone a charlar y el chat se anima, el listón sube con él.
 
+## Lo que dio una tarde entera vigilándole (2 de agosto)
+
+**16 clips detectados, 2 publicables.** Un 12 %, contra el 24 % de media del
+resto de canales. Y los dos que valieron no eran de la partida:
+
+| Publicado | De qué iba |
+|---|---|
+| *Le arruinan las partidas solo para verle la cara* | se enfada con los que le grifean, y habla de **quitarse la cámara** |
+| *Alucina con lo que se ha tatuado un uruguayo* | **reacciona a algo de fuera**: un tuit |
+
+De los 14 descartados, **9 eran comentario de partida en crudo**: jerga de LoL
+(*ganqueo*, *remake*, *stackear corazones*) que no se entiende fuera del juego.
+
+Y hay un problema mayor: **tres de esos descartes llevaban insultos
+capacitistas** (*retrasado*, *subnormal*) dichos a compañeros de partida, y uno
+un comentario racial. Eso no se publica ni recortado, y no es casual: le sale
+cuando pierde, que es justo cuando el detector salta.
+
+**Conclusión operativa:** mientras esté en SoloQ, casi todo lo que detecte va a
+ser inservible. No merece la pena revisar sus picos uno a uno durante una sesión
+de LoL. Lo que sí merece la pena es estar atento a cuando **para de jugar y
+reacciona a algo** — un tuit, una noticia, una polémica: ahí es donde salen sus
+clips buenos, y el mejor del día salió exactamente así.
+
+Con él, además, **hay que leer la transcripción entera antes de cortar**. No
+vale fiarse de que el pico marque un buen momento.
+
 ## En resumen, cómo hay que trabajarle
 
 - Dejar el vigilante puesto y **fiarse del detector de audio**, no del de chat.
