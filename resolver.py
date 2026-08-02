@@ -16,6 +16,10 @@ import urllib.request
 
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
+# Momento de la ultima peticion a Twitch, para no ir en rafaga. En lista porque
+# se toca desde dentro de la funcion.
+_DESDE_ULTIMA = [0.0]
+
 
 def variantes(nombre: str):
     base = nombre.lower().strip()
@@ -59,8 +63,17 @@ def twitch(slug: str):
     # Twitch falla de vez en cuando y devuelve HTML sin <title>. Un falso
     # "no existe" es el peor error posible aqui: el canal se queda sin vigilar
     # y nadie se entera. Por eso se insiste con espera creciente.
+    # Twitch limita por rafaga: comprobando quince canales seguidos, cinco
+    # dieron "no existe" y todos resolvieron bien al repetirlos espaciados. Un
+    # falso negativo aqui deja el canal sin vigilar sin que nadie se entere, asi
+    # que se separan las peticiones aunque el barrido tarde algo mas.
+    espera = _DESDE_ULTIMA[0] + 1.2 - time.monotonic()
+    if espera > 0:
+        time.sleep(espera)
+
     html = ""
     for intento in range(5):
+        _DESDE_ULTIMA[0] = time.monotonic()
         req = urllib.request.Request(f"https://www.twitch.tv/{slug}", headers=UA)
         try:
             with urllib.request.urlopen(req, timeout=25) as r:
