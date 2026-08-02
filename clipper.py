@@ -372,7 +372,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     if hook and not hook.startswith("ESCRIBE"):
         # Capitalizacion de titulo, no mayusculas: el todo-alta grita, y el
         # titulo se lee como una noticia. Es lo que hacen los canales de clips.
-        txt = _partir_hook(_titulo(hook) if rc.get("hook_titulo", True) else hook.upper())
+        #
+        # Salvo en estilo complice, donde el gancho es la cita del streamer mas
+        # la coletilla del que clipea y va en minusculas A PROPOSITO: es lo que
+        # hace que suene a chat y no a periodico. Ponerle mayusculas de titulo
+        # a "¿estamos en nuestro declive como influencers? (si)" le quita
+        # justo la gracia. Ver ESTILO.md.
+        if clip.get("estilo_gancho") == "complice":
+            txt = _partir_hook(hook)
+        else:
+            txt = _partir_hook(_titulo(hook) if rc.get("hook_titulo", True) else hook.upper())
         lineas_hook = txt.count(r"\N") + 1
         # Persistente: el gancho es lo que sostiene la retencion, no solo el arranque.
         fin_hook = (end - start) if rc.get("hook_persistente") else rc["hook_duracion_s"]

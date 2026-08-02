@@ -48,6 +48,12 @@ def resolver(slug: str, gancho: str, descripcion: str = "", etiquetas=None):
     clip["hook_auto"] = False
     canal = re.split(r"-\d{6}$", slug)[0]
 
+    # El estilo viaja con el clip para que el render sepa si debe respetar las
+    # minusculas del gancho (complice) o ponerle mayusculas de titulo (noticia).
+    ficha = next((c for c in clipper.CONFIG.get("canales", [])
+                  if c.get("canal") == canal), {})
+    clip["estilo_gancho"] = ficha.get("estilo_gancho", "noticia")
+
     # Los hashtags de contexto salen de lo que se dice en el clip, no del canal.
     tr = clipper.WORK / slug / "transcript.txt"
     texto = tr.read_text(encoding="utf-8") if tr.exists() else ""
