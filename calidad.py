@@ -140,42 +140,31 @@ def evaluar(mp4: Path, clip: dict, segmentos: list,
     if negro > q.get("negro_max_s", 2.0):
         fallos.append(f"{negro:.1f}s de pantalla en negro")
 
-    if aviso := _quiza_musica(dentro):
-        fallos.append(aviso)
-
     return (not fallos), fallos
 
 
-def _quiza_musica(dentro: list) -> str:
-    """Avisa si lo transcrito parece una cancion sonando, no el streamer.
-
-    Publicar musica con copyright hace que Content ID silencie o desmonetice el
-    clip, asi que hay que mirarlo antes. Ya ha pasado dos veces: un tema de rap
-    en Elxokas y un reggaeton en LopezFNX, los dos transcritos como si fueran
-    dialogo.
-
-    La pista es contraintuitiva: la musica se transcribe MEJOR que el habla.
-    Es audio de estudio, voz limpia y sin ruido, mientras que un streamer hablando
-    en la calle o sobre una partida sale sucio. Medido sobre cinco clips:
-
-        musica   -0,121  -0,067
-        habla    -0,352  -0,435  -0,519
-
-    Con cinco muestras no da para vetar nada: un falso positivo tiraria un clip
-    bueno sin que nadie se entere, que es justo el fallo que no queremos. Asi
-    que esto solo aparta el clip para que alguien lo mire, y el umbral se queda
-    pegado al grupo de la musica, no en mitad del hueco.
-    """
-    umbral = CONFIG.get("calidad", {}).get("logprob_musica", -0.20)
-    conf = [s["logprob"] for s in dentro if s.get("logprob") is not None]
-    if len(conf) < 2:
-        return ""          # los transcripts viejos no lo traen
-    media = sum(conf) / len(conf)
-    if media > umbral:
-        return (f"puede ser musica sonando, no el streamer "
-                f"(confianza {media:.2f}, habla suele estar bajo {umbral:.2f}) "
-                f"- comprueba el audio antes de publicar")
-    return ""
+# Detectar musica de fondo sigue pendiente, y conviene: publicar una cancion con
+# copyright hace que Content ID silencie o desmonetice el clip. Ya ha pasado dos
+# veces (un rap en Elxokas, un reggaeton en LopezFNX, los dos transcritos como
+# si fueran dialogo).
+#
+# Dos intentos fallidos, para no repetirlos:
+#
+# 1. Proporcion de silencio. El habla tiene huecos entre frases y la musica no.
+#    No separa: clips de El Calvo que son dialogo puro dan 0 % de silencio
+#    (graba en la calle, con ruido de fondo continuo) y la musica daba 18,7 %.
+#
+# 2. avg_logprob de Whisper. La musica se transcribe mejor que el habla, y sobre
+#    cinco muestras parecia limpio (musica -0,12/-0,07 frente a habla
+#    -0,35/-0,44/-0,52). Pero lo que mide es la LIMPIEZA DEL AUDIO, no si hay
+#    musica: Elxokas, con buen micro en una sala silenciosa, sale a -0,138 y lo
+#    marcaba como cancion siendo el hablando. Confundido con la calidad de
+#    grabacion del canal, asi que dispararia en todos los que graban bien.
+#
+# Lo que si queda es que transcript.json guarda ahora logprob por segmento: no
+# cuesta nada y hace falta para medir cualquier intento futuro. Un tercer intento
+# tendria que mirar el audio en si (periodicidad del ritmo, o separar voz de
+# acompanamiento), no el texto ni la confianza.
 
 
 def apartar(mp4: Path, motivos: list[str], meta: dict) -> Path:
