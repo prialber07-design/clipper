@@ -525,7 +525,7 @@
       "nombre": "Agustin51",
       "plataforma": "twitch",
       "canal": "agustin51",
-      "layout": "reaccion",
+      "layout": "completo",
       "permiso_clips": "PENDIENTE",
       "verificado": true,
       "seguidores": null,
@@ -543,10 +543,12 @@
         "polemica"
       ],
       "etiquetas": [
+        "fortnite",
         "xokas",
-        "argentina",
-        "twitchespañol",
-        "gaming"
+        "cs2",
+        "valorant",
+        "gaming",
+        "twitchespañol"
       ],
       "fuente": "Pedido por el usuario, existencia verificada en twitch.tv",
       "estilo_gancho": "complice",
