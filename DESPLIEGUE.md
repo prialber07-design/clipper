@@ -13,7 +13,7 @@ Sirve para tres cosas:
 Al final hay un anexo con las recetas de despliegue. Ese anexo es material de
 consulta, no el contenido principal.
 
-**Última actualización del código: 2 de agosto de 2026, 22:25 CEST.**
+**Última actualización del código: 3 de agosto de 2026, 01:15 CEST.**
 **Última verificación del servidor: 2 de agosto de 2026, 22:10 CEST.**
 Si hoy es una fecha muy posterior, trata la sección "Estado real del servidor"
 como caducada y verifícala con los comandos del apartado "Cómo comprobar el
@@ -83,7 +83,17 @@ Esto está implementado y verificado en el servidor.
   transcripciones, chat, secretos ni respuestas completas.
 - Limpieza automática a siete días, que expira también trabajos, logs,
   contadores e índices antiguos. El buffer se poda incluso mientras hay una
-  transcripción o un render en curso.
+  transcripción o un render en curso. **`RAW` es la excepción**: ahí solo
+  caduca lo que tiene `status: completado`. Un candidato pendiente o con error
+  se conserva indefinidamente, porque es material que todavía no ha dado clip.
+- Transcripción y render comparten un único cerrojo (`clipper.CPU_LOCK`), que
+  respeta `cpu.una_tarea_pesada_a_la_vez` de `config.json`. Con GPU, pon esa
+  clave en `false` y dejarán de ir en fila.
+- La ventana de captura se concatena sin recodificar. No metas un `libx264` de
+  vuelta en `montar_ventana`: los `.ts` ya vienen en H.264 y el recorte RAW
+  posterior también copia.
+- El adjunto de vídeo de ntfy está desactivado a propósito: con el límite de 2
+  MB del ntfy anónimo nunca llegaba a enviarse. El aviso viaja con el enlace.
 
 ## Qué NO funciona todavía
 
@@ -155,7 +165,7 @@ Para saber dónde tocar sin leerlo todo.
 | `web.py` | Galería autenticada; RAW informa estado sin acciones manuales |
 | `notify.py` | Bandeja `LISTOS` y aviso a ntfy |
 | `kick.py` | Chat de Kick por WebSocket nativo, sin Playwright |
-| `bloqueo.py` | Cerrojo entre procesos para que no haya dos transcripciones a la vez |
+| `bloqueo.py` | Cerrojo entre procesos: una sola tarea pesada a la vez, transcripción o render |
 | `resolver.py` | Resuelve plataforma y existencia de cada canal |
 | `clipper.py` | Flujo v1 sobre VOD, de URL a clip vertical |
 | `publicar_todo.py` | Pasa a bandeja todo lo que haya en `REVISAR` |
@@ -196,9 +206,10 @@ Antes de seguir cualquiera de estas recetas al pie de la letra:
   `LISTOS`.
 - La lista de variables de EasyPanel y la tabla de `.env` no coinciden. La
   tabla es la más completa.
-- No está documentado si `CLIPPER_MODELO` y `CLIPPER_COMPUTE` ganan a
-  `whisper.modelo` y `whisper.compute_type` de `config.json`. Ambos están hoy
-  en `small` e `int8`, así que en la práctica no hay conflicto.
+- Precedencia resuelta: **el entorno gana a `config.json`**. `_aplicar_entorno`
+  en `clipper.py` pisa el fichero con `CLIPPER_MODELO`, `CLIPPER_COMPUTE`,
+  `CLIPPER_MARCA`, `CLIPPER_NTFY_TOPIC` y las demás de esa lista, tanto al
+  arrancar como en cada recarga de configuración.
 - La tarea programada de la Opción A usa `AtStartup` sin `-LogonType S4U` ni
   credenciales guardadas, y pasa `0` a `-ExecutionTimeLimit`, que espera un
   `TimeSpan`. Pruébala antes de confiar en ella.
