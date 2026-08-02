@@ -146,7 +146,32 @@ def evaluar(mp4: Path, clip: dict, segmentos: list,
     if negro > q.get("negro_max_s", 2.0):
         fallos.append(f"{negro:.1f}s de pantalla en negro")
 
+    if marcado := _lenguaje_marcado(dentro):
+        fallos.append(marcado)
+
     return (not fallos), fallos
+
+
+# Insultos que hunden un clip en las plataformas: capacitistas y raciales. No es
+# una lista de tacos (esos son parte del registro y no pasa nada); son palabras
+# que TikTok y YouTube penalizan como discurso de odio, y un clip asi puede
+# costar el canal entero.
+#
+# En una tarde salieron en tres canales distintos, siempre igual: al streamer se
+# le escapan cuando pierde o se calienta, que es justo cuando el detector salta.
+RE_MARCADO = re.compile(
+    r"\b(retrasad[oa]s?|subnormal(es)?|mongol[oi]c?[oa]s?|"
+    r"panchit[oa]s?|sudac[ao]s?|moro de mierda|negrata)\b", re.IGNORECASE)
+
+
+def _lenguaje_marcado(dentro: list) -> str:
+    """Avisa si en el corte se dice algo que hunde el clip en las plataformas."""
+    texto = " ".join(s.get("text", "") for s in dentro)
+    encontrados = {m.group(0).lower() for m in RE_MARCADO.finditer(texto)}
+    if not encontrados:
+        return ""
+    return (f"lenguaje que penalizan las plataformas ({', '.join(sorted(encontrados))}): "
+            f"busca otro corte o descarta el clip")
 
 
 # Detectar musica de fondo sigue pendiente, y conviene: publicar una cancion con
