@@ -23,6 +23,37 @@ por dos audiencias.
 
 ---
 
+## A quién estamos clipeando de verdad (2 de agosto de 2026)
+
+Repasando los 32 clips publicados, el reparto no se parece en nada al tamaño de
+las audiencias:
+
+| Canal | Seguidores | Clips publicados |
+|---|---|---|
+| **Davoo Xeneize** | **2.031.801** | **0** |
+| **La Cobra** | **1.832.913** | **0** |
+| **RDJavi** | **969.536** | **0** |
+| Zona Gemelos (Kick) | 192.370 | 0 |
+| Rey de la City | 159.477 | **14** |
+| El Calvo | 66.075 | **10** |
+
+**24 de 32 clips (75 %) son de los dos creadores más pequeños**, y los tres
+millonarios no tienen ni uno. El canal de clips que estudiamos hace lo
+contrario: 13 de sus 18 publicaciones son de Xokas.
+
+No es un fallo del sistema: se comprobó canal por canal y los grandes estaban
+realmente offline. El motivo es el **horario**. Davoo, La Cobra y RDJavi son
+argentinos y emiten de madrugada hora española, justo cuando no hay nadie
+revisando ganchos. Rey de la City y El Calvo emiten a todas horas, así que
+copan la cola.
+
+**Qué hacer con esto:** cuando uno de los grandes esté en directo, sus clips van
+primero aunque haya cola de otros. Un clip de Davoo tiene trece veces más
+audiencia potencial que uno de Rey de la City, y el esfuerzo de escribir el
+gancho es el mismo.
+
+---
+
 ## Twitch
 
 ### El Calvo (`elcalvolol`) · 66.075 seguidores
