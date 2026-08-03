@@ -472,8 +472,11 @@ def _render_and_publish(manifest: dict, mp4: Path, hook: str, llm: dict) -> dict
             "layout": None,
             "source_path": str(mp4),
         })()
+        # Prioritario: un render termina un clip, mientras que una
+        # transcripcion mas solo alarga la cola. Sin esto, con diez canales
+        # transcribiendo el render no consigue el turno nunca.
         with bloqueo.exclusivo_si(clipper.serializar_cpu(), clipper.CPU_LOCK,
-                                  etiqueta="render RAW"):
+                                  etiqueta="render RAW", prioritario=True):
             clipper.cmd_render(args)
         if not salida.exists():
             raise RawError("render sin archivo de salida")

@@ -181,6 +181,41 @@ class CerrojoCpuTests(unittest.TestCase):
         with patch.dict(clipper.CONFIG, {"cpu": {}}):
             self.assertTrue(clipper.serializar_cpu())
 
+    def test_el_render_deja_marca_de_prioridad_mientras_espera(self):
+        """Sin esto el render se quedaba 16 minutos sin conseguir turno."""
+        marca = bloqueo._marca_prioridad(self.ruta)
+        with bloqueo.exclusivo(self.ruta, prioritario=True):
+            self.assertFalse(marca.exists(),
+                             "con el turno ya en la mano, la marca debe levantarse")
+        self.assertFalse(marca.exists())
+
+    def test_una_marca_fresca_hace_ceder_el_turno(self):
+        marca = bloqueo._marca_prioridad(self.ruta)
+        marca.parent.mkdir(parents=True, exist_ok=True)
+        marca.touch()
+        self.assertTrue(bloqueo._hay_prioridad(self.ruta))
+
+    def test_una_marca_caducada_se_ignora(self):
+        """Si el proceso prioritario muere, nadie puede quedarse esperandolo."""
+        marca = bloqueo._marca_prioridad(self.ruta)
+        marca.parent.mkdir(parents=True, exist_ok=True)
+        marca.touch()
+        viejo = time.time() - bloqueo.PRIORIDAD_MAX_S - 60
+        os.utime(marca, (viejo, viejo))
+        self.assertFalse(bloqueo._hay_prioridad(self.ruta))
+        # Y el turno se consigue igualmente, sin quedarse colgado.
+        with bloqueo.exclusivo(self.ruta, etiqueta="normal"):
+            pass
+
+    def test_sin_marca_no_hay_prioridad(self):
+        self.assertFalse(bloqueo._hay_prioridad(self.ruta))
+
+    def test_el_render_pide_prioridad(self):
+        """Guarda contra quitarla sin darse cuenta."""
+        fuente = (clipper.ROOT / "raw.py").read_text(encoding="utf-8")
+        self.assertIn("prioritario=True", fuente,
+                      "el render debe pedir prioridad sobre las transcripciones")
+
     def test_transcripcion_y_render_usan_el_mismo_cerrojo(self):
         """Guarda contra volver a separarlos: es el bug que se arreglo."""
         fuentes = {
