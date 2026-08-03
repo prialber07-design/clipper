@@ -209,56 +209,50 @@ Igual: máximo 1.580 visitas. `ah!` · `yo flipo tio` · `Se cae yony pobrecito`
 
 ---
 
-## Qué están haciendo ahora (revisado 2026-08-01)
+## Qué están haciendo ahora (revisado 2026-08-03)
 
 Esto caduca rápido: revisar cada pocas semanas.
 
-**Los cuatro de Twitch están en el mismo circuito.** Tour IRL por España, La
-Velada del Año en Sevilla (ya pasada, "post Velada") y festivales de verano
-(Arenal Sound, Share Festival). Se cruzan constantemente: El Calvo y Lopezfnx
-coinciden en el Share Festival de Barcelona, Franbeuve y El Calvo van juntos
-a la Velada, y Lopezfnx+Iratxe se cruzan también con El Calvo ("Iratxe y
-López", 2.121 vistas en el canal de El Calvo).
+**Los cuatro de Twitch siguen cruzándose entre sí**, y ahora también con
+canales de Kick: José Nogales clipeó *"sobre pereira"* (Peereira7) y
+Agustín51 volvió a streamear con Peereira7 tras una "ruptura" — primer indicio
+de puente entre el universo Twitch-IRL y el universo Kick-gaming de la lista.
 
-- **El Calvo** — Tour IRL España (Andalucía, Sevilla, Valencia, Cataluña) y
-  ahora post-Velada en Arenal Sound con artistas (Juseph, Omar Montes,
-  Danirep) y Paula Monnet. **Nuevo running gag: Toni.** Se le cae el
-  invisalign, le tiran un huevo, "Doble Huevazo a Toni" — tres clips
-  distintos en el último mes. También un meme suelto: clips titulados
-  simplemente *"67"* (dos veces). Directos de 4–6 h.
-- **Lopezfnx** — Sigue siendo todo con **Iratxe**: IRL Barcelona, anuncio de
-  una serie juntos. Top clips del mes: *"SEMICUCHARITA DE IRATXE"* (32.610),
-  *"Iratxe enamorada?"* (15.267). Sin cambios de fondo.
-- **Franbeuve** — Vuelta tras la Velada, día 2–3 en su pueblo (moto
-  eléctrica, FIFA, OmeTV), luego "short stream" de vuelta. Clips nuevos con
-  algo de tracción: *"cama"* (573), *"como se cae"* (397). Volumen bajo en
-  general (mejor clip del mes: 720 vistas).
-- **José Nogales** — Sigue en el reality (*La casa del gemelo*), directos
-  cortos e irregulares de madrugada, más un DJ set en Cádiz/Magaluf. **Nuevo
-  nombre recurrente: Aitana** — *"aitana"* (746) y *"aitana y jose"* (420),
-  ambos hace 21 días. Confirma lo ya sabido: el looksmaxxing es su discurso,
-  pero su comunidad sigue clipeando lo social (*"liada historica"*, *"el
-  trio"*, *"cadera de muñeka"*).
+- **El Calvo** — Sigue en gira: tras el tour por Andalucía llegó a
+  **Arenal Sound**, y el lineup de artistas se ha renovado día a día —
+  Juseph/Omar Montes/Danirep dieron paso a **Juan Magán, RVFV y JC Reyes**
+  (día 4), siempre con Paula Monnet. Se añaden esos tres nombres a temas.
+  El running gag de **Toni** sigue vivo (*"a toni se le cae el invisalain"*,
+  *"Doble Huevazo a Toni"*). Nuevo: parada en **Cantabria** y un clip de
+  *"Salto al rio"* (449 vistas) — la gira sigue moviéndose de ciudad. Se
+  retiran de temas `colar`/`expulsan`/`denuncia` (la denuncia de Ibai fue un
+  episodio puntual del tour por Andalucía, ya sin tracción nueva) y
+  `myke towers`/`artista` (sin señal este mes) para dejar sitio.
+- **Lopezfnx** — Sigue con **Iratxe** como motor (*"SEMICUCHARITA DE
+  IRATXE"*, 33.382 vistas; *"Iratxe enamorada?"*, 15.875), pero **cambio de
+  formato en marcha**: los dos últimos directos son *"5 DÍAS POR LAS ISLAS
+  GRIEGAS"* (Naxos, día 1 y 2) — salen de la rutina de IRL Barcelona hacia un
+  viaje. Aún sin clips de ese viaje (es de hace 1-2 días), pero se añaden
+  `grecia`/`naxos` a temas para no perder el arranque. Se retira `share`
+  (Share Festival ya no aparece en nada del último mes).
+- **Franbeuve** — Sigue cruzando con El Calvo (*"beuve critica a toni"*,
+  nuevo). Directos muestran un plan con Paula Monnet y un tatuador
+  (*"CITA PAULA x TATOME TATU"*) y una broma a su hermano. Se añaden
+  `toni`, `paula`, `tatuaje`, `hermano`, `tenerife` (mencionado como posible
+  próximo destino) y `chancla` (clip nuevo).
+- **José Nogales** — Sigue en el reality y con **Aitana** como nombre
+  recurrente, ya confirmado. Nuevo: mención cruzada a **Peereira7**
+  (*"sobre pereira"*, 739 vistas) — se añade `pereira` a temas. Directos
+  irregulares de madrugada, sin cambio de formato.
 
-**Kick, último mes:**
-
-- **La Cobra** — Sigue viviendo del **fútbol** (Mundial 2026 llegando a su
-  fin): *"tercer gol"*, *"GOLAZO CABO VERDE"*, *"GOL DE ENZO FERNANDEZ
-  ARGENTINA VS INGLATERRA"*. Sin cambios.
-- **Davoo** — Cerró su etapa en España (*"ULTIMO STREAM EN SEVILLA"*) y
-  volvió a Just Chatting habitual. Sin temas nuevos con tracción suficiente
-  para añadir (vistas del último mes muy bajas, 200–420).
-- **RdJavi** — Sigue en **GTA V**, pero el volumen de clips del último mes es
-  bajo (máx. 580 vistas) y sin títulos con señal clara. Sin cambios.
-- **Rey de la city** — Sin señal aprovechable, como siempre (*"gg"*, *"ssss"*,
-  *"TYTY"*).
-- **Mario Taxi** — **No está dormido**: varios directos largos recientes
-  (hasta 11,9 h) con VTC de noche y, en varias sesiones, "noche de Visage"
-  (juego de terror) tras acabar las carreras. Formato mixto taxi+terror
-  nocturno; se añade `visage` a temas. Sus clips de Twitch no se han podido
-  recoger todavía (los pinta JS y quedó fuera del muestreo de esta semana).
-- **Viviendo en la calle** — Confirmado sin clips en el último mes. Sigue
-  dormido.
+**Kick, último mes:** sin cambios en ninguno de los seis. Se revisaron clips
+y directos de Davoo, La Cobra, RdJavi, Rey de la City, Mario Taxi y Viviendo
+en la Calle: todo lo que aparece (fútbol/Mundial en Davoo y La Cobra, GTA en
+RdJavi, VTC+Visage en Mario Taxi) ya estaba cubierto en `temas`. Los tres
+grandes (Davoo, La Cobra, RdJavi) siguen con volumen de clips del último mes
+muy bajo (200-600 vistas) frente a sus históricos de cientos de miles — sigue
+siendo un tema de horario, no de contenido (ver más abajo). Mario Taxi y
+Viviendo en la Calle, activos y dormido respectivamente, sin cambios.
 
 ---
 
