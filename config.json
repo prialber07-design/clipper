@@ -11,16 +11,7 @@
                         "permiso_clips":  "PENDIENTE",
                         "layout":  "reaccion"
                     },
-                    {
-                        "nombre":  "La Cobra",
-                        "plataforma":  "kick",
-                        "canal":  "lacobraaa",
-                        "seguidores":  1830408,
-                        "verificado":  true,
-                        "detector":  "reaccion",
-                        "permiso_clips":  "PENDIENTE",
-                        "layout":  "reaccion"
-                    },
+                    
                     {
                         "nombre":  "RdJavi",
                         "plataforma":  "kick",
@@ -31,16 +22,7 @@
                         "permiso_clips":  "PENDIENTE",
                         "layout":  "reaccion"
                     },
-                    {
-                        "nombre":  "Rey de la city",
-                        "plataforma":  "kick",
-                        "canal":  "reydelacity",
-                        "seguidores":  158772,
-                        "verificado":  true,
-                        "detector":  "reaccion",
-                        "permiso_clips":  "PENDIENTE",
-                        "layout":  "irl"
-                    },
+                    
                     {
                         "nombre":  "Lopezfnx",
                         "plataforma":  "twitch",
@@ -67,28 +49,6 @@
                                        "sub_max_hold_s":  0.4
                                    },
                         "_nota_render":  "sin subtitulos mientras nadie habla: el bloque se corta si hay mas de 0.6s de pausa y ninguna palabra se sostiene mas de 0.4s tras pronunciarse"
-                    },
-                    {
-                        "nombre":  "Franbuve",
-                        "plataforma":  "twitch",
-                        "canal":  "franbeuve",
-                        "verificado":  true,
-                        "detector":  "reaccion",
-                        "permiso_clips":  "PENDIENTE",
-                        "seguidores":  null,
-                        "fuente":  "URL facilitada por el usuario, existencia verificada en twitch.tv",
-                        "layout":  "reaccion"
-                    },
-                    {
-                        "nombre":  "Jose Nogales",
-                        "plataforma":  "twitch",
-                        "canal":  "josenogales1",
-                        "verificado":  true,
-                        "detector":  "reaccion",
-                        "permiso_clips":  "PENDIENTE",
-                        "seguidores":  null,
-                        "fuente":  "URL facilitada por el usuario, existencia verificada en twitch.tv",
-                        "layout":  "reaccion"
                     }
                 ],
     "render":  {
