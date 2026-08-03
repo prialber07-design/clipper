@@ -567,6 +567,43 @@ def get_whisper_model(modelo_name, device, compute_type):
     return _MODELO_CACHE[key]
 
 
+def _transcribir(model, audio: Path, wcfg: dict, opciones: dict):
+    """Transcribe por lotes o de una, segun 'batch_size' en config.json.
+
+    El procesado por lotes promete de 2x a 4x en CPU, pero arrastra dos
+    problemas que pegan justo donde duele en este proyecto:
+
+    1. BatchedInferencePipeline tiene bugs conocidos de timestamps, tanto de
+       segmento como de palabra (faster-whisper#919: un audio de 3 segundos
+       devolvia start=18.71). Aqui los subtitulos van quemados y sincronizados
+       palabra a palabra, asi que un desfase se ve en pantalla y no hay forma
+       de arreglarlo despues.
+    2. En audios cortos llego a ser mas lento que la via normal
+       (faster-whisper#954), y estos clips duran entre 26 y 95 segundos, que
+       es exactamente ese rango.
+
+    Por eso viene desactivado: la ganancia es una promesa y el riesgo es
+    concreto. Se activa poniendo un batch_size mayor que 1, y solo despues de
+    medirlo con material real y mirar si los subtitulos siguen cuadrando.
+    """
+    lotes = int(wcfg.get("batch_size", 0) or 0)
+    if lotes <= 1:
+        return model.transcribe(str(audio), **opciones)
+
+    try:
+        from faster_whisper import BatchedInferencePipeline
+    except ImportError:
+        LOG.warning("⚠️ LOTES NO DISPONIBLES\n   MOTIVO: esta versión de "
+                    "faster-whisper no trae BatchedInferencePipeline\n"
+                    "   SE USA: transcripción normal")
+        return model.transcribe(str(audio), **opciones)
+
+    LOG.info("🧠 TRANSCRIPCIÓN POR LOTES\n   TAMAÑO: %d\n"
+             "   AVISO: revisa que los subtítulos sigan cuadrando", lotes)
+    return BatchedInferencePipeline(model=model).transcribe(
+        str(audio), batch_size=lotes, **opciones)
+
+
 def cmd_transcribe(args):
     d = WORK / args.slug
     audio = d / "audio.wav"
@@ -586,10 +623,13 @@ def cmd_transcribe(args):
         model = get_whisper_model(wcfg["modelo"], dev, comp)
         LOG.info("🧠 TRANSCRIPCIÓN INICIADA\n   DISPOSITIVO: %s\n   COMPUTE: %s\n   AUDIO: %s",
                  dev.upper(), comp, audio)
-        segments, _ = model.transcribe(
-            str(audio), language=wcfg["idioma"], word_timestamps=True,
-            beam_size=1, vad_filter=True, vad_parameters={"min_silence_duration_ms": 300},
-        )
+        segments, _ = _transcribir(model, audio, wcfg, {
+            "language": wcfg["idioma"],
+            "word_timestamps": True,
+            "beam_size": 1,
+            "vad_filter": True,
+            "vad_parameters": {"min_silence_duration_ms": 300},
+        })
         segs, words = [], []
         try:
             for s in segments:

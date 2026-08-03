@@ -7,6 +7,7 @@ import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import unittest.mock
 from unittest.mock import patch
 
 import antigravity
@@ -570,6 +571,61 @@ class CacheListadoRawTests(unittest.TestCase):
         item = raw.listar_api()[0]
         for campo in ("segments", "words", "chat", "_queue", "_name"):
             self.assertNotIn(campo, item)
+
+
+class TranscripcionPorLotesTests(unittest.TestCase):
+    """El batching existe pero viene apagado: rompe timestamps en clips cortos."""
+
+    def setUp(self):
+        self.model = unittest.mock.Mock()
+        self.model.transcribe.return_value = ([], None)
+        self.opciones = {"language": "es", "word_timestamps": True}
+
+    def _llamar(self, batch_size):
+        return clipper._transcribir(self.model, Path("audio.wav"),
+                                    {"batch_size": batch_size}, self.opciones)
+
+    def test_apagado_usa_la_via_normal(self):
+        for valor in (0, 1, None, ""):
+            with self.subTest(batch_size=valor):
+                self.model.reset_mock()
+                self._llamar(valor)
+                self.model.transcribe.assert_called_once()
+
+    def test_viene_apagado_en_la_configuracion(self):
+        """Activarlo sin medir desincroniza los subtitulos quemados."""
+        self.assertLessEqual(
+            int(clipper.CONFIG["whisper"].get("batch_size", 0) or 0), 1)
+
+    def test_encendido_usa_la_tuberia_por_lotes(self):
+        tuberia = unittest.mock.Mock()
+        tuberia.transcribe.return_value = ([], None)
+        fabrica = unittest.mock.Mock(return_value=tuberia)
+        with patch.dict("sys.modules", {"faster_whisper": unittest.mock.Mock(
+                BatchedInferencePipeline=fabrica)}):
+            self._llamar(16)
+        fabrica.assert_called_once_with(model=self.model)
+        self.assertEqual(tuberia.transcribe.call_args.kwargs["batch_size"], 16)
+        self.model.transcribe.assert_not_called()
+
+    def test_si_la_version_no_lo_trae_no_revienta(self):
+        modulo = unittest.mock.Mock()
+        del modulo.BatchedInferencePipeline
+        with patch.dict("sys.modules", {"faster_whisper": modulo}):
+            self._llamar(16)
+        self.model.transcribe.assert_called_once()
+
+    def test_las_opciones_llegan_intactas_en_los_dos_caminos(self):
+        self._llamar(0)
+        normales = self.model.transcribe.call_args.kwargs
+        self.assertTrue(normales["word_timestamps"], "sin esto no hay subtitulos")
+        self.assertEqual(normales["language"], "es")
+
+
+class RenderCalidadTests(unittest.TestCase):
+    def test_el_crf_no_desperdicia_bitrate(self):
+        """Las plataformas recodifican: un CRF bajo solo cuesta tiempo y megas."""
+        self.assertGreaterEqual(int(clipper.CONFIG["render"]["crf"]), 23)
 
 
 class AdjuntoNtfyTests(unittest.TestCase):
