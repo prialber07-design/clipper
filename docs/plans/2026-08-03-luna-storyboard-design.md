@@ -2,8 +2,8 @@
 
 ## Objetivo
 
-Sustituir por completo Antigravity y Gemini por una única llamada multimodal a
-GPT-5.6 Luna. Cada candidato RAW se analiza visual y editorialmente antes de
+Usar una única llamada multimodal a GPT-5.6 Luna. Cada candidato RAW se
+analiza visual y editorialmente antes de
 renderizarse.
 
 ## Flujo
@@ -28,8 +28,8 @@ renderizarse.
 - No se activa búsqueda web automática. Una identidad solo se afirma cuando la
   sostienen el canal, la transcripción o texto visible; de lo contrario se
   describe sin nombre.
-- No quedan binarios, OAuth, variables, estados ni carpetas de Antigravity,
-  `agy` o Gemini.
+- No quedan binarios, OAuth, variables, estados ni carpetas del sistema
+  anterior.
 
 ## Verificación
 

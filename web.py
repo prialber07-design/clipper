@@ -1626,16 +1626,16 @@ HTML_TEMPLATE = r"""<!doctype html>
       hidden>
       <div class="section-heading">
         <div>
-          <p class="eyebrow">Validación manual</p>
+          <p class="eyebrow">Procesamiento visual</p>
           <h3>Candidatos RAW</h3>
         </div>
         <span id="rawNote" class="section-note">Cargando…</span>
       </div>
       <div class="review-summary raw-summary">
-        <strong>PAUSA</strong>
+        <strong>AUTOMÁTICO</strong>
         <span>
-          El MP4 está limpio, sin hook ni subtítulos. Elige Gemini para añadir
-          análisis visual a Luna o procesa solo con Luna.
+          Luna recibe la transcripción y fotogramas de todo el candidato antes
+          de decidir, escribir el hook y renderizarlo.
         </span>
       </div>
       <div class="toolbar">
@@ -1939,22 +1939,17 @@ HTML_TEMPLATE = r"""<!doctype html>
           ? "Completado"
           : status.startsWith("procesando_")
             ? "Procesando con Luna"
-            : status === "error_gemini"
-              ? "Análisis Gemini inválido"
+            : status === "error_luna"
+              ? "Análisis visual de Luna fallido"
               : clip.next_retry_at
                 ? "Esperando reintento"
-                : clip.gemini_ready
-                  ? "Análisis Gemini recibido"
-                  : "Esperando análisis Gemini";
+                : "Esperando turno de Luna";
         panel.appendChild(text("strong", "raw-status-value", label));
         if (clip.last_attempt_at) {
           panel.appendChild(text("p", "clip-reason", "Último intento: " + clip.last_attempt_at));
         }
-        if (clip.gemini_latency_ms) {
-          panel.appendChild(text("p", "clip-reason", "Gemini: " + clip.gemini_latency_ms + " ms"));
-        }
         if (clip.luna_latency_ms) {
-          panel.appendChild(text("p", "clip-reason", "Luna: " + clip.luna_latency_ms + " ms"));
+          panel.appendChild(text("p", "clip-reason", "Luna: " + clip.luna_latency_ms + " ms · " + (clip.image_count || 0) + " fotogramas"));
         }
         if (clip.last_error) {
           panel.appendChild(text("p", "raw-error", clip.last_error));

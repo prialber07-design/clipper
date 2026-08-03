@@ -11,18 +11,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# CLI oficial opcional para el análisis visual. Se deja instalado, pero el
-# flujo lo mantiene desactivado hasta que se complete OAuth y se configure.
-# Se instala desde el script oficial, sin version fijada ni verificacion de
-# hash: es lo unico que ofrece hoy el instalador. El analisis visual es
-# opcional, asi que una caida de esa URL no debe tumbar el despliegue entero:
-# si falla, la imagen se construye igual y el pipeline sigue funcionando sin
-# agy (CLIPPER_ANTIGRAVITY_ACTIVO queda sin efecto y los RAW esperan analisis).
-RUN (curl -fsSL https://antigravity.google/cli/install.sh | bash \
-      && install -m 0755 /root/.local/bin/agy /usr/local/bin/agy) \
-    || echo "AVISO: agy no se pudo instalar; el analisis visual quedara inactivo" \
-    ; rm -rf /root/.local
-
 COPY *.py *.sh config.json ./
 COPY fonts ./fonts
 RUN mkdir -p /usr/local/share/fonts/clipper \
@@ -33,14 +21,13 @@ RUN chmod +x *.sh
 # El codigo va como root y de solo lectura; los datos, de un usuario sin
 # privilegios sobre el volumen.
 RUN useradd --system --uid 10001 clipper \
-    && mkdir -p /app/clips/modelos /app/clips/antigravity \
+    && mkdir -p /app/clips/modelos \
     && chown -R clipper:clipper /app/clips
 
 ENV CLIPPER_DATA=/app/clips \
     HF_HOME=/app/clips/modelos \
     PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8 \
-    HOME=/app/clips/antigravity \
     TZ=Europe/Madrid \
     OMP_NUM_THREADS=8 \
     MKL_NUM_THREADS=8 \

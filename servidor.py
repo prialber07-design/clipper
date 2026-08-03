@@ -188,8 +188,7 @@ def limpiar_raw_completados(limite_segundos: float, ahora: float) -> int:
         raw_id = _raw_caducado(manifest_path, limite_segundos, ahora)
         if not raw_id:
             continue
-        for ruta in (manifest_path, carpeta / f"{raw_id}.mp4",
-                     carpeta / "_gemini" / f"{raw_id}.json"):
+        for ruta in (manifest_path, carpeta / f"{raw_id}.mp4"):
             try:
                 if ruta.is_file():
                     ruta.unlink()
@@ -250,23 +249,12 @@ def limpiar_archivos_antiguos(dias: int = 7):
 
 
 def preparar_volumen():
-    """Crea en el volumen las carpetas que la imagen solo trae en tiempo de build.
-
-    El Dockerfile hace mkdir de /app/clips/antigravity y /app/clips/modelos, y
-    apunta ahi HOME y HF_HOME. Con un volumen con nombre eso basta, porque
-    Docker copia el contenido de la imagen la primera vez. Pero EasyPanel monta
-    una carpeta del host sobre /app/clips, y un bind mount tapa lo que la imagen
-    tuviera debajo: comprobado, HOME no existe. Sin HOME, agy no tiene donde
-    guardar su sesion y el OAuth no sobrevive a un reinicio.
-
-    Solo se tocan rutas que caen dentro del volumen: fuera de ahi, el HOME es
-    el del usuario y no es cosa nuestra.
-    """
+    """Crea el directorio de modelos cuando el bind mount tapa la imagen."""
     try:
         base = DATA.resolve()
     except OSError:
         return
-    for variable in ("HOME", "HF_HOME"):
+    for variable in ("HF_HOME",):
         valor = os.environ.get(variable, "").strip()
         if not valor:
             continue
@@ -341,10 +329,6 @@ def main():
             for v in vigilantes:
                 v.revisar()
 
-            # Dos fuentes de análisis, y las dos exigen un Gemini v2 válido
-            # antes de llegar a Luna:
-            #   1. JSON que escriba un agy externo en el volumen compartido.
-            #   2. El agy del propio contenedor, si CLIPPER_ANTIGRAVITY_ACTIVO=1.
             # Cada 5 minutos, devolver a la cola lo que lleve media hora en
             # 'procesando' sin avanzar. Un hilo puede morir con el proceso
             # vivo, y sin esto su candidato se queda clavado y frena a los
@@ -352,7 +336,6 @@ def main():
             if ciclos % 20 == 0:
                 raw.recuperar_huerfanos(max_edad_s=raw.EDAD_ZOMBI_S)
 
-            raw.procesar_analizados()
             raw.procesar_pendientes()
 
             # 1. Comprobar si se ha generado un NUEVO CLIP LISTO

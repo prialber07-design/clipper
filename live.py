@@ -528,8 +528,9 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
         chat=chat or [],
         limites=(dur["min"], dur["max"]),
     )
-    LOG.info("🧊 CANDIDATO DETENIDO EN RAW\n   JOB: %s\n   RAW: %s\n   MODO: %s",
-             slug, manifest["nombre"], raw.modo().upper())
+    LOG.info("🧊 CANDIDATO DETENIDO EN RAW\n   JOB: %s\n   RAW: %s\n"
+             "   SIGUIENTE PASO: ANÁLISIS VISUAL CON LUNA",
+             slug, manifest["nombre"])
 
 
 # --- bucle principal ----------------------------------------------------------

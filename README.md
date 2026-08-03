@@ -4,8 +4,8 @@ Detecta el mejor momento de un directo mientras sigue emitiendo, lo corta en
 vertical 9:16 con subtítulos y gancho quemados, y lo deja listo para subir a
 TikTok, Reels y Shorts.
 
-Todo local: `streamlink` + `ffmpeg` + `faster-whisper`. Sin servicios de pago ni
-claves de API.
+Captura y transcripción locales con `streamlink`, `ffmpeg` y `faster-whisper`;
+GPT-5.6 Luna analiza los fotogramas y toma la decisión editorial.
 
 ## Cómo funciona
 
@@ -16,9 +16,9 @@ detector: velocidad y contenido del chat + energía de audio
         ↓
 pico → ventana → faster-whisper (timestamps por palabra)
         ↓
-out/RAW (MP4 limpio + manifiesto) → agy escribe _gemini/<id>.json v2
+out/RAW (MP4 limpio + manifiesto) → storyboard temporal (1 imagen/s + pico)
         ↓
-Gemini v2 validado → Luna + filtro de calidad → ffmpeg (9:16 + subtítulos + gancho)
+Luna multimodal + filtro de calidad → ffmpeg (9:16 + subtítulos + gancho)
         ↓
 bandeja numerada + aviso al móvil (ntfy)
 ```
@@ -78,22 +78,18 @@ Kick usa el chat real cuando `aiohttp` esta instalado. La galeria web exige
 `CLIPPER_WEB_CLAVE`, refresca los clips automaticamente y es la interfaz unica
 de revision.
 
-## Validación RAW con Gemini v2
+## Análisis visual de RAW
 
-El despliegue usa `CLIPPER_RAW_MODO=manual`: después de Whisper cada candidato
-queda en `out/RAW/` con su MP4 limpio y un manifiesto privado. El CLI `agy` del
-host analiza el MP4 y escribe `out/RAW/_gemini/<id>.json`.
-
-El supervisor comprueba esa carpeta cada 15 segundos. Solo acepta esquema 2,
-política de identidad 2, `raw_id` coincidente, estado `ok`, contrato visual
-válido y dos URLs para cualquier identidad nombrada. Entonces envía el análisis,
-Whisper y chat a una única llamada de Luna y renderiza hacia `LISTOS` o
-`REVISAR`. Sin JSON v2 válido, el RAW espera y no existe un botón para saltarse
-Gemini.
+Después de Whisper cada candidato queda en `out/RAW/` con su MP4 limpio y un
+manifiesto privado. El supervisor extrae temporalmente un JPEG 768x432 por
+segundo y cinco imágenes adicionales alrededor del pico. Una única petición a
+Luna recibe esas imágenes ordenadas, la transcripción, el chat y el canal, y
+devuelve el análisis visual junto con la decisión, el hook, la descripción y
+los hashtags. Los JPEG se eliminan siempre al terminar.
 
 Los fallos de Luna o render se reintentan a 1, 5 y 15 minutos y después cada
 hora. No se registran prompts, transcripciones, chat, tokens ni análisis
-completos en los logs.
+completos ni imágenes en los logs.
 
 ## Sincronizacion automatica para Windows
 

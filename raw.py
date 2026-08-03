@@ -1,4 +1,4 @@
-"""Cola RAW y procesamiento editorial de candidatos analizados por Gemini."""
+"""Cola RAW y procesamiento visual/editorial de candidatos mediante Luna."""
 
 import json
 import os
@@ -12,20 +12,19 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
 
-import antigravity
 import bloqueo
 import calidad
 import clipper
 import notify
+import storyboard
 from registro import obtener
 
 
 RAW = clipper.OUT / "RAW"
 RAW_LOG = clipper.DATA / "logs" / "raw-processing.jsonl"
 RAW_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$")
-MODOS = {"gemini", "luna"}
-ESTADOS_ACTIVOS = {"procesando_gemini", "procesando_luna"}
-ESTADOS_REINTENTABLES = {"pendiente", "error_gemini", "error_luna", "error_render"}
+ESTADOS_ACTIVOS = {"procesando_luna"}
+ESTADOS_REINTENTABLES = {"pendiente", "error_luna", "error_render"}
 RETRY_DELAYS_S = (60, 300, 900, 3600)
 # Un valor de uno o dos caracteres no es un secreto que merezca proteccion, y
 # tacharlo destroza el log entero: con un ALGO_AUTH=1 en el entorno, cada "1"
@@ -47,13 +46,6 @@ class RawActivo(RawError):
     pass
 
 
-def modo() -> str:
-    valor = os.environ.get("CLIPPER_RAW_MODO", "manual").strip().lower()
-    if valor != "manual":
-        LOG.warning("⚠️ RAW_CONFIG_INVALIDA · VALOR: %s · SE USA: MANUAL", valor[:40])
-    return "manual"
-
-
 def _ahora() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -71,10 +63,6 @@ def _manifest_path(raw_id: str) -> Path:
 
 def _mp4_path(raw_id: str) -> Path:
     return RAW / f"{validar_id(raw_id)}.mp4"
-
-
-def _gemini_path(raw_id: str) -> Path:
-    return RAW / "_gemini" / f"{validar_id(raw_id)}.json"
 
 
 def _atomic_write(path: Path, data: dict):
@@ -211,7 +199,6 @@ def crear(fuente: Path, inicio: float, fin: float, raw_id: str, *, canal: str,
         "last_attempt_at": "",
         "last_error": "",
         "attempt": None,
-        "gemini": None,
         "luna": None,
         "destination": None,
         "retry_count": 0,
@@ -230,10 +217,8 @@ def _error_text(error) -> str:
     return _texto_log(error, 300) or "error no especificado"
 
 
-def _claim(raw_id: str, modo_actual: str) -> tuple[dict, str]:
+def _claim(raw_id: str) -> tuple[dict, str]:
     validar_id(raw_id)
-    if modo_actual not in MODOS:
-        raise RawError("modo inválido")
     with bloqueo.exclusivo(_MANIFEST_LOCK, etiqueta="cola RAW"):
         manifest = _read(raw_id)
         status = manifest.get("status")
@@ -242,22 +227,21 @@ def _claim(raw_id: str, modo_actual: str) -> tuple[dict, str]:
         if status not in ESTADOS_REINTENTABLES:
             raise RawError("el candidato no admite otro procesamiento")
         intento = uuid.uuid4().hex[:12]
-        manifest["status"] = f"procesando_{modo_actual}"
+        manifest["status"] = "procesando_luna"
         manifest["last_attempt_at"] = _ahora()
         manifest["last_error"] = ""
-        manifest["attempt"] = {"id": intento, "mode": modo_actual, "started_at": _ahora()}
+        manifest["attempt"] = {"id": intento, "mode": "luna", "started_at": _ahora()}
         _atomic_write(_manifest_path(raw_id), manifest)
-    _evento("RAW_QUEUED", raw_id, modo_actual=modo_actual,
-            status=manifest["status"])
+    _evento("RAW_QUEUED", raw_id, modo_actual="luna", status=manifest["status"])
     return manifest, intento
 
 
-def enqueue(raw_id: str, modo_actual: str) -> dict:
-    manifest, intento = _claim(raw_id, modo_actual)
+def enqueue(raw_id: str) -> dict:
+    manifest, intento = _claim(raw_id)
     try:
         hilo = threading.Thread(
             target=_run,
-            args=(raw_id, modo_actual, intento),
+            args=(raw_id, intento),
             name=f"raw-{raw_id}",
             daemon=True,
         )
@@ -267,34 +251,9 @@ def enqueue(raw_id: str, modo_actual: str) -> dict:
     except Exception as error:
         with _THREADS_LOCK:
             _THREADS.pop((raw_id, intento), None)
-        estado = "error_gemini" if modo_actual == "gemini" else "error_luna"
-        evento = "GEMINI_FAILED" if modo_actual == "gemini" else "LUNA_FAILED"
-        _fallar(raw_id, modo_actual, estado, error, evento)
+        _fallar(raw_id, "luna", "error_luna", error, "LUNA_FAILED", reintentar=True)
         raise RawError("no se pudo encolar el candidato") from error
     return manifest
-
-
-def _leer_gemini_v2(raw_id: str, duracion: float) -> dict:
-    try:
-        data = json.loads(_gemini_path(raw_id).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise RawError("análisis Gemini v2 no disponible") from error
-    if (not isinstance(data, dict) or data.get("schema") != 2 or
-            data.get("identity_policy_version") != 2 or
-            data.get("raw_id") != raw_id or data.get("status") != "ok" or
-            not isinstance(data.get("result"), dict)):
-        raise RawError("análisis Gemini v2 inválido")
-    try:
-        result = antigravity.validar(
-            json.dumps(data["result"], ensure_ascii=False), float(duracion))
-    except (TypeError, ValueError, json.JSONDecodeError) as error:
-        raise RawError("resultado Gemini v2 inválido") from error
-    for person in result["people"]:
-        urls = [e for e in person["evidence"]
-                if e.startswith(("http://", "https://"))]
-        if person["name"] and len(urls) < 2:
-            raise RawError("identidad Gemini v2 sin dos fuentes")
-    return result
 
 
 # Un trabajo vivo tarda minutos: analisis 2, Luna 20 segundos, y el render
@@ -323,106 +282,9 @@ def _reintento_pendiente(manifest: dict) -> bool:
         return False
 
 
-def enqueue_analizado(raw_id: str, visual: dict) -> dict:
-    manifest, intento = _claim(raw_id, "luna")
-    try:
-        hilo = threading.Thread(
-            target=_run,
-            args=(raw_id, "luna", intento, visual),
-            name=f"raw-{raw_id}",
-            daemon=True,
-        )
-        with _THREADS_LOCK:
-            _THREADS[(raw_id, intento)] = hilo
-        hilo.start()
-    except Exception as error:
-        with _THREADS_LOCK:
-            _THREADS.pop((raw_id, intento), None)
-        _fallar(raw_id, "luna", "error_luna", error, "LUNA_FAILED",
-                reintentar=True)
-        raise RawError("no se pudo encolar el candidato") from error
-    return manifest
-
-
-def procesar_analizados() -> int:
-    """Encola RAW con un resultado externo v2 válido y reintentos vencidos."""
-    if not RAW.exists():
-        return 0
-    encolados = 0
-    for path in sorted(RAW.glob("*.json")):
-        raw_id = path.stem
-        try:
-            manifest = _read(raw_id)
-            if (manifest.get("status") == "completado" or
-                    manifest.get("status") in ESTADOS_ACTIVOS or
-                    _reintento_pendiente(manifest) or
-                    not _mp4_path(raw_id).is_file() or
-                    not _gemini_path(raw_id).is_file()):
-                continue
-            visual = _leer_gemini_v2(raw_id, manifest.get("duracion", 0))
-            enqueue_analizado(raw_id, visual)
-            encolados += 1
-        except RawActivo:
-            continue
-        except RawError as error:
-            mensaje = _error_text(error)
-            try:
-                actual = _read(raw_id)
-                if actual.get("last_error") != mensaje:
-                    _update(raw_id, status="error_gemini", last_error=mensaje)
-                    _evento("GEMINI_V2_INVALID", raw_id, status="error_gemini",
-                            error=mensaje)
-            except RawError:
-                pass
-    return encolados
-
-
-_AVISO_CONFIG = {"motivo": "", "ts": 0.0}
-AVISO_CONFIG_CADA_S = 900
-
-
-def _avisar_no_configurado(motivo: str):
-    """Avisa del motivo una vez, y luego como mucho cada cuarto de hora."""
-    ahora = time.monotonic()
-    if (_AVISO_CONFIG["motivo"] == motivo and
-            ahora - _AVISO_CONFIG["ts"] < AVISO_CONFIG_CADA_S):
-        return
-    _AVISO_CONFIG.update(motivo=motivo, ts=ahora)
-    ayuda = {
-        "disabled": "pon CLIPPER_ANTIGRAVITY_ACTIVO=1",
-        "credits_unknown": "confirma los creditos con CLIPPER_G1_CREDITS=0 "
-                           "o con useG1Credits en el settings.json de agy",
-        "credits_enabled": "agy tiene los creditos G1 activados; desactivalos "
-                           "antes de dejarlo analizar",
-        "missing_binary": "no encuentro el binario agy; revisa CLIPPER_AGY_BIN",
-    }.get(motivo, "revisa la configuracion del analisis visual")
-    LOG.warning("⏸️ ANÁLISIS VISUAL EN PAUSA\n   MOTIVO: %s\n   QUÉ HACER: %s\n"
-                "   LA COLA NO SE TOCA MIENTRAS TANTO", motivo.upper(), ayuda)
-
-
 def procesar_pendientes(limite: int = 1) -> int:
-    """Encola candidatos sin análisis para que Gemini los mire dentro del contenedor.
-
-    El motivo por el que esta ruta estaba dormida era que el `agy` autenticado
-    vivía en el host. Ya no: el token OAuth está en el volumen, así que el CLI
-    del contenedor puede analizar por sí mismo.
-
-    Se encola de uno en uno y el más antiguo primero. El análisis se serializa
-    con su propio cerrojo y cada uno puede tardar hasta dos minutos, así que
-    encolar la cola entera solo crearía cientos de hilos esperando turno.
-
-    El interruptor es `CLIPPER_ANTIGRAVITY_ACTIVO`: en 0 esta función no hace
-    nada y el comportamiento es el de antes, esperar análisis externos.
-    """
+    """Encola de uno en uno el RAW más antiguo para Luna multimodal."""
     if not RAW.exists():
-        return 0
-
-    # Un problema de configuracion no es culpa de ningun clip: comprobarlo
-    # arriba deja la cola quieta en vez de marcar 45 candidatos como fallidos
-    # a razon de uno cada quince segundos, que es lo que llego a pasar.
-    listo, motivo = antigravity.preparado()
-    if not listo:
-        _avisar_no_configurado(motivo)
         return 0
 
     candidatos = []
@@ -442,15 +304,14 @@ def procesar_pendientes(limite: int = 1) -> int:
             continue
         if (manifest.get("status") not in ESTADOS_REINTENTABLES or
                 _reintento_pendiente(manifest) or
-                not _mp4_path(raw_id).is_file() or
-                _gemini_path(raw_id).is_file()):
+                not _mp4_path(raw_id).is_file()):
             continue
         candidatos.append((str(manifest.get("created_at", "")), raw_id))
 
     encolados = 0
     for _, raw_id in sorted(candidatos)[:max(0, int(limite))]:
         try:
-            enqueue(raw_id, "gemini")
+            enqueue(raw_id)
             encolados += 1
         except RawActivo:
             break
@@ -564,14 +425,8 @@ def _render_and_publish(manifest: dict, mp4: Path, hook: str, llm: dict) -> dict
         shutil.rmtree(clipper.OUT / slug, ignore_errors=True)
 
 
-def _run(raw_id: str, modo_actual: str, intento: str,
-         visual_prevalidado: dict | None = None):
-    fase = "gemini" if modo_actual == "gemini" else "luna"
-    automatico = visual_prevalidado is not None
-    # Ambas entradas las dispara ahora el supervisor, no una persona: sin
-    # espera creciente, un agy que falle (cuota, OAuth caducado) se
-    # reintentaria cada 15 segundos para siempre.
-    reintentable = automatico or modo_actual == "gemini"
+def _run(raw_id: str, intento: str):
+    fase = "luna"
     try:
         with bloqueo.exclusivo(_PROCESS_LOCK, etiqueta="procesamiento RAW"):
             manifest = _read(raw_id)
@@ -581,90 +436,48 @@ def _run(raw_id: str, modo_actual: str, intento: str,
             if not mp4.is_file():
                 raise RawError("MP4 RAW ausente")
 
-            visual = visual_prevalidado
-            if automatico:
-                _update(raw_id, status="procesando_luna", gemini={
-                    "model": "external-v2",
-                    "status": "ok",
-                    "latency_ms": 0,
-                    "result": visual,
-                })
-                _evento("GEMINI_V2_ACCEPTED", raw_id, modo_actual="luna",
-                        status="ok")
-            if modo_actual == "gemini":
-                _evento("GEMINI_STARTED", raw_id, modo_actual=modo_actual,
-                        status="procesando_gemini")
-                visual, visual_meta = antigravity.analizar(
-                    candidato=mp4,
-                    canal=manifest.get("canal", ""),
-                    motivo=manifest.get("motivo", ""),
-                    segmentos=manifest.get("segments", []),
-                    chat=manifest.get("chat", []),
-                    duracion=manifest.get("duracion", 0),
-                    pico=manifest.get("pico", 0),
-                    bloqueo_path=clipper.DATA / ".antigravity.lock",
-                    permitir_manual=True,
-                )
-                _update(raw_id, gemini={**visual_meta, "result": visual} if visual else visual_meta)
-                if visual is None:
-                    estado = visual_meta.get("status", "error")
-                    evento = ("GEMINI_TIMEOUT" if estado == "timeout" else
-                              "GEMINI_EMPTY_OUTPUT" if estado == "empty_output" else
-                              "GEMINI_INVALID_JSON" if estado == "invalid_json" else
-                              "GEMINI_FAILED")
-                    # El detalle es el stderr del CLI, ya recortado y sin
-                    # secretos: sin el, 'empty_output' no dice nada de por que.
-                    detalle = visual_meta.get("detalle", "")
-                    _fallar(raw_id, modo_actual, "error_gemini",
-                            f"{estado}: {detalle}" if detalle else estado,
-                            evento, reintentar=reintentable)
-                    return
-                _evento("GEMINI_FINISHED", raw_id, modo_actual=modo_actual,
-                        status="ok", latency_ms=visual_meta.get("latency_ms", 0))
-                _update(raw_id, status="procesando_luna")
-                fase = "luna"
-
-            _evento("LUNA_STARTED", raw_id, modo_actual=modo_actual,
+            _evento("LUNA_VISUAL_STARTED", raw_id, modo_actual="luna",
                     status="procesando_luna")
             try:
-                hook, llm = clipper.evaluar_editorial(
-                    canal=manifest.get("canal", ""),
-                    motivo=manifest.get("motivo", ""),
-                    segmentos=manifest.get("segments", []),
-                    chat=manifest.get("chat", []),
-                    duracion=manifest.get("duracion", 0),
-                    pico=manifest.get("pico", 0),
-                    fallback="",
-                    analisis_visual=visual,
-                    estricto=True,
-                )
+                with storyboard.extraer(
+                        mp4, manifest.get("duracion", 0), manifest.get("pico", 0)) as fotogramas:
+                    hook, llm = clipper.evaluar_editorial(
+                        canal=manifest.get("canal", ""),
+                        motivo=manifest.get("motivo", ""),
+                        segmentos=manifest.get("segments", []),
+                        chat=manifest.get("chat", []),
+                        duracion=manifest.get("duracion", 0),
+                        pico=manifest.get("pico", 0),
+                        fallback="",
+                        fotogramas=fotogramas,
+                        estricto=True,
+                    )
             except Exception as error:
-                _fallar(raw_id, modo_actual, "error_luna", error, "LUNA_FAILED",
-                        reintentar=reintentable)
+                _fallar(raw_id, "luna", "error_luna", error, "LUNA_FAILED",
+                        reintentar=True)
                 return
             _update(raw_id, luna=llm)
-            _evento("LUNA_FINISHED", raw_id, modo_actual=modo_actual,
-                    status="ok", latency_ms=llm.get("latency_ms", 0))
+            _evento("LUNA_VISUAL_FINISHED", raw_id, modo_actual="luna", status="ok",
+                    latency_ms=llm.get("latency_ms", 0),
+                    fotogramas=llm.get("image_count", 0))
 
             fase = "render"
             try:
                 destination = _render_and_publish(manifest, mp4, hook, llm)
             except Exception as error:
-                _fallar(raw_id, modo_actual, "error_render", error, "RENDER_FAILED",
-                        reintentar=reintentable)
+                _fallar(raw_id, "luna", "error_render", error, "RENDER_FAILED",
+                        reintentar=True)
                 return
             _update(raw_id, status="completado", last_error="", destination=destination,
                     retry_count=0, next_retry_at="")
-            _evento("RAW_COMPLETED", raw_id, modo_actual=modo_actual, status="completado")
+            _evento("RAW_COMPLETED", raw_id, modo_actual="luna", status="completado")
     except Exception as error:
         estados = {
-            "gemini": ("error_gemini", "GEMINI_FAILED"),
             "luna": ("error_luna", "LUNA_FAILED"),
             "render": ("error_render", "RENDER_FAILED"),
         }
         estado, evento = estados[fase]
-        _fallar(raw_id, modo_actual, estado, error, evento,
-                reintentar=reintentable)
+        _fallar(raw_id, "luna", estado, error, evento, reintentar=True)
     finally:
         with _THREADS_LOCK:
             _THREADS.pop((raw_id, intento), None)
@@ -692,9 +505,10 @@ def recuperar_huerfanos(max_edad_s: float | None = None):
             if max_edad_s is not None and not _zombi(manifest, max_edad_s):
                 continue
             raw_id = validar_id(manifest.get("id", path.stem))
-            nuevo = "error_gemini" if estado.endswith("gemini") else "error_luna"
-            _update(raw_id, status=nuevo, last_error="proceso interrumpido; reintento disponible")
-            _evento("RAW_RECOVERED", raw_id, status=nuevo, error="proceso interrumpido")
+            _update(raw_id, status="error_luna",
+                    last_error="proceso interrumpido; reintento disponible")
+            _evento("RAW_RECOVERED", raw_id, status="error_luna",
+                    error="proceso interrumpido")
         except (OSError, json.JSONDecodeError, RawError):
             continue
 
@@ -721,7 +535,6 @@ def _campos_para_api(raw_id: str, mtime_ns: int) -> dict | None:
         manifest = _read(raw_id)
     except RawError:
         return None
-    gemini = manifest.get("gemini") or {}
     luna = manifest.get("luna") or {}
     destino = manifest.get("destination") or {}
     campos = {
@@ -733,8 +546,8 @@ def _campos_para_api(raw_id: str, mtime_ns: int) -> dict | None:
         "last_attempt_at": manifest.get("last_attempt_at", ""),
         "last_error": manifest.get("last_error", ""),
         "next_retry_at": manifest.get("next_retry_at", ""),
-        "gemini_latency_ms": gemini.get("latency_ms", 0) if isinstance(gemini, dict) else 0,
         "luna_latency_ms": luna.get("latency_ms", 0) if isinstance(luna, dict) else 0,
+        "image_count": luna.get("image_count", 0) if isinstance(luna, dict) else 0,
         "_queue": destino.get("queue") if isinstance(destino, dict) else "",
         "_name": destino.get("name") if isinstance(destino, dict) else "",
     }
@@ -765,8 +578,6 @@ def listar_api() -> list[dict]:
             campos = _campos_para_api(path.stem, path.stat().st_mtime_ns)
             if campos is None:
                 continue
-            # Lo que no depende del manifiesto se recalcula siempre: el JSON de
-            # Gemini aparece sin tocarlo, asi que cachearlo lo dejaria obsoleto.
             destination_url = ""
             if (campos["_queue"] in {"LISTOS", "REVISAR"} and
                     isinstance(campos["_name"], str) and campos["_name"]):
@@ -776,7 +587,6 @@ def listar_api() -> list[dict]:
                 **{k: v for k, v in campos.items() if not k.startswith("_")},
                 "nombre": mp4.name,
                 "timestamp": mp4.stat().st_mtime,
-                "gemini_ready": _gemini_path(campos["id"]).is_file(),
                 "destination": destination_url,
                 "url": f"/files/out/RAW/{quote(mp4.name, safe='')}",
             })
