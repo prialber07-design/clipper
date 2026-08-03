@@ -218,8 +218,8 @@ def _binario() -> str | None:
     return shutil.which(configurado)
 
 
-def _credits_habilitados() -> bool | None:
-    """Devuelve True/False solo con una configuración explícita y confirmable."""
+def _credits_del_fichero() -> bool | None:
+    """Lo que dice el propio agy en su settings.json, si es que lo dice."""
     home = Path(os.environ.get("HOME") or os.environ.get("USERPROFILE") or "")
     ruta = home / ".gemini" / "antigravity-cli" / "settings.json"
     try:
@@ -228,6 +228,54 @@ def _credits_habilitados() -> bool | None:
         return None
     valor = ajustes.get("useG1Credits")
     return valor if isinstance(valor, bool) else None
+
+
+def _credits_del_entorno() -> bool | None:
+    valor = os.environ.get("CLIPPER_G1_CREDITS", "").strip().lower()
+    if valor in {"0", "false", "no", "off"}:
+        return False
+    if valor in {"1", "true", "si", "sí", "yes", "on"}:
+        return True
+    return None
+
+
+def _credits_habilitados() -> bool | None:
+    """Devuelve True/False solo con una configuración explícita y confirmable.
+
+    agy reescribe su settings.json y se lleva por delante las claves que no
+    reconoce, asi que `useG1Credits` no sobrevive ahi: se puso a mano y
+    desaparecio sola, dejando el analisis en 'credits_unknown'. Por eso la
+    confirmacion puede venir tambien de `CLIPPER_G1_CREDITS`, que pone una
+    persona en el panel del despliegue y aguanta reinicios y actualizaciones
+    del CLI.
+
+    Lo que el entorno NO puede hacer es tapar un 'true' del fichero: si el
+    propio agy dice que va a gastar creditos, eso no es una duda que confirmar,
+    es un hecho, y manda.
+    """
+    del_fichero = _credits_del_fichero()
+    if del_fichero is not None:
+        return del_fichero
+    return _credits_del_entorno()
+
+
+def preparado() -> tuple[bool, str]:
+    """Si el analisis visual puede ejecutarse, sin tocar ningun candidato.
+
+    Un problema de configuracion no es culpa de un clip concreto: comprobarlo
+    por candidato marcaba la cola entera como fallida de quince en quince
+    segundos. Se comprueba una vez, arriba, y la cola se queda quieta.
+    """
+    if not activo():
+        return False, "disabled"
+    creditos = _credits_habilitados()
+    if creditos is None:
+        return False, "credits_unknown"
+    if creditos:
+        return False, "credits_enabled"
+    if not _binario():
+        return False, "missing_binary"
+    return True, ""
 
 
 def _entorno_seguro() -> dict:

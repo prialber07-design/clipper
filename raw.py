@@ -377,6 +377,29 @@ def procesar_analizados() -> int:
     return encolados
 
 
+_AVISO_CONFIG = {"motivo": "", "ts": 0.0}
+AVISO_CONFIG_CADA_S = 900
+
+
+def _avisar_no_configurado(motivo: str):
+    """Avisa del motivo una vez, y luego como mucho cada cuarto de hora."""
+    ahora = time.monotonic()
+    if (_AVISO_CONFIG["motivo"] == motivo and
+            ahora - _AVISO_CONFIG["ts"] < AVISO_CONFIG_CADA_S):
+        return
+    _AVISO_CONFIG.update(motivo=motivo, ts=ahora)
+    ayuda = {
+        "disabled": "pon CLIPPER_ANTIGRAVITY_ACTIVO=1",
+        "credits_unknown": "confirma los creditos con CLIPPER_G1_CREDITS=0 "
+                           "o con useG1Credits en el settings.json de agy",
+        "credits_enabled": "agy tiene los creditos G1 activados; desactivalos "
+                           "antes de dejarlo analizar",
+        "missing_binary": "no encuentro el binario agy; revisa CLIPPER_AGY_BIN",
+    }.get(motivo, "revisa la configuracion del analisis visual")
+    LOG.warning("⏸️ ANÁLISIS VISUAL EN PAUSA\n   MOTIVO: %s\n   QUÉ HACER: %s\n"
+                "   LA COLA NO SE TOCA MIENTRAS TANTO", motivo.upper(), ayuda)
+
+
 def procesar_pendientes(limite: int = 1) -> int:
     """Encola candidatos sin análisis para que Gemini los mire dentro del contenedor.
 
@@ -391,7 +414,15 @@ def procesar_pendientes(limite: int = 1) -> int:
     El interruptor es `CLIPPER_ANTIGRAVITY_ACTIVO`: en 0 esta función no hace
     nada y el comportamiento es el de antes, esperar análisis externos.
     """
-    if not RAW.exists() or not antigravity.activo():
+    if not RAW.exists():
+        return 0
+
+    # Un problema de configuracion no es culpa de ningun clip: comprobarlo
+    # arriba deja la cola quieta en vez de marcar 45 candidatos como fallidos
+    # a razon de uno cada quince segundos, que es lo que llego a pasar.
+    listo, motivo = antigravity.preparado()
+    if not listo:
+        _avisar_no_configurado(motivo)
         return 0
 
     candidatos = []

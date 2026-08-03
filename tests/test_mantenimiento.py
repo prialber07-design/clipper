@@ -368,7 +368,9 @@ class ProcesarPendientesTests(unittest.TestCase):
             destino.write_text("{}", encoding="utf-8")
 
     def _encolar(self, activo=True, limite=1):
-        with patch.object(raw.antigravity, "activo", return_value=activo), \
+        preparado = (True, "") if activo else (False, "disabled")
+        raw._AVISO_CONFIG.update(motivo="", ts=0.0)
+        with patch.object(raw.antigravity, "preparado", return_value=preparado), \
              patch.object(raw, "enqueue") as enqueue:
             encolados = raw.procesar_pendientes(limite=limite)
         return encolados, [call.args[0] for call in enqueue.call_args_list]
@@ -745,6 +747,100 @@ class RenderCalidadTests(unittest.TestCase):
     def test_el_crf_no_desperdicia_bitrate(self):
         """Las plataformas recodifican: un CRF bajo solo cuesta tiempo y megas."""
         self.assertGreaterEqual(int(clipper.CONFIG["render"]["crf"]), 23)
+
+
+class ConfirmacionCreditosTests(unittest.TestCase):
+    """agy borra useG1Credits de su settings.json; la confirmacion debe durar."""
+
+    def _sin_fichero(self):
+        return patch.object(antigravity, "_credits_del_fichero", return_value=None)
+
+    def test_el_entorno_confirma_cuando_el_fichero_no_dice_nada(self):
+        with self._sin_fichero(), patch.dict(os.environ, {"CLIPPER_G1_CREDITS": "0"}):
+            self.assertIs(antigravity._credits_habilitados(), False)
+
+    def test_sin_fichero_ni_entorno_sigue_siendo_desconocido(self):
+        with self._sin_fichero(), patch.dict(os.environ, {}, clear=True):
+            self.assertIsNone(antigravity._credits_habilitados())
+
+    def test_el_entorno_no_puede_tapar_un_si_del_fichero(self):
+        """Si agy dice que gastara creditos, eso manda sobre cualquier variable."""
+        with patch.object(antigravity, "_credits_del_fichero", return_value=True), \
+             patch.dict(os.environ, {"CLIPPER_G1_CREDITS": "0"}):
+            self.assertIs(antigravity._credits_habilitados(), True)
+
+    def test_admite_las_formas_habituales(self):
+        for texto, esperado in [("0", False), ("false", False), ("no", False),
+                                ("1", True), ("true", True), ("si", True)]:
+            with self.subTest(valor=texto):
+                with self._sin_fichero(), patch.dict(os.environ,
+                                                     {"CLIPPER_G1_CREDITS": texto}):
+                    self.assertIs(antigravity._credits_habilitados(), esperado)
+
+    def test_un_valor_raro_no_confirma_nada(self):
+        with self._sin_fichero(), patch.dict(os.environ, {"CLIPPER_G1_CREDITS": "quizas"}):
+            self.assertIsNone(antigravity._credits_habilitados())
+
+
+class AnalisisNoConfiguradoTests(unittest.TestCase):
+    """Un fallo de configuracion no puede ir quemando candidatos."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.previous = (raw.RAW, clipper.OUT)
+        raw.RAW = self.root / "out" / "RAW"
+        clipper.OUT = self.root / "out"
+        raw.RAW.mkdir(parents=True, exist_ok=True)
+        (raw.RAW / "uno-01.mp4").write_bytes(b"raw")
+        raw._atomic_write(raw.RAW / "uno-01.json", {
+            "id": "uno-01", "status": "pendiente", "duracion": 30.0,
+            "created_at": "2026-08-03T05:00:00+00:00", "next_retry_at": "",
+        })
+        raw._AVISO_CONFIG.update(motivo="", ts=0.0)
+
+    def tearDown(self):
+        (raw.RAW, clipper.OUT) = self.previous
+        self.temp.cleanup()
+
+    def test_no_encola_nada_si_falta_configuracion(self):
+        with patch.object(raw.antigravity, "preparado",
+                          return_value=(False, "credits_unknown")), \
+             patch.object(raw, "enqueue") as enqueue:
+            self.assertEqual(raw.procesar_pendientes(), 0)
+        enqueue.assert_not_called()
+
+    def test_el_candidato_se_queda_pendiente_intacto(self):
+        with patch.object(raw.antigravity, "preparado",
+                          return_value=(False, "credits_unknown")), \
+             patch.object(raw, "enqueue"):
+            raw.procesar_pendientes()
+        self.assertEqual(raw._read("uno-01")["status"], "pendiente",
+                         "no es culpa del clip; no puede quedar marcado como fallido")
+
+    def test_el_aviso_no_se_repite_cada_15_segundos(self):
+        with patch.object(raw.antigravity, "preparado",
+                          return_value=(False, "credits_unknown")), \
+             patch.object(raw.LOG, "warning") as aviso:
+            for _ in range(20):
+                raw.procesar_pendientes()
+        self.assertEqual(aviso.call_count, 1, "spam de log en cada ciclo")
+
+    def test_un_motivo_distinto_si_avisa(self):
+        with patch.object(raw.LOG, "warning") as aviso:
+            with patch.object(raw.antigravity, "preparado",
+                              return_value=(False, "credits_unknown")):
+                raw.procesar_pendientes()
+            with patch.object(raw.antigravity, "preparado",
+                              return_value=(False, "missing_binary")):
+                raw.procesar_pendientes()
+        self.assertEqual(aviso.call_count, 2)
+
+    def test_configurado_del_todo_si_encola(self):
+        with patch.object(raw.antigravity, "preparado", return_value=(True, "")), \
+             patch.object(raw, "enqueue") as enqueue:
+            self.assertEqual(raw.procesar_pendientes(), 1)
+        enqueue.assert_called_once()
 
 
 class AdjuntoNtfyTests(unittest.TestCase):
