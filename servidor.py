@@ -345,6 +345,13 @@ def main():
             # antes de llegar a Luna:
             #   1. JSON que escriba un agy externo en el volumen compartido.
             #   2. El agy del propio contenedor, si CLIPPER_ANTIGRAVITY_ACTIVO=1.
+            # Cada 5 minutos, devolver a la cola lo que lleve media hora en
+            # 'procesando' sin avanzar. Un hilo puede morir con el proceso
+            # vivo, y sin esto su candidato se queda clavado y frena a los
+            # demas: paso, y tuvo la cola parada doce horas.
+            if ciclos % 20 == 0:
+                raw.recuperar_huerfanos(max_edad_s=raw.EDAD_ZOMBI_S)
+
             raw.procesar_analizados()
             raw.procesar_pendientes()
 

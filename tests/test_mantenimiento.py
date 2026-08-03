@@ -358,6 +358,9 @@ class ProcesarPendientesTests(unittest.TestCase):
         raw._atomic_write(raw.RAW / f"{raw_id}.json", {
             "id": raw_id, "status": status, "created_at": creado,
             "duracion": 30.0, "next_retry_at": next_retry_at,
+            # _claim siempre la escribe: un activo sin fecha no existe en
+            # produccion, y sin ella el trabajo se daria por muerto.
+            "last_attempt_at": datetime.now(timezone.utc).isoformat(),
         })
         if con_gemini:
             destino = raw.RAW / "_gemini" / f"{raw_id}.json"
@@ -442,6 +445,52 @@ class ProcesarPendientesTests(unittest.TestCase):
                               return_value=(None, {"status": "quota"})):
                 raw._run("falla-02", "gemini", intento)
             self.assertEqual(raw._read("falla-02")["retry_count"], esperado)
+
+    def test_un_zombi_no_bloquea_la_cola(self):
+        """El fallo real: dos trabajos muertos pararon la cola doce horas."""
+        viejo = (datetime.now(timezone.utc) - timedelta(hours=12)).isoformat()
+        self._candidato("zombi-01", status="procesando_luna")
+        raw._update("zombi-01", last_attempt_at=viejo)
+        self._candidato("espera-01")
+        encolados, ids = self._encolar()
+        self.assertEqual(ids, ["espera-01"],
+                         "un trabajo muerto no puede frenar a los vivos")
+
+    def test_un_trabajo_vivo_si_bloquea(self):
+        reciente = datetime.now(timezone.utc).isoformat()
+        self._candidato("vivo-01", status="procesando_luna")
+        raw._update("vivo-01", last_attempt_at=reciente)
+        self._candidato("espera-01")
+        encolados, ids = self._encolar()
+        self.assertEqual((encolados, ids), (0, []),
+                         "el analisis va de uno en uno a proposito")
+
+    def test_sin_fecha_de_intento_se_da_por_muerto(self):
+        self._candidato("sinfecha-01", status="procesando_luna")
+        raw._update("sinfecha-01", last_attempt_at="")
+        self._candidato("espera-01")
+        _, ids = self._encolar()
+        self.assertEqual(ids, ["espera-01"])
+
+    def test_recuperar_en_caliente_solo_toca_los_zombis(self):
+        viejo = (datetime.now(timezone.utc) - timedelta(hours=12)).isoformat()
+        self._candidato("zombi-01", status="procesando_luna")
+        raw._update("zombi-01", last_attempt_at=viejo)
+        self._candidato("vivo-01", status="procesando_luna")
+        raw._update("vivo-01", last_attempt_at=datetime.now(timezone.utc).isoformat())
+
+        raw.recuperar_huerfanos(max_edad_s=raw.EDAD_ZOMBI_S)
+
+        self.assertEqual(raw._read("zombi-01")["status"], "error_luna")
+        self.assertEqual(raw._read("vivo-01")["status"], "procesando_luna",
+                         "no puede tumbar un trabajo que si esta corriendo")
+
+    def test_al_arrancar_se_recupera_todo(self):
+        """Ningun hilo sobrevive al reinicio, por reciente que sea."""
+        self._candidato("reciente-01", status="procesando_gemini")
+        raw._update("reciente-01", last_attempt_at=datetime.now(timezone.utc).isoformat())
+        raw.recuperar_huerfanos()
+        self.assertEqual(raw._read("reciente-01")["status"], "error_gemini")
 
     def test_el_limite_acota_cuantos_entran(self):
         for i in range(5):

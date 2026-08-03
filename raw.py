@@ -297,6 +297,22 @@ def _leer_gemini_v2(raw_id: str, duracion: float) -> dict:
     return result
 
 
+# Un trabajo vivo tarda minutos: analisis 2, Luna 20 segundos, y el render
+# unos pocos mas aunque haya cola. Pasada media hora, quien sigue en
+# 'procesando' es un zombi: su hilo murio y nadie lo va a terminar.
+EDAD_ZOMBI_S = 1800
+
+
+def _zombi(manifest: dict, max_edad_s: float) -> bool:
+    """Un trabajo activo que lleva demasiado sin dar señales."""
+    try:
+        inicio = datetime.fromisoformat(manifest.get("last_attempt_at", ""))
+    except (TypeError, ValueError):
+        # Sin fecha de intento no hay forma de saber si vive: se da por muerto.
+        return True
+    return (datetime.now(timezone.utc) - inicio).total_seconds() > max_edad_s
+
+
 def _reintento_pendiente(manifest: dict) -> bool:
     value = manifest.get("next_retry_at")
     if not value:
@@ -386,8 +402,13 @@ def procesar_pendientes(limite: int = 1) -> int:
         except RawError:
             continue
         if manifest.get("status") in ESTADOS_ACTIVOS:
-            # Ya hay uno en marcha: esperar a que termine antes de encolar otro.
-            return 0
+            # Uno en marcha de verdad bloquea la cola a proposito, para que el
+            # analisis vaya de uno en uno. Pero un zombi no: si contara, dos
+            # trabajos muertos dejarian la cola parada para siempre, que es
+            # exactamente lo que paso durante doce horas.
+            if not _zombi(manifest, EDAD_ZOMBI_S):
+                return 0
+            continue
         if (manifest.get("status") not in ESTADOS_REINTENTABLES or
                 _reintento_pendiente(manifest) or
                 not _mp4_path(raw_id).is_file() or
@@ -614,7 +635,17 @@ def _run(raw_id: str, modo_actual: str, intento: str,
             _THREADS.pop((raw_id, intento), None)
 
 
-def recuperar_huerfanos():
+def recuperar_huerfanos(max_edad_s: float | None = None):
+    """Devuelve a la cola lo que quedo en 'procesando' sin nadie detras.
+
+    Al arrancar se recupera todo (max_edad_s=None), porque ningun hilo
+    sobrevive al reinicio. En caliente hay que llamarla con una edad maxima,
+    para no tocar los trabajos que si estan corriendo ahora mismo.
+
+    Hacia falta en caliente: dos trabajos quedaron en 'procesando_luna' tras un
+    redespliegue y, como esta funcion solo corria al arrancar y el proceso ya
+    no volvio a reiniciarse, bloquearon la cola entera durante doce horas.
+    """
     if not RAW.exists():
         return
     for path in RAW.glob("*.json"):
@@ -622,6 +653,8 @@ def recuperar_huerfanos():
             manifest = json.loads(path.read_text(encoding="utf-8"))
             estado = manifest.get("status", "")
             if estado not in ESTADOS_ACTIVOS:
+                continue
+            if max_edad_s is not None and not _zombi(manifest, max_edad_s):
                 continue
             raw_id = validar_id(manifest.get("id", path.stem))
             nuevo = "error_gemini" if estado.endswith("gemini") else "error_luna"
