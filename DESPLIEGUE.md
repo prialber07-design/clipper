@@ -14,7 +14,7 @@ Al final hay un anexo con las recetas de despliegue. Ese anexo es material de
 consulta, no el contenido principal.
 
 **Última actualización del código: 3 de agosto de 2026, 02:15 CEST.**
-**Última verificación del servidor: 3 de agosto de 2026, 02:20 CEST.**
+**Última verificación del servidor: 3 de agosto de 2026, 17:50 CEST.**
 
 > **La cola está atascada**: 102 candidatos RAW en `pendiente` y solo 4 con
 > análisis. Ver "Estado real del servidor". El código de este repositorio
@@ -245,6 +245,43 @@ PY
 persona confirme que el CLI no va a gastar créditos extra. Si el código la
 escribiera solo, Clipper afirmaría algo que nadie ha verificado, que es justo
 lo que la comprobación quiere evitar.
+
+### Permisos de `agy` en modo headless
+
+Sin esto el análisis **no funciona**, y falla de la forma más silenciosa posible:
+`agy` sale con código 0 y sin nada en stdout, unos cinco segundos después de
+arrancar. El motivo solo aparece en su stderr:
+
+```
+jetski: no output produced — a tool required the "read_file" permission that
+headless mode cannot prompt for, so it was auto-denied.
+```
+
+En headless no hay a quién preguntar, así que toda herramienta sin regla previa
+se deniega sola. Hay que concederlas por adelantado en `permissions.allow` del
+`settings.json` de `agy`, con la forma `action(target)`.
+
+Lo concedido, a propósito lo mínimo:
+
+```json
+"permissions": {
+  "allow": [
+    "read_file(/app/clips/antigravity-workspace)",
+    "command(ffprobe)"
+  ],
+  "deny": ["command(rm)", "command(curl)", "command(wget)",
+           "command(bash)", "command(sh)"]
+}
+```
+
+**No abras `command(*)`.** Lo que se le da de comer a `agy` es material no
+confiable: el vídeo de un directo, su transcripción y el chat en vivo. Todo el
+diseño de `antigravity.py` existe para contener eso, y un permiso de comando
+abierto lo anula. `command(ffprobe)` acota por token con expresión regular
+anclada, y las reglas `deny` mandan sobre las `allow`.
+
+Queda un riesgo residual que conviene conocer: `ffprobe` admite URLs como
+entrada, así que en teoría es un canal de salida. Es estrecho, pero existe.
 
 ### El OAuth ya está hecho
 
