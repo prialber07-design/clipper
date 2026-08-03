@@ -13,12 +13,13 @@ Sirve para tres cosas:
 Al final hay un anexo con las recetas de despliegue. Ese anexo es material de
 consulta, no el contenido principal.
 
-**Última actualización del código: 3 de agosto de 2026, 02:15 CEST.**
+**Última actualización del código: 3 de agosto de 2026, 17:50 CEST.**
 **Última verificación del servidor: 3 de agosto de 2026, 17:50 CEST.**
 
-> **La cola está atascada**: 102 candidatos RAW en `pendiente` y solo 4 con
-> análisis. Ver "Estado real del servidor". El código de este repositorio
-> **no está desplegado**: EasyPanel necesita un redespliegue.
+> **El análisis visual todavía no produce nada.** `agy` se ejecuta pero se
+> queda sin permisos en modo headless. Ver "Permisos de `agy` en modo
+> headless", que es el paso que falta.
+
 Si hoy es una fecha muy posterior, trata la sección "Estado real del servidor"
 como caducada y verifícala con los comandos del apartado "Cómo comprobar el
 estado tú mismo" antes de afirmar nada.
@@ -101,28 +102,25 @@ Esto está implementado y verificado en el servidor.
 
 ## Estado real del servidor
 
-Verificado por SSH el 3 de agosto de 2026 a las 02:20 CEST, con la skill
+Verificado por SSH el 3 de agosto de 2026 a las 17:50 CEST, con la skill
 `server-access` (clave dedicada, sin contraseña).
 
 | Cosa | Estado |
 |---|---|
-| Captura | Activa. Entran RAW nuevos cada pocos minutos |
-| Candidatos RAW | **102, todos en `pendiente`** |
-| Con análisis v2 | **4** (`lacobraaa` x2, `rdjavi` x2, del 2 de agosto) |
-| Errores en `_gemini/errors/` | 0 |
+| Canales vigilados | 4: `davooxeneize`, `rdjavi`, `lopezfnx`, `elcalvolol` |
+| Candidatos RAW | ~174, creciendo unos 35 por hora |
+| Con análisis v2 | **0**. `agy` corre pero se queda sin permisos |
 | `LISTOS` | 2 clips |
-| `REVISAR` | 85 clips |
-| Proceso `agy` vivo | **Ninguno** |
-| RAW más antiguo | 2 de agosto, 05:07. Nada supera aún los 7 días |
-| Disco | 202 GB de 388 usados, 187 libres. RAW 3,4 GB, REVISAR 3,1 GB, buffer 4,6 GB |
+| `REVISAR` | 87 clips |
+| Disco | 242 GB de 388 usados, 146 libres. RAW 7,2 GB |
+| Carga | ~2,4 con 4 canales |
 
-Lectura: el cuello de botella no es el código, es que **nadie analiza la cola**.
-La captura produce y nada consume. Con el consumidor v2 ya en el repositorio,
-basta desplegar y tener un `agy` que escriba los JSON.
+Lectura: la cadena funciona entera salvo el último eslabón. Se ha visto un
+recorrido completo (Gemini v2 → Luna → render → `REVISAR`), así que el problema
+no es el diseño. Lo que falta es que `agy` pueda analizar en headless.
 
-Ojo con la limpieza: el arreglo de retención de RAW llegó a tiempo, pero por
-poco. Con el código anterior, esos 102 candidatos se habrían empezado a borrar
-al cumplir siete días.
+La cola crece más rápido de lo que se drena. Cuando el análisis arranque, hay
+que medir el ritmo real y ajustar canales otra vez si no alcanza.
 
 ## Qué NO funciona todavía
 
