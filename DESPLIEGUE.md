@@ -13,7 +13,7 @@ Sirve para tres cosas:
 Al final hay un anexo con las recetas de despliegue. Ese anexo es material de
 consulta, no el contenido principal.
 
-**Última actualización del código: 3 de agosto de 2026, 01:15 CEST.**
+**Última actualización del código: 3 de agosto de 2026, 02:15 CEST.**
 **Última verificación del servidor: 2 de agosto de 2026, 22:10 CEST.**
 Si hoy es una fecha muy posterior, trata la sección "Estado real del servidor"
 como caducada y verifícala con los comandos del apartado "Cómo comprobar el
@@ -113,7 +113,9 @@ Esto está implementado y verificado en el servidor.
    bloquea el objetivo del proyecto, no solo el despliegue. Hasta resolverlo,
    todo lo demás es infraestructura sin salida comercial.
 2. **`agy` no persiste.** Hace falta una sola ejecución de `agy` que sobreviva
-   fuera de una sesión interactiva, sin depender de `Schedule`.
+   fuera de una sesión interactiva, sin depender de `Schedule`. Ver
+   "Análisis visual dentro del contenedor": el camino está despejado salvo dos
+   pasos manuales.
 3. **Falta verificar el recorrido desplegado.** El cable v2 → Luna ya está en
    el código; falta desplegarlo y comprobar una salida real y sus reintentos.
 
@@ -122,6 +124,47 @@ Esto está implementado y verificado en el servidor.
 Desplegar y verificar el bloqueante 3. Después hacer persistente `agy` para que
 los nuevos RAW reciban análisis sin una sesión interactiva. En todo momento
 `CLIPPER_RAW_MODO` permanece en `manual`.
+
+## Análisis visual dentro del contenedor
+
+Probado el 3 de agosto de 2026 con Docker en local. Conclusión: `agy` puede
+vivir dentro del contenedor y su sesión persiste en el volumen. Lo verificado:
+
+- `agy 1.1.9` se instala con el script oficial y corre dentro de la imagen como
+  el usuario sin privilegios (uid 10001). Es la misma versión que hay en el host.
+- `HOME=/app/clips/antigravity` y `antigravity.workspace()` caen los dos dentro
+  del volumen, así que lo que `agy` escriba sobrevive a un redespliegue.
+
+Y el fallo que había, ya corregido en el código:
+
+- El Dockerfile creaba `/app/clips/antigravity` solo en tiempo de build. Con el
+  volumen con nombre de `docker-compose.yml` eso bastaba, porque Docker copia el
+  contenido de la imagen la primera vez. Pero **EasyPanel monta una carpeta del
+  host y un bind mount tapa lo que la imagen trajera**: comprobado, `HOME` no
+  existía. Ahora `servidor.preparar_volumen()` crea esas carpetas al arrancar,
+  solo si caen dentro del volumen.
+
+### Los dos pasos que siguen siendo manuales
+
+**1. OAuth.** Hay que autenticar `agy` una vez dentro del contenedor. Necesita
+una cuenta de Google en un navegador, así que lo hace una persona. Al vivir
+`HOME` en el volumen, basta hacerlo una vez.
+
+**2. `useG1Credits`.** `antigravity.analizar()` se niega a invocar el CLI si no
+puede confirmar `useG1Credits=false`, y `agy` **no escribe esa clave por su
+cuenta**. Comprobado sobre un `settings.json` real: sin la clave, la función
+devuelve `credits_unknown` y el análisis se omite aunque todo lo demás esté bien.
+Hay que añadirla a mano en
+`/app/clips/antigravity/.gemini/antigravity-cli/settings.json`:
+
+```json
+{ "useG1Credits": false }
+```
+
+**Esto no se automatiza a propósito.** La puerta existe para que una persona
+confirme que el CLI no va a gastar créditos extra. Si el código la escribiera
+solo, Clipper estaría afirmando algo que nadie ha verificado, que es justo lo
+que la comprobación quiere evitar. Es un paso de instalación, no un bug.
 
 ---
 

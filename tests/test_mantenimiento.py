@@ -248,6 +248,51 @@ class RmsSegmentoTests(unittest.TestCase):
         self.assertAlmostEqual(self._con_stderr(stderr), 3276.8, places=1)
 
 
+class PrepararVolumenTests(unittest.TestCase):
+    """HOME vive en el volumen y un bind mount lo deja sin crear."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.previous = servidor.DATA
+        servidor.DATA = self.root
+
+    def tearDown(self):
+        servidor.DATA = self.previous
+        self.temp.cleanup()
+
+    def test_crea_el_home_de_agy_dentro_del_volumen(self):
+        home = self.root / "antigravity"
+        with patch.dict(os.environ, {"HOME": str(home)}, clear=True):
+            servidor.preparar_volumen()
+        self.assertTrue(home.is_dir(), "sin HOME, agy no puede guardar la sesion")
+
+    def test_crea_tambien_la_carpeta_del_modelo(self):
+        modelos = self.root / "modelos"
+        with patch.dict(os.environ, {"HF_HOME": str(modelos)}, clear=True):
+            servidor.preparar_volumen()
+        self.assertTrue(modelos.is_dir())
+
+    def test_no_toca_un_home_fuera_del_volumen(self):
+        fuera = Path(self.temp.name).parent / "home-de-verdad-no-crear"
+        with patch.dict(os.environ, {"HOME": str(fuera)}, clear=True):
+            servidor.preparar_volumen()
+        self.assertFalse(fuera.exists(), "solo debe crear rutas dentro del volumen")
+
+    def test_respeta_una_carpeta_que_ya_existe(self):
+        home = self.root / "antigravity"
+        home.mkdir()
+        (home / "sesion.json").write_text("{}", encoding="utf-8")
+        with patch.dict(os.environ, {"HOME": str(home)}, clear=True):
+            servidor.preparar_volumen()
+        self.assertTrue((home / "sesion.json").exists(), "no debe pisar lo que hay")
+
+    def test_sin_variables_no_hace_nada(self):
+        with patch.dict(os.environ, {}, clear=True):
+            servidor.preparar_volumen()
+        self.assertEqual(list(self.root.iterdir()), [])
+
+
 class AdjuntoNtfyTests(unittest.TestCase):
     def test_el_adjunto_viene_desactivado(self):
         """Con ntfy anonimo el adjunto nunca llegaba a enviarse."""

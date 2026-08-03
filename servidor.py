@@ -249,6 +249,40 @@ def limpiar_archivos_antiguos(dias: int = 7):
                  borrados, dias)
 
 
+def preparar_volumen():
+    """Crea en el volumen las carpetas que la imagen solo trae en tiempo de build.
+
+    El Dockerfile hace mkdir de /app/clips/antigravity y /app/clips/modelos, y
+    apunta ahi HOME y HF_HOME. Con un volumen con nombre eso basta, porque
+    Docker copia el contenido de la imagen la primera vez. Pero EasyPanel monta
+    una carpeta del host sobre /app/clips, y un bind mount tapa lo que la imagen
+    tuviera debajo: comprobado, HOME no existe. Sin HOME, agy no tiene donde
+    guardar su sesion y el OAuth no sobrevive a un reinicio.
+
+    Solo se tocan rutas que caen dentro del volumen: fuera de ahi, el HOME es
+    el del usuario y no es cosa nuestra.
+    """
+    try:
+        base = DATA.resolve()
+    except OSError:
+        return
+    for variable in ("HOME", "HF_HOME"):
+        valor = os.environ.get(variable, "").strip()
+        if not valor:
+            continue
+        ruta = Path(valor)
+        try:
+            if not ruta.resolve().is_relative_to(base) or ruta.is_dir():
+                continue
+            ruta.mkdir(parents=True, exist_ok=True)
+            LOG.info("📁 CARPETA DEL VOLUMEN CREADA\n   VARIABLE: %s\n   RUTA: %s",
+                     variable, ruta)
+        except OSError as e:
+            LOG.warning("⚠️ NO SE PUDO CREAR LA CARPETA DEL VOLUMEN\n"
+                        "   VARIABLE: %s\n   RUTA: %s\n   MOTIVO: %s",
+                        variable, ruta, e)
+
+
 def main():
     p = argparse.ArgumentParser(description="supervisor de vigilantes")
     p.add_argument("--canales", help="lista separada por comas; por defecto, todos")
@@ -265,6 +299,8 @@ def main():
 
     LOG.info("🚀 SUPERVISOR INICIANDO\n   VIGILANTES: %d\n   FECHA: %s",
              len(lista), datetime.now().astimezone().isoformat(timespec="seconds"))
+
+    preparar_volumen()
 
     # La galeria va en el mismo proceso: un contenedor, un puerto, una cosa
     # que vigilar.
