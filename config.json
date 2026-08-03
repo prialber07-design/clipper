@@ -42,26 +42,6 @@
                         "layout":  "irl"
                     },
                     {
-                        "nombre":  "Mario Taxi",
-                        "plataforma":  "kick",
-                        "canal":  "mariotaxi",
-                        "seguidores":  6029,
-                        "verificado":  true,
-                        "detector":  "reaccion",
-                        "permiso_clips":  "PENDIENTE",
-                        "layout":  "irl"
-                    },
-                    {
-                        "nombre":  "Viviendo en la calle",
-                        "plataforma":  "kick",
-                        "canal":  "viviendoenlacalle",
-                        "seguidores":  5280,
-                        "verificado":  true,
-                        "detector":  "reaccion",
-                        "permiso_clips":  "PENDIENTE",
-                        "layout":  "irl"
-                    },
-                    {
                         "nombre":  "Lopezfnx",
                         "plataforma":  "twitch",
                         "canal":  "lopezfnx",
