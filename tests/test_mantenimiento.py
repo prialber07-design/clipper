@@ -622,6 +622,56 @@ class TranscripcionPorLotesTests(unittest.TestCase):
         self.assertEqual(normales["language"], "es")
 
 
+class MotivoHookRechazadoTests(unittest.TestCase):
+    """Un rechazo de titulo debe decir que regla salto, sin filtrar el texto."""
+
+    def _motivo(self, texto):
+        hook, motivo = clipper._sanear_hook_detallado(texto)
+        return hook, motivo
+
+    def test_un_titulo_valido_pasa_sin_motivo(self):
+        hook, motivo = self._motivo("Nunca había visto algo así")
+        self.assertTrue(hook)
+        self.assertEqual(motivo, "")
+
+    def test_dice_que_son_las_llaves(self):
+        _, motivo = self._motivo("Esto {rompe} los subtítulos")
+        self.assertIn("llaves", motivo)
+
+    def test_dice_que_el_emoji_va_en_medio(self):
+        _, motivo = self._motivo("Mira 😱 lo que pasó aquí")
+        self.assertIn("despues del primer emoji", motivo)
+
+    def test_los_emojis_al_final_si_valen(self):
+        hook, motivo = self._motivo("Se acabó la paciencia 😱")
+        self.assertTrue(hook, motivo)
+        self.assertEqual(motivo, "")
+
+    def test_dice_que_sobran_emojis(self):
+        _, motivo = self._motivo("Se acabó la paciencia 😱😱😱")
+        self.assertIn("emojis", motivo)
+        self.assertIn("2", motivo)
+
+    def test_dice_que_ocupa_demasiadas_lineas(self):
+        _, motivo = self._motivo("Palabra " * 9)
+        self.assertTrue(motivo, "un titulo larguisimo debe explicar por que cae")
+
+    def test_dice_que_no_llego_texto(self):
+        _, motivo = self._motivo(None)
+        self.assertIn("no devolvio texto", motivo)
+
+    def test_el_motivo_no_filtra_el_titulo(self):
+        """Los logs no guardan respuestas del modelo, y esto va al log."""
+        secreto = "Frase confidencial del modelo"
+        _, motivo = self._motivo(secreto + " {roto}")
+        self.assertNotIn("confidencial", motivo)
+        self.assertNotIn(secreto, motivo)
+
+    def test_la_funcion_simple_sigue_funcionando(self):
+        self.assertEqual(clipper._sanear_hook("Esto {rompe} todo"), "")
+        self.assertTrue(clipper._sanear_hook("Nunca había visto algo así"))
+
+
 class RenderCalidadTests(unittest.TestCase):
     def test_el_crf_no_desperdicia_bitrate(self):
         """Las plataformas recodifican: un CRF bajo solo cuesta tiempo y megas."""

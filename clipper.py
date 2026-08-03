@@ -275,13 +275,22 @@ def _emoji_count(valor: str) -> int:
     return cuenta
 
 
-def _sanear_hook(valor, clave: str = "") -> str:
+def _sanear_hook_detallado(valor, clave: str = "") -> tuple[str, str]:
+    """Devuelve (hook, motivo_del_rechazo).
+
+    El motivo nombra la regla que salto, nunca el texto: las respuestas del
+    modelo no se guardan en los logs. Sin esto, un rechazo llegaba al log como
+    'screen_title vacio' y no habia forma de saber que regla lo tiro ni si
+    convenia relajarla.
+    """
     original = valor if isinstance(valor, str) else ""
+    if not isinstance(valor, str):
+        return "", "el modelo no devolvio texto"
     if re.search(r"(?:\\|[{}])", original):
-        return ""
+        return "", "lleva barras o llaves, que romperian los subtitulos"
     hook = _ocultar_clave(_texto_llm(original, LLM_TITLE_MAX_CHARS), clave)
     if not hook:
-        return ""
+        return "", "vacio tras limpiar y recortar a %d caracteres" % LLM_TITLE_MAX_CHARS
     posiciones = [i for i, c in enumerate(hook)
                   if 0x1F000 <= ord(c) <= 0x1FAFF or
                   0x2600 <= ord(c) <= 0x27FF]
@@ -290,13 +299,22 @@ def _sanear_hook(valor, clave: str = "") -> str:
         sufijo = hook[primer_emoji:].strip()
         permitido = (r"[^\U0001F000-\U0001FAFF\u2600-\u27FF\u200d\ufe0f"
                      r"\U0001F3FB-\U0001F3FF\s]")
-        if (any(0x1F000 <= ord(c) <= 0x1FAFF or 0x2600 <= ord(c) <= 0x27FF
-                for c in hook[:primer_emoji]) or
-                re.search(permitido, sufijo) or _emoji_count(sufijo) > 2):
-            return ""
-    if len(_partir_hook(hook, max_lineas=None).split(r"\N")) > 2:
-        return ""
-    return hook
+        # Que haya texto normal despues del primer emoji significa que el
+        # emoji va en medio de la frase, y aqui solo se admiten al final.
+        # (La comprobacion original miraba tambien si habia emojis antes del
+        # primero, que por definicion es imposible: era una rama muerta.)
+        if re.search(permitido, sufijo):
+            return "", "hay texto despues del primer emoji; solo se admiten al final"
+        if _emoji_count(sufijo) > 2:
+            return "", f"{_emoji_count(sufijo)} emojis al final, el maximo es 2"
+    lineas = len(_partir_hook(hook, max_lineas=None).split(r"\N"))
+    if lineas > 2:
+        return "", f"ocupa {lineas} lineas en pantalla, el maximo es 2"
+    return hook, ""
+
+
+def _sanear_hook(valor, clave: str = "") -> str:
+    return _sanear_hook_detallado(valor, clave)[0]
 
 
 def _sanear_descripcion(valor, clave: str = "") -> str:
@@ -462,7 +480,7 @@ def evaluar_editorial(canal: str, motivo: str, segmentos: list, chat: list,
         score = resultado.get("score")
         confidence = resultado.get("confidence")
         reason = _ocultar_clave(_texto_llm(resultado.get("reason"), 300), clave)
-        title = _sanear_hook(resultado.get("screen_title"), clave)
+        title, motivo_title = _sanear_hook_detallado(resultado.get("screen_title"), clave)
         descripcion = _sanear_descripcion(resultado.get("social_description"), clave)
         hashtags = _sanear_hashtags(resultado.get("hashtags"), clave)
         if decision not in {"publicar", "revisar", "descartar"}:
@@ -475,7 +493,7 @@ def evaluar_editorial(canal: str, motivo: str, segmentos: list, chat: list,
         if not reason:
             raise ValueError("reason vacío")
         if not title:
-            raise ValueError("screen_title vacío")
+            raise ValueError(f"screen_title rechazado: {motivo_title}")
         if not descripcion:
             raise ValueError("social_description vacía")
         if not hashtags:
