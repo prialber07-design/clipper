@@ -206,7 +206,11 @@ def cmd_fetch(args):
 _MODELO_CACHE = {}
 
 LLM_ENDPOINT = "https://api.openai.com/v1/responses"
-LLM_TITLE_MAX_CHARS = 66
+# 2 lineas de 22 caracteres es lo que cabe en el render (ver _partir_hook).
+# Estaba en 66, o sea que a Luna se le pedia medio titulo mas del que entra:
+# gastar todo el margen garantizaba 3 lineas y rechazo seguro. Fue la causa de
+# 12 de los 15 fallos editoriales del primer dia.
+LLM_TITLE_MAX_CHARS = 44
 LLM_DESCRIPTION_MAX_CHARS = 320
 LLM_HASHTAG_MIN = 4
 LLM_HASHTAG_MAX = 6
@@ -288,9 +292,15 @@ def _sanear_hook_detallado(valor, clave: str = "") -> tuple[str, str]:
         return "", "el modelo no devolvio texto"
     if re.search(r"(?:\\|[{}])", original):
         return "", "lleva barras o llaves, que romperian los subtitulos"
-    hook = _ocultar_clave(_texto_llm(original, LLM_TITLE_MAX_CHARS), clave)
+    # Se limpia con margen de sobra a proposito: recortar aqui a la medida
+    # exacta cortaria la frase a mitad de palabra y encima colaria el filtro
+    # de lineas, dejando un gancho mutilado quemado en el video. Mejor medirlo
+    # entero y rechazarlo entero.
+    hook = _ocultar_clave(_texto_llm(original, LLM_TITLE_MAX_CHARS * 4), clave)
     if not hook:
-        return "", "vacio tras limpiar y recortar a %d caracteres" % LLM_TITLE_MAX_CHARS
+        return "", "vacio tras limpiar"
+    if len(hook) > LLM_TITLE_MAX_CHARS:
+        return "", f"{len(hook)} caracteres, el maximo son {LLM_TITLE_MAX_CHARS}"
     posiciones = [i for i, c in enumerate(hook)
                   if 0x1F000 <= ord(c) <= 0x1FAFF or
                   0x2600 <= ord(c) <= 0x27FF]
@@ -405,7 +415,11 @@ def _llm_prompt(canal: str, motivo: str, segmentos: list, chat: list,
         "momento y el contenido editorial son sólidos; `revisar` que necesita "
         "criterio humano; `descartar` que no aporta un clip útil. Usa de 4 a 6 "
         "hashtags con # y sin espacios. Los emojis son opcionales (cero, uno o "
-        "dos) y solo pueden ir al final del hook."
+        "dos) y solo pueden ir al final del hook.\n"
+        f"`screen_title` va quemado en el vídeo y solo caben {LLM_TITLE_MAX_CHARS} "
+        "caracteres contando espacios y emojis: si te pasas, el clip se "
+        "descarta entero. Escribe un gancho corto y con gancho de verdad, no "
+        "una frase descriptiva."
         + visual
     )
 

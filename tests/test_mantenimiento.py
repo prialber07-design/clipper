@@ -705,6 +705,26 @@ class MotivoHookRechazadoTests(unittest.TestCase):
         _, motivo = self._motivo("Palabra " * 9)
         self.assertTrue(motivo, "un titulo larguisimo debe explicar por que cae")
 
+    def test_el_limite_cuadra_con_lo_que_cabe_en_pantalla(self):
+        """66 caracteres no entraban en 2 lineas de 22: era rechazo seguro."""
+        self.assertLessEqual(clipper.LLM_TITLE_MAX_CHARS, 2 * 22)
+
+    def test_un_titulo_largo_se_rechaza_entero_sin_mutilarlo(self):
+        largo = "Perdi tres mil euros en una sola noche y no me lo creo"
+        hook, motivo = self._motivo(largo)
+        self.assertEqual(hook, "", "un gancho cortado a medias no puede quemarse")
+        self.assertIn("caracteres", motivo)
+        self.assertIn(str(len(largo)), motivo, "debe decir cuanto se paso")
+
+    def test_a_luna_se_le_dice_el_limite(self):
+        """Rechazar por una regla que el modelo no conoce es un bucle tonto."""
+        prompt = clipper._llm_prompt("canal", "pico", [], [], 30.0, 5.0)
+        self.assertIn(str(clipper.LLM_TITLE_MAX_CHARS), prompt)
+
+    def test_un_titulo_que_cabe_pasa(self):
+        hook, motivo = self._motivo("Nunca vi nada igual en directo")
+        self.assertTrue(hook, motivo)
+
     def test_dice_que_no_llego_texto(self):
         _, motivo = self._motivo(None)
         self.assertIn("no devolvio texto", motivo)
