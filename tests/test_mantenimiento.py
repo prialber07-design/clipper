@@ -813,7 +813,7 @@ class DiagnosticoAgyTests(unittest.TestCase):
         self.assertEqual(antigravity._diagnostico(None), "(sin mensaje)")
 
     def test_recorta(self):
-        self.assertLessEqual(len(antigravity._diagnostico("x" * 900)), 300)
+        self.assertLessEqual(len(antigravity._diagnostico("x" * 2000)), 700)
 
 
 class AnalisisNoConfiguradoTests(unittest.TestCase):

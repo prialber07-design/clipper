@@ -59,7 +59,7 @@ def _secretos() -> list[str]:
             and any(palabra in nombre.upper() for palabra in claves)]
 
 
-def _diagnostico(texto, limite: int = 300) -> str:
+def _diagnostico(texto, limite: int = 700) -> str:
     """Resumen del stderr de agy, apto para el log.
 
     _texto() no vale aqui: rechaza lo que lleve backticks o parezca un comando,
