@@ -361,6 +361,52 @@ def procesar_analizados() -> int:
     return encolados
 
 
+def procesar_pendientes(limite: int = 1) -> int:
+    """Encola candidatos sin análisis para que Gemini los mire dentro del contenedor.
+
+    El motivo por el que esta ruta estaba dormida era que el `agy` autenticado
+    vivía en el host. Ya no: el token OAuth está en el volumen, así que el CLI
+    del contenedor puede analizar por sí mismo.
+
+    Se encola de uno en uno y el más antiguo primero. El análisis se serializa
+    con su propio cerrojo y cada uno puede tardar hasta dos minutos, así que
+    encolar la cola entera solo crearía cientos de hilos esperando turno.
+
+    El interruptor es `CLIPPER_ANTIGRAVITY_ACTIVO`: en 0 esta función no hace
+    nada y el comportamiento es el de antes, esperar análisis externos.
+    """
+    if not RAW.exists() or not antigravity.activo():
+        return 0
+
+    candidatos = []
+    for path in RAW.glob("*.json"):
+        raw_id = path.stem
+        try:
+            manifest = _read(raw_id)
+        except RawError:
+            continue
+        if manifest.get("status") in ESTADOS_ACTIVOS:
+            # Ya hay uno en marcha: esperar a que termine antes de encolar otro.
+            return 0
+        if (manifest.get("status") not in ESTADOS_REINTENTABLES or
+                _reintento_pendiente(manifest) or
+                not _mp4_path(raw_id).is_file() or
+                _gemini_path(raw_id).is_file()):
+            continue
+        candidatos.append((str(manifest.get("created_at", "")), raw_id))
+
+    encolados = 0
+    for _, raw_id in sorted(candidatos)[:max(0, int(limite))]:
+        try:
+            enqueue(raw_id, "gemini")
+            encolados += 1
+        except RawActivo:
+            break
+        except RawError:
+            continue
+    return encolados
+
+
 def _fallar(raw_id: str, modo_actual: str, estado: str, error, evento: str = "",
             reintentar: bool = False):
     motivo = _error_text(error)
@@ -466,6 +512,11 @@ def _render_and_publish(manifest: dict, mp4: Path, hook: str, llm: dict) -> dict
 def _run(raw_id: str, modo_actual: str, intento: str,
          visual_prevalidado: dict | None = None):
     fase = "gemini" if modo_actual == "gemini" else "luna"
+    automatico = visual_prevalidado is not None
+    # Ambas entradas las dispara ahora el supervisor, no una persona: sin
+    # espera creciente, un agy que falle (cuota, OAuth caducado) se
+    # reintentaria cada 15 segundos para siempre.
+    reintentable = automatico or modo_actual == "gemini"
     try:
         with bloqueo.exclusivo(_PROCESS_LOCK, etiqueta="procesamiento RAW"):
             manifest = _read(raw_id)
@@ -476,7 +527,6 @@ def _run(raw_id: str, modo_actual: str, intento: str,
                 raise RawError("MP4 RAW ausente")
 
             visual = visual_prevalidado
-            automatico = visual_prevalidado is not None
             if automatico:
                 _update(raw_id, status="procesando_luna", gemini={
                     "model": "external-v2",
@@ -507,7 +557,8 @@ def _run(raw_id: str, modo_actual: str, intento: str,
                               "GEMINI_EMPTY_OUTPUT" if estado == "empty_output" else
                               "GEMINI_INVALID_JSON" if estado == "invalid_json" else
                               "GEMINI_FAILED")
-                    _fallar(raw_id, modo_actual, "error_gemini", estado, evento)
+                    _fallar(raw_id, modo_actual, "error_gemini", estado, evento,
+                            reintentar=reintentable)
                     return
                 _evento("GEMINI_FINISHED", raw_id, modo_actual=modo_actual,
                         status="ok", latency_ms=visual_meta.get("latency_ms", 0))
@@ -530,7 +581,7 @@ def _run(raw_id: str, modo_actual: str, intento: str,
                 )
             except Exception as error:
                 _fallar(raw_id, modo_actual, "error_luna", error, "LUNA_FAILED",
-                        reintentar=automatico)
+                        reintentar=reintentable)
                 return
             _update(raw_id, luna=llm)
             _evento("LUNA_FINISHED", raw_id, modo_actual=modo_actual,
@@ -541,7 +592,7 @@ def _run(raw_id: str, modo_actual: str, intento: str,
                 destination = _render_and_publish(manifest, mp4, hook, llm)
             except Exception as error:
                 _fallar(raw_id, modo_actual, "error_render", error, "RENDER_FAILED",
-                        reintentar=automatico)
+                        reintentar=reintentable)
                 return
             _update(raw_id, status="completado", last_error="", destination=destination,
                     retry_count=0, next_retry_at="")
@@ -553,7 +604,8 @@ def _run(raw_id: str, modo_actual: str, intento: str,
             "render": ("error_render", "RENDER_FAILED"),
         }
         estado, evento = estados[fase]
-        _fallar(raw_id, modo_actual, estado, error, evento)
+        _fallar(raw_id, modo_actual, estado, error, evento,
+                reintentar=reintentable)
     finally:
         with _THREADS_LOCK:
             _THREADS.pop((raw_id, intento), None)

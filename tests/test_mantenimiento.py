@@ -5,6 +5,7 @@ import os
 import tempfile
 import time
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -291,6 +292,126 @@ class PrepararVolumenTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             servidor.preparar_volumen()
         self.assertEqual(list(self.root.iterdir()), [])
+
+
+class ProcesarPendientesTests(unittest.TestCase):
+    """La ruta Gemini integrada vuelve a dispararse, pero con freno."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.previous = (raw.RAW, raw.RAW_LOG, raw._MANIFEST_LOCK,
+                         raw._PROCESS_LOCK, clipper.DATA, clipper.OUT)
+        raw.RAW = self.root / "out" / "RAW"
+        raw.RAW_LOG = self.root / "logs" / "raw.jsonl"
+        raw._MANIFEST_LOCK = self.root / "manifest.lock"
+        raw._PROCESS_LOCK = self.root / "process.lock"
+        clipper.DATA = self.root
+        clipper.OUT = self.root / "out"
+        raw.RAW.mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        (raw.RAW, raw.RAW_LOG, raw._MANIFEST_LOCK,
+         raw._PROCESS_LOCK, clipper.DATA, clipper.OUT) = self.previous
+        self.temp.cleanup()
+
+    def _candidato(self, raw_id, status="pendiente", creado="2026-08-02T05:00:00+00:00",
+                   con_gemini=False, next_retry_at=""):
+        (raw.RAW / f"{raw_id}.mp4").write_bytes(b"raw")
+        raw._atomic_write(raw.RAW / f"{raw_id}.json", {
+            "id": raw_id, "status": status, "created_at": creado,
+            "duracion": 30.0, "next_retry_at": next_retry_at,
+        })
+        if con_gemini:
+            destino = raw.RAW / "_gemini" / f"{raw_id}.json"
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            destino.write_text("{}", encoding="utf-8")
+
+    def _encolar(self, activo=True, limite=1):
+        with patch.object(raw.antigravity, "activo", return_value=activo), \
+             patch.object(raw, "enqueue") as enqueue:
+            encolados = raw.procesar_pendientes(limite=limite)
+        return encolados, [call.args[0] for call in enqueue.call_args_list]
+
+    def test_encola_el_candidato_pendiente(self):
+        self._candidato("uno-01")
+        encolados, ids = self._encolar()
+        self.assertEqual(encolados, 1)
+        self.assertEqual(ids, ["uno-01"])
+
+    def test_el_interruptor_lo_apaga(self):
+        self._candidato("uno-01")
+        encolados, ids = self._encolar(activo=False)
+        self.assertEqual((encolados, ids), (0, []),
+                         "CLIPPER_ANTIGRAVITY_ACTIVO=0 debe frenarlo todo")
+
+    def test_empieza_por_el_mas_antiguo(self):
+        self._candidato("nuevo-01", creado="2026-08-02T20:00:00+00:00")
+        self._candidato("viejo-01", creado="2026-08-01T05:00:00+00:00")
+        _, ids = self._encolar()
+        self.assertEqual(ids, ["viejo-01"], "la cola debe drenarse en orden")
+
+    def test_no_encola_si_hay_uno_en_marcha(self):
+        self._candidato("activo-01", status="procesando_gemini")
+        self._candidato("espera-01")
+        encolados, ids = self._encolar()
+        self.assertEqual((encolados, ids), (0, []),
+                         "el analisis se serializa: uno cada vez")
+
+    def test_ignora_los_que_ya_tienen_analisis(self):
+        self._candidato("hecho-01", con_gemini=True)
+        encolados, ids = self._encolar()
+        self.assertEqual((encolados, ids), (0, []),
+                         "de esos ya se ocupa procesar_analizados")
+
+    def test_respeta_la_espera_creciente(self):
+        futuro = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+        self._candidato("fallado-01", status="error_gemini", next_retry_at=futuro)
+        encolados, ids = self._encolar()
+        self.assertEqual((encolados, ids), (0, []),
+                         "un agy que falla no puede reintentarse cada 15s")
+
+    def test_reintenta_cuando_vence_la_espera(self):
+        pasado = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        self._candidato("fallado-01", status="error_gemini", next_retry_at=pasado)
+        encolados, _ = self._encolar()
+        self.assertEqual(encolados, 1)
+
+    def test_no_toca_los_completados(self):
+        self._candidato("listo-01", status="completado")
+        encolados, ids = self._encolar()
+        self.assertEqual((encolados, ids), (0, []))
+
+    def test_un_fallo_de_gemini_programa_la_espera(self):
+        """Lo contrario seria machacar agy cada 15 segundos con cuota agotada."""
+        self._candidato("falla-01")
+        _, intento = raw._claim("falla-01", "gemini")
+        with patch.object(raw.antigravity, "analizar",
+                          return_value=(None, {"status": "quota", "latency_ms": 5})):
+            raw._run("falla-01", "gemini", intento)
+        actual = raw._read("falla-01")
+        self.assertEqual(actual["status"], "error_gemini")
+        self.assertEqual(actual["retry_count"], 1)
+        self.assertTrue(actual["next_retry_at"], "sin espera se reintenta en bucle")
+        self.assertGreater(datetime.fromisoformat(actual["next_retry_at"]),
+                           datetime.now(timezone.utc))
+
+    def test_la_espera_crece_con_cada_fallo(self):
+        self._candidato("falla-02")
+        for esperado in (1, 2, 3):
+            raw._update("falla-02", status="pendiente", next_retry_at="")
+            _, intento = raw._claim("falla-02", "gemini")
+            with patch.object(raw.antigravity, "analizar",
+                              return_value=(None, {"status": "quota"})):
+                raw._run("falla-02", "gemini", intento)
+            self.assertEqual(raw._read("falla-02")["retry_count"], esperado)
+
+    def test_el_limite_acota_cuantos_entran(self):
+        for i in range(5):
+            self._candidato(f"cand-{i:02d}", creado=f"2026-08-0{i + 1}T05:00:00+00:00")
+        encolados, ids = self._encolar(limite=2)
+        self.assertEqual(encolados, 2)
+        self.assertEqual(ids, ["cand-00", "cand-01"])
 
 
 class AdjuntoNtfyTests(unittest.TestCase):

@@ -150,9 +150,14 @@ al cumplir siete días.
 
 ## Siguiente paso
 
-Desplegar y verificar el bloqueante 3. Después hacer persistente `agy` para que
-los nuevos RAW reciban análisis sin una sesión interactiva. En todo momento
-`CLIPPER_RAW_MODO` permanece en `manual`.
+1. Redesplegar en EasyPanel para que entre el código de este repositorio.
+2. Añadir `useG1Credits: false` y poner `CLIPPER_ANTIGRAVITY_ACTIVO=1`. Ver
+   "Análisis visual dentro del contenedor".
+3. Vigilar el log: `GEMINI_STARTED` → `GEMINI_FINISHED` → `LUNA_*` →
+   `RAW_COMPLETED`. Si aparece `GEMINI_FAILED` con `credits_unknown`, falta el
+   paso 2.
+
+En todo momento `CLIPPER_RAW_MODO` permanece en `manual`.
 
 ## Análisis visual dentro del contenedor
 
@@ -187,27 +192,64 @@ Sobre la creación de `HOME`, con una corrección importante:
   privilegios. Sin esa clave en `false`, `analizar()` devuelve `credits_unknown`.
 - **No hay ningún proceso `agy` vivo**, así que nada consume la cola.
 
-### Los dos pasos que siguen siendo manuales
+### La ruta integrada está reactivada
 
-**1. OAuth.** Hay que autenticar `agy` una vez dentro del contenedor. Necesita
-una cuenta de Google en un navegador, así que lo hace una persona. Al vivir
-`HOME` en el volumen, basta hacerlo una vez.
+Hasta el 3 de agosto la ruta Gemini integrada era **código inalcanzable**:
+`raw.enqueue()` solo aparecía en los tests, porque el `POST /api/raw/process`
+se había retirado. Por eso la cola llegó a 102 pendientes con 4 análisis.
 
-**2. `useG1Credits`.** `antigravity.analizar()` se niega a invocar el CLI si no
-puede confirmar `useG1Credits=false`, y `agy` **no escribe esa clave por su
-cuenta**. Comprobado sobre un `settings.json` real: sin la clave, la función
-devuelve `credits_unknown` y el análisis se omite aunque todo lo demás esté bien.
-Hay que añadirla a mano en
-`/app/clips/antigravity/.gemini/antigravity-cli/settings.json`:
+Ahora `servidor.py` llama cada 15 segundos a `raw.procesar_pendientes()`, que
+encola candidatos para que los analice el `agy` del propio contenedor. Con dos
+frenos:
 
-```json
-{ "useG1Credits": false }
+- **De uno en uno y el más antiguo primero.** El análisis se serializa con su
+  cerrojo y puede tardar hasta dos minutos; encolar 102 solo crearía 102 hilos
+  esperando turno.
+- **Espera creciente ante fallos**: 1, 5, 15 minutos y luego cada hora. Sin
+  esto, un `agy` sin cuota se reintentaría cada 15 segundos para siempre.
+
+Esto **no** abre una puerta para saltarse Gemini: sigue siendo obligatorio un
+análisis v2 válido antes de llegar a Luna. Solo añade quién lo produce.
+
+### Los dos pasos de instalación que faltan
+
+**1. `CLIPPER_ANTIGRAVITY_ACTIVO=1`** en las variables de EasyPanel. Es el
+interruptor. En `0`, que es el valor actual, `procesar_pendientes()` no hace
+nada y el comportamiento es el de antes: esperar análisis externos.
+
+**2. `useG1Credits: false`** en
+`/app/clips/antigravity/.gemini/antigravity-cli/settings.json`.
+`antigravity.analizar()` se niega a invocar el CLI si no puede confirmarlo, y
+`agy` no escribe esa clave por su cuenta. Verificado el 3 de agosto: el fichero
+real solo tenía `trustedWorkspaces`, así que la función devolvía
+`credits_unknown`.
+
+Al añadirla hay que **conservar `trustedWorkspaces`**, que ya apunta a
+`/app/clips/antigravity-workspace` y `/app/clips/out/RAW`. Sobrescribir el
+fichero entero rompería esa confianza. Comando seguro, que hace copia y
+preserva el resto:
+
+```bash
+sudo python3 - <<'PY'
+import json, shutil
+p = "/etc/easypanel/projects/automatizaciones/clips-alberto/volumes/clips/antigravity/.gemini/antigravity-cli/settings.json"
+shutil.copy2(p, p + ".bak")
+d = json.load(open(p))
+d["useG1Credits"] = False
+json.dump(d, open(p, "w"), indent=2)
+print(json.dumps(d, indent=2))
+PY
 ```
 
-**Esto no se automatiza a propósito.** La puerta existe para que una persona
-confirme que el CLI no va a gastar créditos extra. Si el código la escribiera
-solo, Clipper estaría afirmando algo que nadie ha verificado, que es justo lo
-que la comprobación quiere evitar. Es un paso de instalación, no un bug.
+**El paso 2 no se automatiza a propósito.** La puerta existe para que una
+persona confirme que el CLI no va a gastar créditos extra. Si el código la
+escribiera solo, Clipper afirmaría algo que nadie ha verificado, que es justo
+lo que la comprobación quiere evitar.
+
+### El OAuth ya está hecho
+
+Verificado el 3 de agosto: hay un `antigravity-oauth-token` en el volumen.
+No hace falta repetirlo salvo que caduque.
 
 ---
 

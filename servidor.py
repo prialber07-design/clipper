@@ -341,9 +341,12 @@ def main():
             for v in vigilantes:
                 v.revisar()
 
-            # Los análisis los escribe agy en el volumen compartido. Solo un
-            # Gemini v2 válido permite continuar hacia Luna.
+            # Dos fuentes de análisis, y las dos exigen un Gemini v2 válido
+            # antes de llegar a Luna:
+            #   1. JSON que escriba un agy externo en el volumen compartido.
+            #   2. El agy del propio contenedor, si CLIPPER_ANTIGRAVITY_ACTIVO=1.
             raw.procesar_analizados()
+            raw.procesar_pendientes()
 
             # 1. Comprobar si se ha generado un NUEVO CLIP LISTO
             listos_dir = OUT / "LISTOS"
