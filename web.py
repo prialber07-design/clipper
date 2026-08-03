@@ -37,12 +37,69 @@ def _duracion_video_cache(path: Path, mtime_ns: int, size: int) -> int:
     return duracion
 
 
+# La cache en memoria moria en cada reinicio del contenedor, y volver a medir
+# con ffprobe cuesta segundos por fichero en una maquina cargada: con 87 clips
+# eran casi dos minutos de galeria en blanco tras cada despliegue. Se persiste
+# en el volumen, firmada con mtime y tamaño para detectar un fichero cambiado.
+_DURACIONES = DATA / ".duraciones.json"
+_DUR_LOCK = threading.Lock()
+_duraciones: dict | None = None
+_duraciones_sucio = False
+
+
+def _duraciones_cargadas() -> dict:
+    """Lee el indice del disco una sola vez. Llamar con _DUR_LOCK tomado."""
+    global _duraciones
+    if _duraciones is None:
+        try:
+            datos = json.loads(_DURACIONES.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            datos = {}
+        _duraciones = datos if isinstance(datos, dict) else {}
+    return _duraciones
+
+
+def guardar_duraciones():
+    """Vuelca el indice si cambio, podando lo que ya no existe."""
+    global _duraciones_sucio
+    with _DUR_LOCK:
+        if not _duraciones_sucio:
+            return
+        cache = _duraciones_cargadas()
+        vivos = {k: v for k, v in cache.items() if (DATA / k).exists()}
+        cache.clear()
+        cache.update(vivos)
+        temporal = _DURACIONES.with_name(f".{_DURACIONES.name}.{os.getpid()}.tmp")
+        try:
+            temporal.write_text(json.dumps(cache), encoding="utf-8")
+            os.replace(temporal, _DURACIONES)
+            _duraciones_sucio = False
+        except OSError:
+            temporal.unlink(missing_ok=True)
+
+
 def _duracion_video(path: Path) -> int:
+    global _duraciones_sucio
     try:
         stat = path.stat()
     except OSError:
         return 0
-    return _duracion_video_cache(path, stat.st_mtime_ns, stat.st_size)
+    try:
+        clave = path.resolve().relative_to(DATA.resolve()).as_posix()
+    except (OSError, ValueError):
+        clave = path.name
+    firma = f"{stat.st_mtime_ns}:{stat.st_size}"
+
+    with _DUR_LOCK:
+        guardado = _duraciones_cargadas().get(clave)
+    if isinstance(guardado, dict) and guardado.get("firma") == firma:
+        return int(guardado.get("s", 0))
+
+    duracion = _duracion_video_cache(path, stat.st_mtime_ns, stat.st_size)
+    with _DUR_LOCK:
+        _duraciones_cargadas()[clave] = {"firma": firma, "s": duracion}
+        _duraciones_sucio = True
+    return duracion
 
 
 def _leer_motivos(path: Path) -> tuple[str, dict, str]:
@@ -2681,8 +2738,11 @@ class Handler(SimpleHTTPRequestHandler):
         listos = self._obtener_clips_dir(listos_dir, es_revisar=False)
         revisar = self._obtener_clips_dir(revisar_dir, es_revisar=True)
 
-        self._responder_json({"listos": listos, "revisar": revisar,
-                              "raw": raw.listar_api()})
+        datos = {"listos": listos, "revisar": revisar, "raw": raw.listar_api()}
+        # Al terminar el barrido, no en cada fichero: asi un arranque en frio
+        # escribe el indice una vez en vez de 87 veces.
+        guardar_duraciones()
+        self._responder_json(datos)
 
     def _obtener_clips_dir(self, dir_path: Path, es_revisar: bool) -> list:
         clips = []

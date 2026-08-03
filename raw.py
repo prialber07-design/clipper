@@ -628,6 +628,52 @@ def recuperar_huerfanos():
             continue
 
 
+_LISTA_CACHE = {}
+_LISTA_CACHE_LOCK = threading.Lock()
+
+
+def _campos_para_api(raw_id: str, mtime_ns: int) -> dict | None:
+    """Extrae del manifiesto solo lo que la galería enseña, y lo recuerda.
+
+    Un manifiesto lleva la transcripción y las palabras con sus tiempos: son
+    cientos de KB de los que la lista usa seis campos. Con la cola en tres
+    cifras eso era más de un MB de JSON reparseado cada quince segundos, en el
+    mismo proceso que renderiza. Mientras el fichero no cambie, no hay nada
+    nuevo que leer.
+    """
+    with _LISTA_CACHE_LOCK:
+        guardado = _LISTA_CACHE.get(raw_id)
+    if guardado and guardado[0] == mtime_ns:
+        return guardado[1]
+
+    try:
+        manifest = _read(raw_id)
+    except RawError:
+        return None
+    gemini = manifest.get("gemini") or {}
+    luna = manifest.get("luna") or {}
+    destino = manifest.get("destination") or {}
+    campos = {
+        "id": manifest["id"],
+        "canal": manifest.get("canal", ""),
+        "motivo": manifest.get("motivo", ""),
+        "duracion": round(float(manifest.get("duracion", 0))),
+        "status": manifest.get("status", "pendiente"),
+        "last_attempt_at": manifest.get("last_attempt_at", ""),
+        "last_error": manifest.get("last_error", ""),
+        "next_retry_at": manifest.get("next_retry_at", ""),
+        "gemini_latency_ms": gemini.get("latency_ms", 0) if isinstance(gemini, dict) else 0,
+        "luna_latency_ms": luna.get("latency_ms", 0) if isinstance(luna, dict) else 0,
+        "_queue": destino.get("queue") if isinstance(destino, dict) else "",
+        "_name": destino.get("name") if isinstance(destino, dict) else "",
+    }
+    with _LISTA_CACHE_LOCK:
+        if len(_LISTA_CACHE) > 500:
+            _LISTA_CACHE.clear()
+        _LISTA_CACHE[raw_id] = (mtime_ns, campos)
+    return campos
+
+
 def listar_api() -> list[dict]:
     salida = []
     if not RAW.exists():
@@ -642,33 +688,24 @@ def listar_api() -> list[dict]:
     paths.sort(key=mtime, reverse=True)
     for path in paths:
         try:
-            manifest = _read(path.stem)
             mp4 = _mp4_path(path.stem)
             if not mp4.is_file():
                 continue
-            destino = manifest.get("destination") or {}
-            queue = destino.get("queue") if isinstance(destino, dict) else ""
-            name = destino.get("name") if isinstance(destino, dict) else ""
+            campos = _campos_para_api(path.stem, path.stat().st_mtime_ns)
+            if campos is None:
+                continue
+            # Lo que no depende del manifiesto se recalcula siempre: el JSON de
+            # Gemini aparece sin tocarlo, asi que cachearlo lo dejaria obsoleto.
             destination_url = ""
-            if queue in {"LISTOS", "REVISAR"} and isinstance(name, str) and name:
-                destination_url = f"/files/out/{queue}/{quote(name, safe='')}"
-            stat = mp4.stat()
-            gemini = manifest.get("gemini") or {}
-            luna = manifest.get("luna") or {}
+            if (campos["_queue"] in {"LISTOS", "REVISAR"} and
+                    isinstance(campos["_name"], str) and campos["_name"]):
+                destination_url = (f"/files/out/{campos['_queue']}"
+                                   f"/{quote(campos['_name'], safe='')}")
             salida.append({
-                "id": manifest["id"],
+                **{k: v for k, v in campos.items() if not k.startswith("_")},
                 "nombre": mp4.name,
-                "timestamp": stat.st_mtime,
-                "canal": manifest.get("canal", ""),
-                "motivo": manifest.get("motivo", ""),
-                "duracion": round(float(manifest.get("duracion", 0))),
-                "status": manifest.get("status", "pendiente"),
-                "last_attempt_at": manifest.get("last_attempt_at", ""),
-                "last_error": manifest.get("last_error", ""),
-                "gemini_ready": _gemini_path(manifest["id"]).is_file(),
-                "next_retry_at": manifest.get("next_retry_at", ""),
-                "gemini_latency_ms": gemini.get("latency_ms", 0),
-                "luna_latency_ms": luna.get("latency_ms", 0),
+                "timestamp": mp4.stat().st_mtime,
+                "gemini_ready": _gemini_path(campos["id"]).is_file(),
                 "destination": destination_url,
                 "url": f"/files/out/RAW/{quote(mp4.name, safe='')}",
             })

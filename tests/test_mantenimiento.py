@@ -14,6 +14,7 @@ import bloqueo
 import clipper
 import live
 import raw
+import web
 import servidor
 
 
@@ -412,6 +413,128 @@ class ProcesarPendientesTests(unittest.TestCase):
         encolados, ids = self._encolar(limite=2)
         self.assertEqual(encolados, 2)
         self.assertEqual(ids, ["cand-00", "cand-01"])
+
+
+class CacheGaleriaTests(unittest.TestCase):
+    """La galería no puede volver a medir 87 vídeos en cada reinicio."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.previous = (web.DATA, web._DURACIONES, web._duraciones,
+                         web._duraciones_sucio)
+        web.DATA = self.root
+        web._DURACIONES = self.root / ".duraciones.json"
+        web._duraciones = None
+        web._duraciones_sucio = False
+        web._duracion_video_cache.cache_clear()
+        self.clip = self.root / "clip.mp4"
+        self.clip.write_bytes(b"video")
+
+    def tearDown(self):
+        (web.DATA, web._DURACIONES, web._duraciones,
+         web._duraciones_sucio) = self.previous
+        web._duracion_video_cache.cache_clear()
+        self.temp.cleanup()
+
+    def _medir(self, segundos=31):
+        """Cuenta cuántas veces se llama de verdad a ffprobe."""
+        return patch.object(web, "_duracion_video_cache", return_value=segundos)
+
+    def test_el_indice_sobrevive_al_reinicio(self):
+        with self._medir() as ffprobe:
+            self.assertEqual(web._duracion_video(self.clip), 31)
+            web.guardar_duraciones()
+            self.assertEqual(ffprobe.call_count, 1)
+
+        self.assertTrue(web._DURACIONES.is_file(), "no se escribió el índice")
+
+        # Reinicio del contenedor: se pierde la memoria, queda el disco.
+        web._duraciones = None
+        web._duracion_video_cache.cache_clear()
+        with self._medir() as ffprobe:
+            self.assertEqual(web._duracion_video(self.clip), 31)
+            self.assertEqual(ffprobe.call_count, 0,
+                             "tras reiniciar no debe volver a medir")
+
+    def test_un_video_modificado_se_vuelve_a_medir(self):
+        with self._medir(31):
+            web._duracion_video(self.clip)
+            web.guardar_duraciones()
+        web._duraciones = None
+        web._duracion_video_cache.cache_clear()
+        self.clip.write_bytes(b"video mas largo")  # cambia tamaño y mtime
+        with self._medir(64) as ffprobe:
+            self.assertEqual(web._duracion_video(self.clip), 64)
+            self.assertEqual(ffprobe.call_count, 1)
+
+    def test_el_indice_poda_lo_que_ya_no_existe(self):
+        with self._medir():
+            web._duracion_video(self.clip)
+        web.guardar_duraciones()
+        self.clip.unlink()
+        web._duraciones_sucio = True
+        web.guardar_duraciones()
+        self.assertEqual(json.loads(web._DURACIONES.read_text(encoding="utf-8")), {},
+                         "el índice crecería para siempre")
+
+    def test_un_indice_corrupto_no_tumba_la_galeria(self):
+        web._DURACIONES.write_text("{esto no es json", encoding="utf-8")
+        web._duraciones = None
+        with self._medir(31):
+            self.assertEqual(web._duracion_video(self.clip), 31)
+
+
+class CacheListadoRawTests(unittest.TestCase):
+    """El listado no puede reparsear los manifiestos enteros cada 15 s."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.previous = (raw.RAW, clipper.OUT)
+        raw.RAW = self.root / "out" / "RAW"
+        clipper.OUT = self.root / "out"
+        raw.RAW.mkdir(parents=True, exist_ok=True)
+        raw._LISTA_CACHE.clear()
+        (raw.RAW / "uno-01.mp4").write_bytes(b"raw")
+        raw._atomic_write(raw.RAW / "uno-01.json", {
+            "id": "uno-01", "status": "pendiente", "canal": "canal",
+            "duracion": 30.0,
+            # Lo caro de verdad: transcripcion y palabras con sus tiempos.
+            "segments": [{"start": i, "end": i + 1, "text": "palabra"} for i in range(400)],
+            "words": [{"start": i, "end": i + 1, "word": "x"} for i in range(2000)],
+        })
+
+    def tearDown(self):
+        (raw.RAW, clipper.OUT) = self.previous
+        raw._LISTA_CACHE.clear()
+        self.temp.cleanup()
+
+    def test_no_reparsea_un_manifiesto_que_no_cambio(self):
+        raw.listar_api()
+        with patch.object(raw, "_read", wraps=raw._read) as leer:
+            raw.listar_api()
+            raw.listar_api()
+        self.assertEqual(leer.call_count, 0, "estaba releyendo lo mismo cada vez")
+
+    def test_un_manifiesto_modificado_si_se_relee(self):
+        raw.listar_api()
+        raw._update("uno-01", status="completado")
+        item = raw.listar_api()[0]
+        self.assertEqual(item["status"], "completado")
+
+    def test_detecta_el_analisis_nuevo_sin_tocar_el_manifiesto(self):
+        self.assertFalse(raw.listar_api()[0]["gemini_ready"])
+        destino = raw.RAW / "_gemini" / "uno-01.json"
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        destino.write_text("{}", encoding="utf-8")
+        self.assertTrue(raw.listar_api()[0]["gemini_ready"],
+                        "el JSON de Gemini aparece sin modificar el manifiesto")
+
+    def test_el_listado_no_expone_la_transcripcion(self):
+        item = raw.listar_api()[0]
+        for campo in ("segments", "words", "chat", "_queue", "_name"):
+            self.assertNotIn(campo, item)
 
 
 class AdjuntoNtfyTests(unittest.TestCase):
