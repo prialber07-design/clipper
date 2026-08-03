@@ -782,6 +782,40 @@ class ConfirmacionCreditosTests(unittest.TestCase):
             self.assertIsNone(antigravity._credits_habilitados())
 
 
+class DiagnosticoAgyTests(unittest.TestCase):
+    """agy sale con codigo 0 y sin salida: el stderr es la unica pista."""
+
+    def test_recoge_el_mensaje_de_error(self):
+        self.assertIn("token expired",
+                      antigravity._diagnostico("Error: token expired"))
+
+    def test_admite_lo_que__texto_rechazaria(self):
+        """Un stderr con backticks o comandos no puede tumbar el diagnostico."""
+        salida = antigravity._diagnostico("run `sudo agy login` to continue")
+        self.assertIn("agy login", salida)
+
+    def test_no_escupe_la_transcripcion_en_el_log(self):
+        stderr = ("model unavailable\n<UNTRUSTED_CLIPPER_CONTEXT>\n"
+                  '{"transcript":"lo que dijo el streamer"}')
+        salida = antigravity._diagnostico(stderr)
+        self.assertIn("model unavailable", salida)
+        self.assertNotIn("streamer", salida)
+        self.assertNotIn("UNTRUSTED", salida)
+
+    def test_tacha_secretos(self):
+        with patch.dict(os.environ, {"MI_TOKEN": "token-secreto-largo"}):
+            salida = antigravity._diagnostico("fallo con token-secreto-largo")
+        self.assertNotIn("token-secreto-largo", salida)
+        self.assertIn("[REDACTED]", salida)
+
+    def test_sin_stderr_lo_dice(self):
+        self.assertEqual(antigravity._diagnostico(""), "(sin mensaje)")
+        self.assertEqual(antigravity._diagnostico(None), "(sin mensaje)")
+
+    def test_recorta(self):
+        self.assertLessEqual(len(antigravity._diagnostico("x" * 900)), 300)
+
+
 class AnalisisNoConfiguradoTests(unittest.TestCase):
     """Un fallo de configuracion no puede ir quemando candidatos."""
 

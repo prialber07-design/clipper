@@ -59,6 +59,26 @@ def _secretos() -> list[str]:
             and any(palabra in nombre.upper() for palabra in claves)]
 
 
+def _diagnostico(texto, limite: int = 300) -> str:
+    """Resumen del stderr de agy, apto para el log.
+
+    _texto() no vale aqui: rechaza lo que lleve backticks o parezca un comando,
+    que es justo lo que suele traer un mensaje de error. Esto solo tacha
+    secretos, quita caracteres de control y recorta. Nunca lleva salida del
+    modelo, solo el error del CLI.
+    """
+    valor = texto if isinstance(texto, str) else ""
+    # Si agy hace eco del prompt al fallar, ahi va la transcripcion y el chat.
+    # Se corta antes del marcador para no acabar escribiendolos en el log.
+    corte = valor.find("<UNTRUSTED_CLIPPER_CONTEXT>")
+    if corte >= 0:
+        valor = valor[:corte]
+    for secreto in _secretos():
+        valor = valor.replace(secreto, "[REDACTED]")
+    valor = re.sub(r"[\x00-\x1f\x7f]", " ", valor)
+    return " ".join(valor.split())[:limite] or "(sin mensaje)"
+
+
 def _texto(valor, limite: int, obligatorio: bool = False) -> str:
     if not isinstance(valor, str):
         if obligatorio:
@@ -380,13 +400,22 @@ def analizar(candidato: Path, canal: str, motivo: str, segmentos: list,
                 estado = ("quota" if any(p in texto_error for p in ("quota", "credit"))
                           else "oauth" if any(p in texto_error for p in ("oauth", "sign in", "login"))
                           else "process_error")
-                LOG.warning("⚠️ ANTIGRAVITY FALLBACK · ESTADO: %s", estado.upper())
-                return None, _meta(estado, inicio)
+                detalle = _diagnostico(error)
+                LOG.warning("⚠️ ANTIGRAVITY FALLBACK · ESTADO: %s\n   CÓDIGO: %s\n"
+                            "   STDERR: %s", estado.upper(), proceso.returncode, detalle)
+                return None, {**_meta(estado, inicio), "detalle": detalle}
             if not (salida or "").strip():
-                LOG.warning("⚠️ ANTIGRAVITY FALLBACK · ESTADO: EMPTY_OUTPUT")
-                return None, _meta("empty_output", inicio)
+                # agy sale con codigo 0 y sin nada en stdout: sin el stderr no
+                # hay forma de saber si es OAuth caducado, un modelo que no
+                # existe o el workspace sin confianza.
+                detalle = _diagnostico(error)
+                LOG.warning("⚠️ ANTIGRAVITY FALLBACK · ESTADO: EMPTY_OUTPUT\n"
+                            "   SALIDA VACÍA CON CÓDIGO 0\n   STDERR: %s", detalle)
+                return None, {**_meta("empty_output", inicio), "detalle": detalle}
             if len((salida or "").encode("utf-8")) > MAX_SALIDA:
-                LOG.warning("⚠️ ANTIGRAVITY FALLBACK · ESTADO: OUTPUT_TOO_LARGE")
+                LOG.warning("⚠️ ANTIGRAVITY FALLBACK · ESTADO: OUTPUT_TOO_LARGE\n"
+                            "   BYTES: %d\n   MÁXIMO: %d",
+                            len(salida.encode("utf-8")), MAX_SALIDA)
                 return None, _meta("output_too_large", inicio)
             try:
                 resultado = validar(salida or "", duracion)

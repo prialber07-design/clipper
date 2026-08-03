@@ -612,8 +612,12 @@ def _run(raw_id: str, modo_actual: str, intento: str,
                               "GEMINI_EMPTY_OUTPUT" if estado == "empty_output" else
                               "GEMINI_INVALID_JSON" if estado == "invalid_json" else
                               "GEMINI_FAILED")
-                    _fallar(raw_id, modo_actual, "error_gemini", estado, evento,
-                            reintentar=reintentable)
+                    # El detalle es el stderr del CLI, ya recortado y sin
+                    # secretos: sin el, 'empty_output' no dice nada de por que.
+                    detalle = visual_meta.get("detalle", "")
+                    _fallar(raw_id, modo_actual, "error_gemini",
+                            f"{estado}: {detalle}" if detalle else estado,
+                            evento, reintentar=reintentable)
                     return
                 _evento("GEMINI_FINISHED", raw_id, modo_actual=modo_actual,
                         status="ok", latency_ms=visual_meta.get("latency_ms", 0))
