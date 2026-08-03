@@ -14,7 +14,11 @@ Al final hay un anexo con las recetas de despliegue. Ese anexo es material de
 consulta, no el contenido principal.
 
 **Última actualización del código: 3 de agosto de 2026, 02:15 CEST.**
-**Última verificación del servidor: 2 de agosto de 2026, 22:10 CEST.**
+**Última verificación del servidor: 3 de agosto de 2026, 02:20 CEST.**
+
+> **La cola está atascada**: 102 candidatos RAW en `pendiente` y solo 4 con
+> análisis. Ver "Estado real del servidor". El código de este repositorio
+> **no está desplegado**: EasyPanel necesita un redespliegue.
 Si hoy es una fecha muy posterior, trata la sección "Estado real del servidor"
 como caducada y verifícala con los comandos del apartado "Cómo comprobar el
 estado tú mismo" antes de afirmar nada.
@@ -95,6 +99,31 @@ Esto está implementado y verificado en el servidor.
 - El adjunto de vídeo de ntfy está desactivado a propósito: con el límite de 2
   MB del ntfy anónimo nunca llegaba a enviarse. El aviso viaja con el enlace.
 
+## Estado real del servidor
+
+Verificado por SSH el 3 de agosto de 2026 a las 02:20 CEST, con la skill
+`server-access` (clave dedicada, sin contraseña).
+
+| Cosa | Estado |
+|---|---|
+| Captura | Activa. Entran RAW nuevos cada pocos minutos |
+| Candidatos RAW | **102, todos en `pendiente`** |
+| Con análisis v2 | **4** (`lacobraaa` x2, `rdjavi` x2, del 2 de agosto) |
+| Errores en `_gemini/errors/` | 0 |
+| `LISTOS` | 2 clips |
+| `REVISAR` | 85 clips |
+| Proceso `agy` vivo | **Ninguno** |
+| RAW más antiguo | 2 de agosto, 05:07. Nada supera aún los 7 días |
+| Disco | 202 GB de 388 usados, 187 libres. RAW 3,4 GB, REVISAR 3,1 GB, buffer 4,6 GB |
+
+Lectura: el cuello de botella no es el código, es que **nadie analiza la cola**.
+La captura produce y nada consume. Con el consumidor v2 ya en el repositorio,
+basta desplegar y tener un `agy` que escriba los JSON.
+
+Ojo con la limpieza: el arreglo de retención de RAW llegó a tiempo, pero por
+poco. Con el código anterior, esos 102 candidatos se habrían empezado a borrar
+al cumplir siete días.
+
 ## Qué NO funciona todavía
 
 - **El análisis temporal automático.** La tarea creada con `Schedule` dentro de
@@ -135,14 +164,28 @@ vivir dentro del contenedor y su sesión persiste en el volumen. Lo verificado:
 - `HOME=/app/clips/antigravity` y `antigravity.workspace()` caen los dos dentro
   del volumen, así que lo que `agy` escriba sobrevive a un redespliegue.
 
-Y el fallo que había, ya corregido en el código:
+Sobre la creación de `HOME`, con una corrección importante:
 
-- El Dockerfile creaba `/app/clips/antigravity` solo en tiempo de build. Con el
-  volumen con nombre de `docker-compose.yml` eso bastaba, porque Docker copia el
-  contenido de la imagen la primera vez. Pero **EasyPanel monta una carpeta del
-  host y un bind mount tapa lo que la imagen trajera**: comprobado, `HOME` no
-  existía. Ahora `servidor.preparar_volumen()` crea esas carpetas al arrancar,
-  solo si caen dentro del volumen.
+- El Dockerfile crea `/app/clips/antigravity` solo en tiempo de build. Con un
+  bind mount puro (`-v /ruta/host:/app/clips`) eso se pierde, y así lo comprobé
+  en local: `HOME` no existía. **Pero en el servidor real sí existe.** EasyPanel
+  no usa un bind mount puro, sino un volumen de Docker apuntando a esa ruta, y
+  ahí Docker sí copia el contenido de la imagen. Verificado por SSH el 3 de
+  agosto: `antigravity/` y `modelos/` están en el volumen.
+- `servidor.preparar_volumen()` se queda igualmente como red de seguridad: es
+  idempotente, no pisa nada y cubre el caso de un bind mount puro o de otro
+  orquestador. Pero **no era el bloqueante que yo creí**.
+
+### Estado real del análisis visual, verificado por SSH
+
+- **El OAuth ya está hecho.** En el volumen hay un
+  `antigravity-oauth-token` dentro de
+  `antigravity/.gemini/antigravity-cli/`. Alguien autenticó `agy` dentro del
+  contenedor y la sesión persistió, que era justo lo que se quería comprobar.
+- **Falta confirmar `useG1Credits`.** El `settings.json` existe (98 bytes) pero
+  pertenece al uid 10001 y no se puede leer como `fable5`. Hay que mirarlo con
+  privilegios. Sin esa clave en `false`, `analizar()` devuelve `credits_unknown`.
+- **No hay ningún proceso `agy` vivo**, así que nada consume la cola.
 
 ### Los dos pasos que siguen siendo manuales
 
