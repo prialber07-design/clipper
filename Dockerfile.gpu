@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=codex-cli /usr/local/bin/node /usr/local/bin/node
-COPY --from=codex-cli /usr/local/bin/codex /usr/local/bin/codex
 COPY --from=codex-cli /usr/local/lib/node_modules/@openai /usr/local/lib/node_modules/@openai
+RUN ln -s /usr/local/lib/node_modules/@openai/codex/bin/codex.js /usr/local/bin/codex
 
 WORKDIR /app
 
