@@ -60,19 +60,28 @@ class EstabilidadTests(unittest.TestCase):
     def test_cloudflare_conserva_timestamps_por_palabra(self):
         payload = json.dumps({"success": True, "result": {
             "words": [{"word": "hola", "start": 0.2, "end": 0.6}],
-            "vtt": "WEBVTT\n\n00:00.200 --> 00:00.600\nhola\n",
+            "vtt": "WEBVTT\n\n00.200 --> 00.600\nhola\n",
         }}).encode()
         respuesta = MagicMock()
         respuesta.__enter__.return_value.read.return_value = payload
+
+        def comprimir(comando):
+            Path(comando[-1]).write_bytes(b"mp3")
+
         with tempfile.TemporaryDirectory() as tmp, \
              patch.dict(os.environ, {"CLOUDFLARE_ACCOUNT": "cuenta",
                                       "CLOUDFLARE_AI_TOKEN": "token"}), \
-             patch.object(clipper, "urlopen", return_value=respuesta):
+             patch.object(clipper, "run", side_effect=comprimir), \
+             patch.object(clipper, "urlopen", return_value=respuesta) as abrir:
             audio = Path(tmp) / "audio.wav"
             audio.write_bytes(b"wav")
             segmentos, words = clipper._transcribir_cloudflare(audio)
         self.assertEqual(segmentos, [{"start": 0.2, "end": 0.6, "text": "hola"}])
         self.assertEqual(words, [{"start": 0.2, "end": 0.6, "word": "hola"}])
+        peticion = abrir.call_args.args[0]
+        self.assertTrue(peticion.full_url.endswith("?language=es"))
+        self.assertEqual(peticion.headers["Content-type"], "audio/mpeg")
+        self.assertEqual(peticion.data, b"mp3")
 
     def test_nombres_antiguos_y_nuevos(self):
         self.assertEqual(clipper.canal_desde_nombre("elcalvolol-193235-01.mp4"), "elcalvolol")

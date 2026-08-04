@@ -668,6 +668,8 @@ def _transcribir(model, audio: Path, wcfg: dict, opciones: dict):
 
 def _vtt_segundos(valor: str) -> float:
     partes = valor.replace(",", ".").split(":")
+    if len(partes) == 1:
+        return float(partes[0])
     if len(partes) == 2:
         partes.insert(0, "0")
     if len(partes) != 3:
@@ -702,14 +704,19 @@ def _transcribir_cloudflare(audio: Path) -> tuple[list, list]:
         raise RuntimeError("faltan CLOUDFLARE_ACCOUNT_ID o CLOUDFLARE_AI_TOKEN")
 
     url = (f"https://api.cloudflare.com/client/v4/accounts/{cuenta}/ai/run/"
-           "@cf/openai/whisper")
-    peticion = Request(url, data=audio.read_bytes(), method="POST", headers={
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/octet-stream",
-    })
+           "@cf/openai/whisper?language=es")
     try:
-        with urlopen(peticion, timeout=120) as respuesta:
-            payload = json.loads(respuesta.read())
+        with tempfile.TemporaryDirectory(prefix="clipper-whisper-") as carpeta:
+            comprimido = Path(carpeta) / "audio.mp3"
+            run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
+                 "-i", str(audio), "-vn", "-ac", "1", "-ar", "16000",
+                 "-c:a", "libmp3lame", "-b:a", "48k", str(comprimido)])
+            peticion = Request(url, data=comprimido.read_bytes(), method="POST", headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "audio/mpeg",
+            })
+            with urlopen(peticion, timeout=120) as respuesta:
+                payload = json.loads(respuesta.read())
     except HTTPError as e:
         detalle = e.read(300).decode("utf-8", "replace")
         raise RuntimeError(f"Cloudflare HTTP {e.code}: {detalle}") from e
