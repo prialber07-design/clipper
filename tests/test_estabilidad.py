@@ -322,6 +322,21 @@ class EstabilidadTests(unittest.TestCase):
         self.assertEqual(meta["decision"], "publicar")
         llamada.assert_called_once()
 
+    def test_codex_recibe_el_prompt_por_stdin(self):
+        respuesta = _respuesta_editorial()
+
+        def ejecutar(cmd, **kwargs):
+            Path(cmd[cmd.index("-o") + 1]).write_text(
+                json.dumps(respuesta), encoding="utf-8")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with patch("clipper.subprocess.run", side_effect=ejecutar) as llamada:
+            self.assertEqual(clipper._codex_exec("PROMPT", [], "codex-default"),
+                             respuesta)
+
+        self.assertEqual(llamada.call_args.args[0][-1], "-")
+        self.assertIn("PROMPT", llamada.call_args.kwargs["input"])
+
     def test_llm_falla_sin_perder_candidato_ni_reintentar(self):
         casos = (
             (_respuesta_editorial(""), "screen_title"),

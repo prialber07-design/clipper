@@ -478,12 +478,12 @@ def _codex_exec(prompt: str, fotogramas: list[tuple[float, Path]], modelo: str) 
             cmd.extend(["--model", modelo])
         for _, path in fotogramas:
             cmd.extend(["--image", str(path)])
-        cmd.append(instruccion)
+        cmd.append("-")
         try:
             entorno = {k: v for k, v in os.environ.items()
                        if k not in {"OPENAI_API_KEY", "CODEX_API_KEY"}}
             proc = subprocess.run(
-                cmd, cwd=carpeta, capture_output=True, text=True,
+                cmd, cwd=carpeta, input=instruccion, capture_output=True, text=True,
                 encoding="utf-8", errors="replace", timeout=LLM_VISION_TIMEOUT_S,
                 env=entorno,
             )
