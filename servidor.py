@@ -254,7 +254,7 @@ def preparar_volumen():
         base = DATA.resolve()
     except OSError:
         return
-    for variable in ("HF_HOME",):
+    for variable in ("HF_HOME", "CODEX_HOME"):
         valor = os.environ.get(variable, "").strip()
         if not valor:
             continue

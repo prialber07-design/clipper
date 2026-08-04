@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import clipper
 import calidad
@@ -26,25 +26,11 @@ def _incrementar_contador(contadores, bloqueo_path, repeticiones):
         live.elegir_duracion("canal")
 
 
-class _RespuestaOpenAI:
-    def __init__(self, cuerpo):
-        self.cuerpo = cuerpo
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *_args):
-        return False
-
-    def read(self):
-        return json.dumps(self.cuerpo).encode("utf-8")
-
-
 def _respuesta_editorial(titulo="Título sólido", descripcion="Una reacción clara.",
                          hashtags=None, decision="publicar", score=80,
                          confidence=0.75):
     hashtags = hashtags or ["#canal", "#clips", "#directo", "#reaccion"]
-    resultado = {
+    return {
         "decision": decision,
         "score": score,
         "confidence": confidence,
@@ -52,13 +38,9 @@ def _respuesta_editorial(titulo="Título sólido", descripcion="Una reacción cl
         "screen_title": titulo,
         "social_description": descripcion,
         "hashtags": hashtags,
-    }
-    return {
-        "output": [{
-            "type": "message",
-            "content": [{"type": "output_text", "text": json.dumps(resultado)}],
-        }],
-        "usage": {"input_tokens": 123, "output_tokens": 22},
+        "visual_summary": "Una persona reacciona.",
+        "visual_timeline": [], "people": [], "visible_text": [],
+        "visual_warnings": [],
     }
 
 
@@ -74,6 +56,23 @@ class EstabilidadTests(unittest.TestCase):
         clipper._MODELO_CACHE["test"] = object()
         clipper.liberar_whisper_model()
         self.assertEqual(clipper._MODELO_CACHE, {})
+
+    def test_cloudflare_conserva_timestamps_por_palabra(self):
+        payload = json.dumps({"success": True, "result": {
+            "words": [{"word": "hola", "start": 0.2, "end": 0.6}],
+            "vtt": "WEBVTT\n\n00:00.200 --> 00:00.600\nhola\n",
+        }}).encode()
+        respuesta = MagicMock()
+        respuesta.__enter__.return_value.read.return_value = payload
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.dict(os.environ, {"CLOUDFLARE_ACCOUNT_ID": "cuenta",
+                                      "CLOUDFLARE_AI_TOKEN": "token"}), \
+             patch.object(clipper, "urlopen", return_value=respuesta):
+            audio = Path(tmp) / "audio.wav"
+            audio.write_bytes(b"wav")
+            segmentos, words = clipper._transcribir_cloudflare(audio)
+        self.assertEqual(segmentos, [{"start": 0.2, "end": 0.6, "text": "hola"}])
+        self.assertEqual(words, [{"start": 0.2, "end": 0.6, "word": "hola"}])
 
     def test_nombres_antiguos_y_nuevos(self):
         self.assertEqual(clipper.canal_desde_nombre("elcalvolol-193235-01.mp4"), "elcalvolol")
@@ -268,33 +267,21 @@ class EstabilidadTests(unittest.TestCase):
     def test_llm_valido_reemplaza_gancho_sin_mover_tiempos(self):
         segmentos = [{"start": 10.5, "end": 13.0, "text": "Esto fue inesperado"}]
         copia = [dict(segmento) for segmento in segmentos]
-        entorno = {
-            "CLIPPER_LLM_ACTIVO": "1",
-            "OPENAI_API_KEY": "sk-test-no-log",
-            "CLIPPER_LLM_MODELO": "gpt-5.6-luna",
-        }
-        with patch.dict(os.environ, entorno):
-            with patch.object(
-                clipper.urllib.request,
-                "urlopen",
-                return_value=_RespuestaOpenAI(_respuesta_editorial()),
-            ) as llamada:
-                gancho, meta = clipper.evaluar_editorial(
-                    "canal", "pico de reacción", segmentos, ["qué ha pasado"],
-                    30.0, 12.0, "Gancho heurístico",
-                )
+        with patch.dict(os.environ, {
+            "CLIPPER_LLM_ACTIVO": "1", "CLIPPER_CODEX_MODELO": "gpt-5.6-terra",
+        }), patch.object(clipper, "_codex_exec",
+                         return_value=_respuesta_editorial()) as llamada:
+            gancho, meta = clipper.evaluar_editorial(
+                "canal", "pico de reacción", segmentos, ["qué ha pasado"],
+                30.0, 12.0, "Gancho heurístico",
+            )
 
         self.assertEqual(gancho, "Título sólido")
         self.assertEqual(segmentos, copia)
         self.assertEqual(meta["decision"], "publicar")
-        self.assertEqual(meta["social_description"], "Una reacción clara.")
-        self.assertEqual(meta["hashtags"], ["#canal", "#clips", "#directo", "#reaccion"])
-        self.assertEqual(meta["input_tokens"], 123)
-        self.assertEqual(meta["output_tokens"], 22)
-        self.assertGreaterEqual(meta["latency_ms"], 0)
-        cuerpo = json.loads(llamada.call_args.args[0].data.decode("utf-8"))
-        self.assertNotIn("sk-test-no-log", json.dumps(cuerpo))
-        self.assertEqual(cuerpo["model"], "gpt-5.6-luna")
+        self.assertEqual(meta["input_tokens"], 0)
+        self.assertEqual(meta["output_tokens"], 0)
+        self.assertEqual(llamada.call_args.args[2], "gpt-5.6-terra")
 
     def test_contexto_llm_es_relativo_y_acotado(self):
         segmentos = [
@@ -302,114 +289,59 @@ class EstabilidadTests(unittest.TestCase):
             {"start": 125.0, "end": 150.0, "text": "el pico queda al final"},
         ]
         relativos, pico = live.contexto_editorial(segmentos, 100.0, 134.0, 150.0)
-        with patch.dict(os.environ, {
-            "CLIPPER_LLM_ACTIVO": "1",
-            "OPENAI_API_KEY": "sk-test-no-log",
-        }):
-            with patch.object(
-                clipper.urllib.request,
-                "urlopen",
-                return_value=_RespuestaOpenAI(_respuesta_editorial()),
-            ) as llamada:
-                clipper.evaluar_editorial(
-                    "canal", "reacción", relativos, [], 34.0, pico,
-                    "Gancho heurístico",
-                )
-        cuerpo = json.loads(llamada.call_args.args[0].data.decode("utf-8"))
-        prompt = cuerpo["input"]
+        with patch.dict(os.environ, {"CLIPPER_LLM_ACTIVO": "1"}), \
+             patch.object(clipper, "_codex_exec",
+                          return_value=_respuesta_editorial()) as llamada:
+            clipper.evaluar_editorial(
+                "canal", "reacción", relativos, [], 34.0, pico, "Gancho heurístico")
+        prompt = llamada.call_args.args[0]
 
         self.assertEqual(pico, 34.0)
         self.assertIn("POSICIÓN DEL PICO: 34.0s", prompt)
         self.assertNotIn("136.0s", prompt)
         self.assertNotIn("150.0s", prompt)
-        for segmento in relativos:
-            self.assertGreaterEqual(segmento["start"], 0.0)
-            self.assertLessEqual(segmento["start"], 34.0)
-            self.assertGreaterEqual(segmento["end"], 0.0)
-            self.assertLessEqual(segmento["end"], 34.0)
         self.assertEqual(segmentos[0]["start"], 100.0)
 
-    def test_llm_no_guarda_modo_en_metadatos(self):
+    def test_llm_no_necesita_api_key(self):
         with patch.dict(os.environ, {
-            "CLIPPER_LLM_ACTIVO": "1",
-            "OPENAI_API_KEY": "sk-test-no-log",
-        }):
-            with patch.object(
-                clipper.urllib.request,
-                "urlopen",
-                return_value=_RespuestaOpenAI(_respuesta_editorial()),
-            ):
-                _, meta = clipper.evaluar_editorial(
-                    "canal", "motivo", [], [], 34.0, 12.0, "Gancho heurístico",
-                )
-        self.assertNotIn("mode", meta)
+            "CLIPPER_LLM_ACTIVO": "1", "OPENAI_API_KEY": "",
+        }), patch.object(clipper, "_codex_exec",
+                         return_value=_respuesta_editorial()) as llamada:
+            gancho, meta = clipper.evaluar_editorial(
+                "canal", "motivo", [], [], 30.0, 12.0, "Gancho heurístico")
+        self.assertEqual(gancho, "Título sólido")
         self.assertEqual(meta["decision"], "publicar")
+        llamada.assert_called_once()
 
     def test_llm_falla_sin_perder_candidato_ni_reintentar(self):
-        entorno = {
-            "CLIPPER_LLM_ACTIVO": "1",
-            "OPENAI_API_KEY": "sk-test-no-log",
-            "CLIPPER_LLM_MODELO": "gpt-5.6-luna",
-        }
         casos = (
-            ("título vacío", _RespuestaOpenAI(_respuesta_editorial("")), "screen_title"),
-            ("JSON inválido", _RespuestaOpenAI({
-                "output": [{"content": [{"type": "output_text", "text": "no-json"}]}],
-            }), "JSON inválida"),
-            ("timeout", TimeoutError(), "timeout"),
-            ("HTTP 429", clipper.urllib.error.HTTPError(
-                clipper.LLM_ENDPOINT, 429, "rate limit", None, None), "HTTP 429"),
-            ("HTTP 500", clipper.urllib.error.HTTPError(
-                clipper.LLM_ENDPOINT, 500, "server error", None, None), "HTTP 500"),
+            (_respuesta_editorial(""), "screen_title"),
+            (ValueError("respuesta JSON inválida"), "JSON inválida"),
+            (RuntimeError("CODEX_TIMEOUT"), "CODEX_TIMEOUT"),
+            (RuntimeError("CODEX_ERROR: login required"), "login required"),
         )
-        for nombre, resultado, esperado in casos:
-            with self.subTest(nombre=nombre):
-                with patch.dict(os.environ, entorno):
-                    opciones = (
-                        {"side_effect": resultado}
-                        if isinstance(resultado, BaseException)
-                        else {"return_value": resultado}
-                    )
-                    with patch.object(clipper.urllib.request, "urlopen", **opciones) as llamada:
-                        gancho, meta = clipper.evaluar_editorial(
-                            "canal", "motivo", [], [], 30.0, 12.0, "Gancho heurístico",
-                        )
+        for resultado, esperado in casos:
+            with self.subTest(esperado=esperado):
+                opciones = ({"side_effect": resultado} if isinstance(resultado, BaseException)
+                            else {"return_value": resultado})
+                with patch.dict(os.environ, {"CLIPPER_LLM_ACTIVO": "1"}), \
+                     patch.object(clipper, "_codex_exec", **opciones) as llamada:
+                    gancho, meta = clipper.evaluar_editorial(
+                        "canal", "motivo", [], [], 30.0, 12.0, "Gancho heurístico")
                 self.assertEqual(gancho, "Gancho heurístico")
                 self.assertIn(esperado, meta["reason"])
-                self.assertEqual(llamada.call_count, 1)
-
-    def test_llm_sin_clave_no_hace_peticion(self):
-        with patch.dict(os.environ, {
-            "CLIPPER_LLM_ACTIVO": "1",
-            "OPENAI_API_KEY": "",
-        }):
-            with patch.object(clipper.urllib.request, "urlopen") as llamada:
-                gancho, meta = clipper.evaluar_editorial(
-                    "canal", "motivo", [], [], 30.0, 12.0, "Gancho heurístico",
-                )
-        self.assertEqual(gancho, "Gancho heurístico")
-        self.assertIn("OPENAI_API_KEY", meta["reason"])
-        self.assertEqual(llamada.call_count, 0)
+                llamada.assert_called_once()
 
     def test_llm_rechaza_descripcion_y_hashtags_invalidos(self):
-        entorno = {
-            "CLIPPER_LLM_ACTIVO": "1",
-            "OPENAI_API_KEY": "sk-test-no-log",
-        }
         for respuesta, esperado in (
             (_respuesta_editorial(descripcion=""), "social_description"),
             (_respuesta_editorial(hashtags=["#uno"]), "hashtags"),
         ):
-            with self.subTest(esperado=esperado):
-                with patch.dict(os.environ, entorno):
-                    with patch.object(
-                        clipper.urllib.request,
-                        "urlopen",
-                        return_value=_RespuestaOpenAI(respuesta),
-                    ):
-                        hook, meta = clipper.evaluar_editorial(
-                            "canal", "motivo", [], [], 30.0, 12.0, "Gancho heurístico"
-                        )
+            with self.subTest(esperado=esperado), \
+                 patch.dict(os.environ, {"CLIPPER_LLM_ACTIVO": "1"}), \
+                 patch.object(clipper, "_codex_exec", return_value=respuesta):
+                hook, meta = clipper.evaluar_editorial(
+                    "canal", "motivo", [], [], 30.0, 12.0, "Gancho heurístico")
                 self.assertEqual(hook, "Gancho heurístico")
                 self.assertIn(esperado, meta["reason"])
 

@@ -1,9 +1,16 @@
 # Imagen CPU. Para GPU, usa Dockerfile.gpu (ver DESPLIEGUE.md).
+FROM node:22-bullseye-slim AS codex-cli
+RUN npm install -g @openai/codex
+
 FROM python:3.12-slim AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg fontconfig ca-certificates tini procps tzdata curl bash \
     && rm -rf /var/lib/apt/lists/*
+
+COPY --from=codex-cli /usr/local/bin/node /usr/local/bin/node
+COPY --from=codex-cli /usr/local/bin/codex /usr/local/bin/codex
+COPY --from=codex-cli /usr/local/lib/node_modules/@openai/codex /usr/local/lib/node_modules/@openai/codex
 
 WORKDIR /app
 
@@ -21,11 +28,12 @@ RUN chmod +x *.sh
 # El codigo va como root y de solo lectura; los datos, de un usuario sin
 # privilegios sobre el volumen.
 RUN useradd --system --uid 10001 clipper \
-    && mkdir -p /app/clips/modelos \
+    && mkdir -p /app/clips/modelos /app/clips/codex-home \
     && chown -R clipper:clipper /app/clips
 
 ENV CLIPPER_DATA=/app/clips \
     HF_HOME=/app/clips/modelos \
+    CODEX_HOME=/app/clips/codex-home \
     PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8 \
     TZ=Europe/Madrid \

@@ -20,7 +20,7 @@ class MantenimientoTests(unittest.TestCase):
             self.assertEqual(raw._texto_log("canal-01"), "canal-01")
 
     def test_un_secreto_real_se_tacha(self):
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-secreto-muy-largo"}, clear=True):
+        with patch.dict(os.environ, {"CODEX_ACCESS_TOKEN": "secreto-muy-largo"}, clear=True):
             texto = raw._texto_log("clave=sk-secreto-muy-largo")
         self.assertNotIn("sk-secreto-muy-largo", texto)
         self.assertIn("[REDACTED]", texto)

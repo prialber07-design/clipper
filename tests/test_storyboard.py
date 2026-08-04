@@ -1,5 +1,5 @@
-import base64
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,20 +7,6 @@ from unittest.mock import patch
 
 import clipper
 import storyboard
-
-
-class _Response:
-    def __init__(self, data):
-        self.data = json.dumps(data).encode()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *_):
-        pass
-
-    def read(self):
-        return self.data
 
 
 class StoryboardTests(unittest.TestCase):
@@ -47,7 +33,7 @@ class StoryboardTests(unittest.TestCase):
                     self.assertTrue(all(path.exists() for path in paths))
                 self.assertTrue(all(not path.exists() for path in paths))
 
-    def test_payload_multimodal_usa_timeout_visual_y_json_estricto(self):
+    def test_codex_exec_usa_oauth_imagenes_y_json_estricto(self):
         with tempfile.TemporaryDirectory() as carpeta:
             frame = Path(carpeta) / "f.jpg"
             frame.write_bytes(b"jpeg")
@@ -59,20 +45,24 @@ class StoryboardTests(unittest.TestCase):
                 "visual_summary": "Una persona habla.", "visual_timeline": [],
                 "people": [], "visible_text": [], "visual_warnings": [],
             }
-            api = {"output_text": json.dumps(resultado),
-                   "usage": {"input_tokens": 10, "output_tokens": 5}}
-            with patch.dict("os.environ", {"CLIPPER_LLM_ACTIVO": "1", "OPENAI_API_KEY": "secreto-largo"}, clear=False), \
-                 patch.object(clipper.urllib.request, "urlopen", return_value=_Response(api)) as abrir:
+            def ejecutar(cmd, **kwargs):
+                Path(cmd[cmd.index("-o") + 1]).write_text(
+                    json.dumps(resultado), encoding="utf-8")
+                return subprocess.CompletedProcess(cmd, 0, "", "")
+
+            with patch.dict("os.environ", {"CLIPPER_LLM_ACTIVO": "1"}, clear=False), \
+                 patch.object(clipper.subprocess, "run", side_effect=ejecutar) as ejecutar_mock:
                 _, meta = clipper.evaluar_editorial(
                     "canal", "pico", [], [], 10, 4, "", [(0.0, frame)], True)
-            request = abrir.call_args.args[0]
-            payload = json.loads(request.data)
-            imagen = payload["input"][0]["content"][2]
-            self.assertEqual(abrir.call_args.kwargs["timeout"], 120)
-            self.assertEqual(imagen["detail"], "high")
-            self.assertEqual(base64.b64decode(imagen["image_url"].split(",", 1)[1]), b"jpeg")
+            cmd = ejecutar_mock.call_args.args[0]
+            self.assertEqual(ejecutar_mock.call_args.kwargs["timeout"], 120)
+            self.assertEqual(cmd[cmd.index("--image") + 1], str(frame))
+            self.assertIn("--output-schema", cmd)
+            self.assertIn("--ephemeral", cmd)
+            self.assertNotIn("OPENAI_API_KEY", " ".join(cmd))
+            self.assertNotIn("OPENAI_API_KEY", ejecutar_mock.call_args.kwargs["env"])
+            self.assertNotIn("CODEX_API_KEY", ejecutar_mock.call_args.kwargs["env"])
             self.assertEqual(meta["image_count"], 1)
-            self.assertTrue(payload["text"]["format"]["strict"])
 
 
 if __name__ == "__main__":

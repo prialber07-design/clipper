@@ -167,9 +167,12 @@ def crear(fuente: Path, inicio: float, fin: float, raw_id: str, *, canal: str,
     try:
         clipper.run([
             clipper.FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
-            "-ss", f"{float(inicio):.3f}", "-i", str(fuente),
+            "-i", str(fuente), "-ss", f"{float(inicio):.3f}",
             "-t", f"{duracion:.3f}",
-            "-map", "0:v:0", "-map", "0:a:0?", "-c", "copy",
+            "-map", "0:v:0", "-map", "0:a:0?",
+            "-vf", "fps=30", "-c:v", "libx264", "-preset", "superfast",
+            "-crf", "23", "-c:a", "aac", "-b:a", "160k",
+            "-movflags", "+faststart",
             "-avoid_negative_ts", "make_zero", str(temporal),
         ])
         os.replace(temporal, mp4)

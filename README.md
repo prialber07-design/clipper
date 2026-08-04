@@ -4,8 +4,9 @@ Detecta el mejor momento de un directo mientras sigue emitiendo, lo corta en
 vertical 9:16 con subtítulos y gancho quemados, y lo deja listo para subir a
 TikTok, Reels y Shorts.
 
-Captura y transcripción locales con `streamlink`, `ffmpeg` y `faster-whisper`;
-GPT-5.6 Luna analiza los fotogramas y toma la decisión editorial.
+Captura con `streamlink` y `ffmpeg`; Workers AI transcribe con timestamps por
+palabra y `faster-whisper` queda como respaldo local. Luna analiza los
+fotogramas mediante Codex OAuth y toma la decisión editorial.
 
 ## Cómo funciona
 
@@ -14,7 +15,7 @@ EventSub / sondeo → captura a buffer rodante (segmentos de 10 s, sin recodific
         ↓
 detector: velocidad y contenido del chat + energía de audio
         ↓
-pico → ventana → faster-whisper (timestamps por palabra)
+pico → ventana → Cloudflare Whisper (respaldo local, timestamps por palabra)
         ↓
 out/RAW (MP4 limpio + manifiesto) → storyboard temporal (1 imagen/s + pico)
         ↓
@@ -82,8 +83,8 @@ de revision.
 
 Después de Whisper cada candidato queda en `out/RAW/` con su MP4 limpio y un
 manifiesto privado. El supervisor extrae temporalmente un JPEG 768x432 por
-segundo y cinco imágenes adicionales alrededor del pico. Una única petición a
-Luna recibe esas imágenes ordenadas, la transcripción, el chat y el canal, y
+segundo y cinco imágenes adicionales alrededor del pico. Un `codex exec`
+autenticado con ChatGPT recibe esas imágenes ordenadas, la transcripción, el chat y el canal, y
 devuelve el análisis visual junto con la decisión, el hook, la descripción y
 los hashtags. Los JPEG se eliminan siempre al terminar.
 

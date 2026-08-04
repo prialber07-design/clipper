@@ -61,6 +61,25 @@ class RawTests(unittest.TestCase):
         with self.assertRaises(raw.RawActivo):
             raw._claim(raw_id)
 
+    def test_crear_recodifica_desde_el_instante_exacto(self):
+        fuente = self.root / "source.mp4"
+        fuente.write_bytes(b"source")
+        temporal = raw.RAW / ".temporal.mp4"
+
+        def ejecutar(comando):
+            Path(comando[-1]).write_bytes(b"raw")
+
+        with patch.object(raw.tempfile, "mkstemp", return_value=(0, str(temporal))), \
+             patch.object(raw.os, "close"), \
+             patch.object(raw.clipper, "run", side_effect=ejecutar) as llamada:
+            raw.crear(fuente, 23.47, 53.47, "exacto", canal="canal", motivo="risa",
+                      pico=2, segmentos=[], words=[], chat=[])
+        comando = llamada.call_args.args[0]
+        self.assertGreater(comando.index("-ss"), comando.index("-i"))
+        self.assertNotIn("copy", comando)
+        self.assertIn("libx264", comando)
+        self.assertIn("fps=30", comando)
+
     def test_luna_visual_completa_y_registra_fotogramas(self):
         raw_id = self.candidato()
         _, intento = raw._claim(raw_id)
