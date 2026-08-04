@@ -695,7 +695,8 @@ def _segmentos_vtt(vtt: str) -> list[dict]:
 
 
 def _transcribir_cloudflare(audio: Path) -> tuple[list, list]:
-    cuenta = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
+    cuenta = (os.environ.get("CLOUDFLARE_ACCOUNT_ID") or
+              os.environ.get("CLOUDFLARE_ACCOUNT", "")).strip()
     token = os.environ.get("CLOUDFLARE_AI_TOKEN", "").strip()
     if not cuenta or not token:
         raise RuntimeError("faltan CLOUDFLARE_ACCOUNT_ID o CLOUDFLARE_AI_TOKEN")
@@ -744,7 +745,9 @@ def cmd_transcribe(args):
 
     wcfg = CONFIG["whisper"]
     device = args.device
-    if os.environ.get("CLOUDFLARE_ACCOUNT_ID") and os.environ.get("CLOUDFLARE_AI_TOKEN"):
+    cuenta_cloudflare = (os.environ.get("CLOUDFLARE_ACCOUNT_ID") or
+                         os.environ.get("CLOUDFLARE_ACCOUNT"))
+    if cuenta_cloudflare and os.environ.get("CLOUDFLARE_AI_TOKEN"):
         device = "cloudflare"
     elif device == "auto":
         try:

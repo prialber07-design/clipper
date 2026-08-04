@@ -65,7 +65,7 @@ class EstabilidadTests(unittest.TestCase):
         respuesta = MagicMock()
         respuesta.__enter__.return_value.read.return_value = payload
         with tempfile.TemporaryDirectory() as tmp, \
-             patch.dict(os.environ, {"CLOUDFLARE_ACCOUNT_ID": "cuenta",
+             patch.dict(os.environ, {"CLOUDFLARE_ACCOUNT": "cuenta",
                                       "CLOUDFLARE_AI_TOKEN": "token"}), \
              patch.object(clipper, "urlopen", return_value=respuesta):
             audio = Path(tmp) / "audio.wav"
