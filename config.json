@@ -56,8 +56,8 @@
                    "fps":  30,
                    "crf":  23,
                    "_nota_crf":  "23 en vez de 20: TikTok, Reels y Shorts recodifican el video al subirlo, asi que la calidad extra de un CRF bajo se tira a la basura y solo cuesta tiempo de encoder y megas. Si alguna vez publicas en un sitio que respete el original, bajalo.",
-                   "duracion_min_s":  26,
-                   "duracion_max_s":  34,
+                   "duracion_min_s":  8,
+                   "duracion_max_s":  40,
                    "zoom":  1.6,
                    "video_y":  700,
                    "reaccion":  {
@@ -75,13 +75,14 @@
                                     "borde_color":  "white@0.22",
                                     "borde_px":  3
                                 },
-                   "marca":  "@TuCanal",
+                   "marca":  "",
                    "marca_y":  130,
                    "marca_size":  34,
                    "sub_y":  1430,
-                   "sub_size":  92,
+                   "sub_size":  80,
                    "palabras_por_bloque":  3,
                    "color_resaltado":  "\u0026H0000FFFF\u0026",
+                   "color_resaltado_azul":  "\u0026H00EEF425\u0026",
                    "escala_palabra_activa":  112,
                    "hook_y":  346,
                    "hook_size":  58,
@@ -118,7 +119,7 @@
                  "peso_risa":  2,
                  "peso_pide_clip":  5,
                  "peso_sorpresa":  2,
-                 "ventana_antes_largo_s":  115
+                 "_nota_ventana":  "El candidato ofrece hasta 40s de contexto; Luna elige dentro el corte final de 8-40s."
              },
     "whisper":  {
                     "modelo":  "large-v3-turbo",
@@ -126,27 +127,23 @@
                     "compute_type":  "int8",
                     "batch_size":  0,
                     "_nota_modelo":  "large-v3-turbo tiene 4 capas de decodificador en vez de las 32 de large-v3, con solo un 0,3% mas de error, y en int8 ocupa 1,6 GB. Es MAS LENTO que 'small' (809M parametros frente a 244M), a cambio de subtitulos bastante mas precisos, que es lo que mas se nota en pantalla. Si la cola crece o las transcripciones se encolan, vuelve a 'small'. OJO: CLIPPER_MODELO en el entorno pisa este valor.",
-                    "_nota_batch":  "batch_size 0 o 1 desactiva el procesado por lotes, que es lo que hay ahora. Promete de 2x a 4x en CPU, pero BatchedInferencePipeline arrastra bugs de timestamps de segmento y de palabra (faster-whisper#919) y aqui los subtitulos van quemados y sincronizados por palabra; ademas en audios cortos llego a ser mas lento que la via normal (#954), y estos clips duran de 26 a 95 segundos. Ponlo en 8 o 16 solo despues de medirlo con material real y comprobar que los subtitulos siguen cuadrando."
+                    "_nota_batch":  "batch_size 0 o 1 desactiva el procesado por lotes, que es lo que hay ahora. Promete de 2x a 4x en CPU, pero BatchedInferencePipeline arrastra bugs de timestamps de segmento y de palabra (faster-whisper#919) y aqui los subtitulos van quemados y sincronizados por palabra; ademas en audios cortos llego a ser mas lento que la via normal (#954). Ponlo en 8 o 16 solo despues de medirlo con material real y comprobar que los subtitulos siguen cuadrando."
                 },
     "calidad":  {
                     "palabras_por_segundo_min":  1.2,
-                    "hook_min_chars":  18,
+                    "hook_min_chars":  10,
+                    "hook_max_palabras":  6,
                     "volumen_min_db":  -40,
                     "negro_max_s":  2,
                      "llm_score_minimo":  80,
                      "llm_confianza_minima":  0.75
                 },
     "duraciones":  {
-                       "corto":  {
-                                     "min":  26,
-                                     "max":  34
-                                 },
-                       "largo":  {
-                                     "min":  64,
-                                     "max":  95
-                                 },
-                       "uno_largo_cada":  3,
-                       "_nota":  "1 de cada 3 clips sale largo (\u003e60s) para poder monetizar en TikTok Creator Rewards, que exige mas de 1 minuto. El resto cortos, que rinden mejor en Reels y Shorts."
+                       "flexible":  {
+                                        "min":  8,
+                                        "max":  40
+                                    },
+                       "_nota":  "Luna escoge el momento completo mas corto dentro de este rango; no se rellena hasta una duracion fija."
                    },
     "hashtags":  {
                      "base":  [

@@ -209,15 +209,15 @@ def cmd_fetch(args):
 
 _MODELO_CACHE = {}
 
-# 2 lineas de 22 caracteres es lo que cabe en el render (ver _partir_hook).
-# Estaba en 66, o sea que a Luna se le pedia medio titulo mas del que entra:
-# gastar todo el margen garantizaba 3 lineas y rechazo seguro. Fue la causa de
-# 12 de los 15 fallos editoriales del primer dia.
-LLM_TITLE_MAX_CHARS = 44
-LLM_DESCRIPTION_MAX_CHARS = 320
+# El hook tiene que leerse de un vistazo; Luna recibe espacio para 4-6 palabras,
+# no para resumir el clip entero.
+LLM_TITLE_MAX_CHARS = 32
+LLM_DESCRIPTION_MAX_CHARS = 140
 LLM_HASHTAG_MIN = 4
 LLM_HASHTAG_MAX = 6
 LLM_VISION_TIMEOUT_S = 120
+CLIP_MIN_S = 8.0
+CLIP_MAX_S = 40.0
 LLM_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -226,6 +226,8 @@ LLM_SCHEMA = {
         "score": {"type": "integer", "minimum": 0, "maximum": 100},
         "confidence": {"type": "number", "minimum": 0, "maximum": 1},
         "reason": {"type": "string"},
+        "clip_start_s": {"type": "number"},
+        "clip_end_s": {"type": "number"},
         "screen_title": {"type": "string"},
         "social_description": {"type": "string"},
         "hashtags": {"type": "array", "items": {"type": "string"}},
@@ -259,7 +261,8 @@ LLM_SCHEMA = {
         "visual_warnings": {"type": "array", "items": {"type": "string"}},
     },
     "required": [
-        "decision", "score", "confidence", "reason", "screen_title",
+        "decision", "score", "confidence", "reason", "clip_start_s",
+        "clip_end_s", "screen_title",
         "social_description", "hashtags", "visual_summary", "visual_timeline",
         "people", "visible_text", "visual_warnings",
     ],
@@ -366,9 +369,30 @@ def _sanear_descripcion(valor, clave: str = "") -> str:
         return ""
     if descripcion.upper().startswith(("DESCRIPCION:", "DESCRIPCIÓN:", "HASHTAGS:")):
         return ""
-    if len(re.findall(r"[.!?…]+(?=\s|$)", descripcion)) > 2:
+    if len(re.findall(r"[.!?…]+(?=\s|$)", descripcion)) > 1:
         return ""
     return descripcion
+
+
+def _sanear_recorte(inicio, fin, duracion: float, pico: float) -> tuple[float, float]:
+    """Valida el tramo elegido por Luna sin alargarlo ni corregirlo a escondidas."""
+    if (isinstance(inicio, bool) or isinstance(fin, bool) or
+            not isinstance(inicio, (int, float)) or
+            not isinstance(fin, (int, float))):
+        raise ValueError("recorte no numerico")
+    inicio, fin = float(inicio), float(fin)
+    if not math.isfinite(inicio) or not math.isfinite(fin):
+        raise ValueError("recorte no finito")
+    if inicio < 0 or fin > float(duracion) + 0.05 or fin <= inicio:
+        raise ValueError("recorte fuera del candidato")
+    elegida = fin - inicio
+    if not CLIP_MIN_S <= elegida <= CLIP_MAX_S:
+        raise ValueError(
+            f"duracion elegida fuera de rango ({elegida:.1f}s, esperado 8-40s)"
+        )
+    if not inicio <= float(pico) <= fin:
+        raise ValueError("el recorte no incluye el pico detectado")
+    return round(inicio, 3), round(fin, 3)
 
 
 def _sanear_hashtags(valor, clave: str = "") -> list[str]:
@@ -427,16 +451,22 @@ def _llm_prompt(canal: str, motivo: str, segmentos: list, chat: list,
         if con_fotogramas else ""
     )
     return (
-        "Evalúa un candidato de clip en español. No inventes hechos ni uses clickbait "
-        "que la transcripción no sostenga. El hook debe ser breve y fiel; la "
-        "descripción debe tener una o dos frases listas para publicar.\n\n"
+        "Evalúa un candidato de clip en español como una editora joven de TikTok. "
+        "El tono debe ser brainrot, informal, directo, curioso y muy clickbait, "
+        "pero nunca inventes hechos, identidades ni consecuencias que el material "
+        "no sostenga. Evita explicaciones y lenguaje corporativo.\n\n"
         f"CANAL: {canal}\n"
         f"MOTIVO DEL PICO: {motivo}\n"
         f"DURACIÓN DEL CANDIDATO: {duracion:.1f}s\n"
         f"POSICIÓN DEL PICO: {pico:.1f}s\n\n"
         f"TRANSCRIPCIÓN SEGMENTADA:\n{transcripcion}\n\n"
         f"CHAT RELEVANTE:\n{mensajes}\n\n"
-        "Devuelve únicamente el objeto JSON solicitado. `publicar` significa que el "
+        "Devuelve únicamente el objeto JSON solicitado. Elige también el momento "
+        "publicable más corto mediante `clip_start_s` y `clip_end_s`: debe durar "
+        "entre 8 y 40 segundos, usar el reloj relativo del candidato (0 es su "
+        "primer fotograma), incluir el pico, empezar justo antes de lo necesario "
+        "para entenderlo y terminar en cuanto cae el remate. No rellenes tiempo. "
+        "`publicar` significa que el "
         "momento y el contenido editorial son sólidos; `revisar` que necesita "
         "criterio humano; `descartar` que no aporta un clip útil. Usa de 4 a 6 "
         "hashtags con # y sin espacios. Los emojis son opcionales (cero, uno o "
@@ -446,10 +476,13 @@ def _llm_prompt(canal: str, motivo: str, segmentos: list, chat: list,
         "participante en `people`; copia texto legible en `visible_text`; y "
         "anota incertidumbres o discontinuidades en `visual_warnings`. "
         "No rellenes campos con suposiciones.\n"
-        f"`screen_title` va quemado en el vídeo y solo caben {LLM_TITLE_MAX_CHARS} "
-        "caracteres contando espacios y emojis: si te pasas, el clip se "
-        "descarta entero. Escribe un gancho corto y con gancho de verdad, no "
-        "una frase descriptiva."
+        f"`screen_title` va quemado en el vídeo: escribe 4-6 palabras, máximo "
+        f"{LLM_TITLE_MAX_CHARS} caracteres contando espacios y emojis. Tiene que "
+        "sonar adolescente y provocar curiosidad al instante, por ejemplo el tono "
+        "de 'BRO NO SE LO CREE 💀', sin copiar el ejemplo ni mentir. "
+        f"`social_description` debe ser una sola frase corta, natural y lista para "
+        f"publicar, con máximo {LLM_DESCRIPTION_MAX_CHARS} caracteres; no resumas "
+        "todo el vídeo."
         + visual
     )
 
@@ -530,6 +563,10 @@ def evaluar_editorial(canal: str, motivo: str, segmentos: list, chat: list,
         title, motivo_title = _sanear_hook_detallado(resultado.get("screen_title"))
         descripcion = _sanear_descripcion(resultado.get("social_description"))
         hashtags = _sanear_hashtags(resultado.get("hashtags"))
+        clip_start, clip_end = _sanear_recorte(
+            resultado.get("clip_start_s"), resultado.get("clip_end_s"),
+            duracion, pico,
+        )
         if decision not in {"publicar", "revisar", "descartar"}:
             raise ValueError("decision inválida")
         if isinstance(score, bool) or not isinstance(score, int) or not 0 <= score <= 100:
@@ -552,6 +589,8 @@ def evaluar_editorial(canal: str, motivo: str, segmentos: list, chat: list,
             "score": score,
             "confidence": round(float(confidence), 3),
             "reason": reason,
+            "clip_start_s": clip_start,
+            "clip_end_s": clip_end,
             "social_description": descripcion,
             "hashtags": hashtags,
             "visual_summary": _texto_llm(resultado.get("visual_summary"), 600),
@@ -599,7 +638,8 @@ def canal_desde_nombre(nombre: str) -> str:
     """Extrae el canal de nombres antiguos y nuevos de clips."""
     stem = Path(nombre).stem
     antiguo = re.match(
-        r"^\d+_(?P<canal>.+?)_\d{4}-\d{2}-\d{2}(?:_\d{6})?$",
+        r"^\d+_(?P<canal>.+?)_\d{4}-\d{2}-\d{2}(?:_\d{6})?"
+        r"(?:_(?:amarillo|azul))?$",
         stem,
     )
     if antiguo:
@@ -644,8 +684,7 @@ def _transcribir(model, audio: Path, wcfg: dict, opciones: dict):
        palabra a palabra, asi que un desfase se ve en pantalla y no hay forma
        de arreglarlo despues.
     2. En audios cortos llego a ser mas lento que la via normal
-       (faster-whisper#954), y estos clips duran entre 26 y 95 segundos, que
-       es exactamente ese rango.
+       (faster-whisper#954), y los candidatos de este proyecto son cortos.
 
     Por eso viene desactivado: la ganancia es una promesa y el riesgo es
     concreto. Se activa poniendo un batch_size mayor que 1, y solo despues de
@@ -922,10 +961,11 @@ def _partir_hook(txt: str, max_linea: int = 22, max_lineas: int | None = 2) -> s
     return r"\N".join(lineas if max_lineas is None else lineas[:max_lineas])
 
 
-def _build_ass(words, clip, path: Path):
+def _build_ass(words, clip, path: Path, *, color_resaltado: str | None = None,
+               con_marca: bool = True):
     rc = CONFIG["render"]
     start, end = clip["start"], clip["end"]
-    hl = rc["color_resaltado"]
+    hl = color_resaltado or rc["color_resaltado"]
 
     head = f"""[Script Info]
 ScriptType: v4.00+
@@ -957,7 +997,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         ev.append(f"Dialogue: 1,{_ts(0)},{_ts(fin_hook)},Hook,,0,0,0,,"
                   f"{{\\pos(540,{rc['hook_y']})}}{txt}")
 
-    marca = (rc.get("marca") or "").strip()
+    marca = (rc.get("marca") or "").strip() if con_marca else ""
     if marca:
         ev.append(f"Dialogue: 1,{_ts(0)},{_ts(end - start)},Marca,,0,0,0,,"
                   f"{{\\pos(540,{rc.get('marca_y', 1560)})\\alpha&H40&}}{marca}")
@@ -1183,25 +1223,34 @@ def cmd_render(args):
     tmp = d / "_render"
     tmp.mkdir(exist_ok=True)
 
+    variantes = (
+        ("amarillo", rc["color_resaltado"], True),
+        ("azul", rc.get("color_resaltado_azul", "&H00EEF425&"), False),
+    )
     for c in clips:
         LOG.info("🎬 RENDER INICIADO\n   JOB: %s\n   CLIP: %s\n   RANGO: %.1fs → %.1fs\n   DURACIÓN: %.0fs",
                  args.slug, c["id"], c["start"], c["end"], c["end"] - c["start"])
-        _build_ass(words, c, tmp / "subs.ass")
-        target = outdir / f"{args.slug}-{c['id']}.mp4"
-        run([FFMPEG, "-y", "-threads", "8",
-             "-ss", str(c["start"]), "-to", str(c["end"]), "-i",
-             str(getattr(args, "source_path", d / "source.mp4")),
-             "-filter_complex", _vf(args.layout or rc["layout"]),
-             "-map", "[v]", "-map", "0:a",
-             "-c:v", "libx264", "-preset", "superfast", "-crf", str(rc["crf"]),
-             "-pix_fmt", "yuv420p", "-r", str(rc["fps"]),
-             "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
-             str(target)], cwd=tmp)
+        for variante, color, con_marca in variantes:
+            _build_ass(words, c, tmp / "subs.ass", color_resaltado=color,
+                       con_marca=con_marca)
+            base = f"{args.slug}-{c['id']}-{variante}"
+            target = outdir / f"{base}.mp4"
+            run([FFMPEG, "-y", "-threads", "8",
+                 "-ss", str(c["start"]), "-to", str(c["end"]), "-i",
+                 str(getattr(args, "source_path", d / "source.mp4")),
+                 "-filter_complex", _vf(args.layout or rc["layout"]),
+                 "-map", "[v]", "-map", "0:a",
+                 "-c:v", "libx264", "-preset", "superfast", "-crf", str(rc["crf"]),
+                 "-pix_fmt", "yuv420p", "-r", str(rc["fps"]),
+                 "-af", "loudnorm=I=-16:LRA=11:TP=-1.5",
+                 "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
+                 str(target)], cwd=tmp)
 
-        (outdir / f"{args.slug}-{c['id']}.txt").write_text(
-            _ficha_texto(args.slug, c), encoding="utf-8")
+            (outdir / f"{base}.txt").write_text(
+                _ficha_texto(args.slug, c), encoding="utf-8")
 
-    LOG.info("✅ RENDER COMPLETADO\n   CLIPS: %d\n   SALIDA: %s", len(clips), outdir)
+    LOG.info("✅ RENDER COMPLETADO\n   CLIPS: %d\n   VERSIONES: %d\n   SALIDA: %s",
+             len(clips), len(clips) * len(variantes), outdir)
 
 
 # --- cli ----------------------------------------------------------------------

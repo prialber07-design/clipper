@@ -288,32 +288,12 @@ def zscore(valor: float, historial) -> float:
 
 # --- montaje de la ventana ----------------------------------------------------
 
-CONTADORES = WORK / "_contadores.json"
-CONTADORES_LOCK = WORK / "_contadores.lock"
-
-
 def elegir_duracion(canal: str) -> tuple[str, dict]:
-    """Alterna clips cortos y largos.
-
-    TikTok solo monetiza vídeos de más de un minuto, pero un feed entero de
-    clips largos rinde peor: se alterna para tener de los dos.
-    """
-    d = CONFIG.get("duraciones", {})
-    cada = int(d.get("uno_largo_cada", 3))
-    with bloqueo.exclusivo(CONTADORES_LOCK, etiqueta="contador de duraciones"):
-        try:
-            cont = json.loads(CONTADORES.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            cont = {}
-        n = cont.get(canal, 0) + 1
-        cont[canal] = n
-        CONTADORES.parent.mkdir(parents=True, exist_ok=True)
-        temporal = CONTADORES.with_name(f"{CONTADORES.name}.{os.getpid()}.tmp")
-        temporal.write_text(json.dumps(cont), encoding="utf-8")
-        os.replace(temporal, CONTADORES)
-
-    modo = "largo" if cada > 0 and n % cada == 0 else "corto"
-    return modo, d.get(modo, {"min": 26, "max": 34})
+    """Un único rango: Luna decide después cuánto dura el momento real."""
+    del canal
+    return "flexible", CONFIG.get("duraciones", {}).get(
+        "flexible", {"min": 8, "max": 40}
+    )
 
 
 def montar_ventana(cap: Captura, t_video: float, slug: str, antes: float = None) -> Path:
@@ -468,8 +448,7 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
     modo, dur = elegir_duracion(canal)
     rc = CONFIG["render"]
     rc["duracion_min_s"], rc["duracion_max_s"] = dur["min"], dur["max"]
-    # Un clip largo necesita mas margen hacia atras del que trae la ventana corta.
-    antes = LIVE["ventana_antes_s"] if modo == "corto" else LIVE.get("ventana_antes_largo_s", 115)
+    antes = LIVE["ventana_antes_s"]
     LOG.info("🪟 VENTANA PREPARADA\n   JOB: %s\n   MODO: %s\n   DURACIÓN: %s-%ss\n   CONTEXTO ANTES: %.0fs",
              slug, modo.upper(), dur["min"], dur["max"], antes)
 

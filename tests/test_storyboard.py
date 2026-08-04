@@ -39,7 +39,8 @@ class StoryboardTests(unittest.TestCase):
             frame.write_bytes(b"jpeg")
             resultado = {
                 "decision": "publicar", "score": 90, "confidence": 0.9,
-                "reason": "claro", "screen_title": "Momento increíble",
+                "reason": "claro", "clip_start_s": 0, "clip_end_s": 10,
+                "screen_title": "Momento increíble",
                 "social_description": "Una escena lista para compartir.",
                 "hashtags": ["#uno", "#dos", "#tres", "#cuatro"],
                 "visual_summary": "Una persona habla.", "visual_timeline": [],

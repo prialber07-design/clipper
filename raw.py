@@ -366,11 +366,13 @@ def _materializar_trabajo(manifest: dict, mp4: Path, clip: dict) -> tuple[Path, 
 
 
 def _render_and_publish(manifest: dict, mp4: Path, hook: str, llm: dict) -> dict:
-    duracion = float(manifest["duracion"])
+    inicio = float(llm["clip_start_s"])
+    fin = float(llm["clip_end_s"])
+    duracion = fin - inicio
     clip = {
         "id": "01",
-        "start": 0.0,
-        "end": round(duracion, 3),
+        "start": inicio,
+        "end": fin,
         "hook": hook,
         "hook_auto": False,
         "title": " ".join(s.get("text", "") for s in manifest.get("segments", []))[:90],
@@ -379,7 +381,10 @@ def _render_and_publish(manifest: dict, mp4: Path, hook: str, llm: dict) -> dict
         "llm": llm,
     }
     trabajo, slug = _materializar_trabajo(manifest, mp4, clip)
-    salida = clipper.OUT / slug / f"{slug}-01.mp4"
+    salidas = {
+        variante: clipper.OUT / slug / f"{slug}-01-{variante}.mp4"
+        for variante in ("amarillo", "azul")
+    }
     try:
         _evento("RENDER_STARTED", manifest["id"], status="procesando")
         args = type("RawRenderArgs", (), {
@@ -394,8 +399,10 @@ def _render_and_publish(manifest: dict, mp4: Path, hook: str, llm: dict) -> dict
         with bloqueo.exclusivo_si(clipper.serializar_cpu(), clipper.CPU_LOCK,
                                   etiqueta="render RAW", prioritario=True):
             clipper.cmd_render(args)
-        if not salida.exists():
-            raise RawError("render sin archivo de salida")
+        ausentes = [variante for variante, salida in salidas.items()
+                    if not salida.exists() or not salida.with_suffix(".txt").exists()]
+        if ausentes:
+            raise RawError(f"render incompleto: faltan {', '.join(ausentes)}")
         _evento("RENDER_FINISHED", manifest["id"], status="ok")
         meta = {
             "canal": manifest.get("canal", "desconocido"),
@@ -409,20 +416,45 @@ def _render_and_publish(manifest: dict, mp4: Path, hook: str, llm: dict) -> dict
         limites = manifest.get("limites") or {}
         if not isinstance(limites, dict):
             limites = {}
-        apto, fallos = calidad.evaluar(
-            salida, clip, manifest.get("segments", []),
-            limites=(float(limites.get("min", clipper.CONFIG["render"]["duracion_min_s"])),
-                     float(limites.get("max", clipper.CONFIG["render"]["duracion_max_s"]))),
+        limite_duracion = (
+            float(limites.get("min", clipper.CONFIG["render"]["duracion_min_s"])),
+            float(limites.get("max", clipper.CONFIG["render"]["duracion_max_s"])),
         )
+        resultados = [
+            calidad.evaluar(salida, clip, manifest.get("segments", []),
+                            limites=limite_duracion)
+            for salida in salidas.values()
+        ]
+        apto = all(resultado[0] for resultado in resultados)
+        fallos = list(dict.fromkeys(
+            fallo for _, motivos in resultados for fallo in motivos
+        ))
+        destinos = []
         if apto:
-            destino = notify.publicar(salida, meta)
+            destinos = notify.publicar_pareja([
+                (salida, {**meta, "variante": variante})
+                for variante, salida in salidas.items()
+            ])
             cola = "LISTOS"
             _evento("MOVED_TO_LISTOS", manifest["id"], status="ok")
         else:
-            destino = calidad.apartar(salida, fallos, meta)
+            try:
+                for variante, salida in salidas.items():
+                    destinos.append(calidad.apartar(
+                        salida, fallos, {**meta, "variante": variante}
+                    ))
+            except Exception:
+                revisar = clipper.OUT / "REVISAR"
+                for salida in salidas.values():
+                    destino = revisar / salida.name
+                    destino.unlink(missing_ok=True)
+                    destino.with_suffix(".txt").unlink(missing_ok=True)
+                    destino.with_suffix(".motivos.txt").unlink(missing_ok=True)
+                raise
             cola = "REVISAR"
             _evento("MOVED_TO_REVISAR", manifest["id"], status="ok")
-        return {"queue": cola, "name": destino.name}
+        return {"queue": cola, "name": destinos[0].name,
+                "names": [destino.name for destino in destinos]}
     finally:
         shutil.rmtree(trabajo, ignore_errors=True)
         shutil.rmtree(clipper.OUT / slug, ignore_errors=True)
@@ -540,11 +572,17 @@ def _campos_para_api(raw_id: str, mtime_ns: int) -> dict | None:
         return None
     luna = manifest.get("luna") or {}
     destino = manifest.get("destination") or {}
+    duracion = float(manifest.get("duracion", 0))
+    if isinstance(luna, dict):
+        try:
+            duracion = float(luna["clip_end_s"]) - float(luna["clip_start_s"])
+        except (KeyError, TypeError, ValueError):
+            pass
     campos = {
         "id": manifest["id"],
         "canal": manifest.get("canal", ""),
         "motivo": manifest.get("motivo", ""),
-        "duracion": round(float(manifest.get("duracion", 0))),
+        "duracion": round(duracion),
         "status": manifest.get("status", "pendiente"),
         "last_attempt_at": manifest.get("last_attempt_at", ""),
         "last_error": manifest.get("last_error", ""),

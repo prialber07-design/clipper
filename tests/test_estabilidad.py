@@ -21,13 +21,6 @@ import web
 import bloqueo
 
 
-def _incrementar_contador(contadores, bloqueo_path, repeticiones):
-    live.CONTADORES = Path(contadores)
-    live.CONTADORES_LOCK = Path(bloqueo_path)
-    for _ in range(repeticiones):
-        live.elegir_duracion("canal")
-
-
 def _ocupar_plaza(ruta, activos, maximo, mutex):
     with bloqueo.limitado(Path(ruta), 3):
         with mutex:
@@ -47,6 +40,8 @@ def _respuesta_editorial(titulo="Título sólido", descripcion="Una reacción cl
         "score": score,
         "confidence": confidence,
         "reason": "El momento tiene una reacción clara.",
+        "clip_start_s": 0,
+        "clip_end_s": 30,
         "screen_title": titulo,
         "social_description": descripcion,
         "hashtags": hashtags,
@@ -157,33 +152,14 @@ class EstabilidadTests(unittest.TestCase):
             clipper.canal_desde_nombre("001_mi_canal_2026-08-01_193235.mp4"),
             "mi_canal",
         )
+        self.assertEqual(
+            clipper.canal_desde_nombre("001_mi_canal_2026-08-01_amarillo.mp4"),
+            "mi_canal",
+        )
 
-    def test_contador_de_duraciones_es_atomico(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            anterior, anterior_lock = live.CONTADORES, live.CONTADORES_LOCK
-            try:
-                live.CONTADORES = Path(tmp) / "_contadores.json"
-                live.CONTADORES_LOCK = Path(tmp) / "_contadores.lock"
-                live.elegir_duracion("canal")
-                live.elegir_duracion("canal")
-                self.assertEqual(json.loads(live.CONTADORES.read_text())["canal"], 2)
-            finally:
-                live.CONTADORES, live.CONTADORES_LOCK = anterior, anterior_lock
-
-    def test_contador_de_duraciones_entre_procesos(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            contadores, bloqueo_path = root / "contadores.json", root / "contadores.lock"
-            ctx = multiprocessing.get_context("spawn" if os.name == "nt" else "fork")
-            procesos = [ctx.Process(target=_incrementar_contador,
-                                     args=(str(contadores), str(bloqueo_path), 6))
-                         for _ in range(2)]
-            for proceso in procesos:
-                proceso.start()
-            for proceso in procesos:
-                proceso.join(30)
-                self.assertEqual(proceso.exitcode, 0)
-            self.assertEqual(json.loads(contadores.read_text())["canal"], 12)
+    def test_duracion_unica_deja_el_recorte_final_a_luna(self):
+        self.assertEqual(live.elegir_duracion("canal"),
+                         ("flexible", {"min": 8, "max": 40}))
 
     def test_registrar_listo_propag_n(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -200,6 +176,62 @@ class EstabilidadTests(unittest.TestCase):
                     destino = notify.registrar_listo(origen, meta)
                 self.assertEqual(meta["n"], 1)
                 self.assertTrue(destino.exists())
+            finally:
+                notify.LISTOS, notify.CONTADOR, notify.SALIDA_LOCK = anterior
+
+    def test_registrar_pareja_revierte_si_falla_la_segunda_version(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            anterior = notify.LISTOS, notify.CONTADOR, notify.SALIDA_LOCK
+            notify.LISTOS = root / "LISTOS"
+            notify.CONTADOR = notify.LISTOS / ".contador"
+            notify.SALIDA_LOCK = root / ".salida.lock"
+            items = []
+            for variante in ("amarillo", "azul"):
+                mp4 = root / f"clip-{variante}.mp4"
+                mp4.write_bytes(b"video")
+                mp4.with_suffix(".txt").write_text("texto", encoding="utf-8")
+                items.append((mp4, {"canal": "canal", "variante": variante}))
+            llamadas = 0
+
+            def copiar(origen, destino):
+                nonlocal llamadas
+                llamadas += 1
+                if llamadas == 3:
+                    raise OSError("disco lleno")
+                Path(destino).write_bytes(Path(origen).read_bytes())
+
+            try:
+                with patch.object(notify.shutil, "copy2", side_effect=copiar), \
+                     patch.object(notify, "_sincronizar"):
+                    with self.assertRaises(OSError):
+                        notify.registrar_pareja(items)
+                self.assertEqual(list(notify.LISTOS.glob("*.mp4")), [])
+                self.assertEqual(list(notify.LISTOS.glob("*.txt")), [])
+            finally:
+                notify.LISTOS, notify.CONTADOR, notify.SALIDA_LOCK = anterior
+
+    def test_registrar_pareja_conserva_dos_mp4_y_dos_txt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            anterior = notify.LISTOS, notify.CONTADOR, notify.SALIDA_LOCK
+            notify.LISTOS = root / "LISTOS"
+            notify.CONTADOR = notify.LISTOS / ".contador"
+            notify.SALIDA_LOCK = root / ".salida.lock"
+            items = []
+            for variante in ("amarillo", "azul"):
+                mp4 = root / f"clip-{variante}.mp4"
+                mp4.write_bytes(b"video")
+                mp4.with_suffix(".txt").write_text("texto", encoding="utf-8")
+                items.append((mp4, {"canal": "mi_canal", "variante": variante}))
+            try:
+                with patch.object(notify, "_sincronizar"):
+                    destinos = notify.registrar_pareja(items)
+                self.assertEqual([p.stem.rsplit("_", 1)[-1] for p in destinos],
+                                 ["amarillo", "azul"])
+                self.assertTrue(all(p.exists() and p.with_suffix(".txt").exists()
+                                    for p in destinos))
+                self.assertEqual([meta["n"] for _, meta in items], [1, 2])
             finally:
                 notify.LISTOS, notify.CONTADOR, notify.SALIDA_LOCK = anterior
 
@@ -336,7 +368,7 @@ class EstabilidadTests(unittest.TestCase):
                 (publicar_todo.REVISAR, notify.LISTOS,
                  notify.CONTADOR, notify.SALIDA_LOCK) = anteriores
 
-    def test_llm_valido_reemplaza_gancho_sin_mover_tiempos(self):
+    def test_llm_valido_guarda_recorte_sin_mutar_el_contexto(self):
         segmentos = [{"start": 10.5, "end": 13.0, "text": "Esto fue inesperado"}]
         copia = [dict(segmento) for segmento in segmentos]
         with patch.dict(os.environ, {
@@ -351,6 +383,7 @@ class EstabilidadTests(unittest.TestCase):
         self.assertEqual(gancho, "Título sólido")
         self.assertEqual(segmentos, copia)
         self.assertEqual(meta["decision"], "publicar")
+        self.assertEqual((meta["clip_start_s"], meta["clip_end_s"]), (0.0, 30.0))
         self.assertEqual(meta["input_tokens"], 0)
         self.assertEqual(meta["output_tokens"], 0)
         self.assertEqual(llamada.call_args.args[2], "gpt-5.6-terra")
@@ -384,6 +417,24 @@ class EstabilidadTests(unittest.TestCase):
         self.assertEqual(gancho, "Título sólido")
         self.assertEqual(meta["decision"], "publicar")
         llamada.assert_called_once()
+
+    def test_luna_elije_recorte_flexible_que_incluye_el_pico(self):
+        self.assertEqual(clipper._sanear_recorte(4, 16, 30, 12), (4.0, 16.0))
+        for inicio, fin, duracion, pico in (
+            (0, 7.9, 30, 4),       # demasiado corto
+            (0, 41, 45, 4),        # demasiado largo
+            (-1, 12, 30, 4),       # fuera del candidato
+            (10, 20, 30, 5),       # deja fuera el pico
+        ):
+            with self.subTest(inicio=inicio, fin=fin):
+                with self.assertRaises(ValueError):
+                    clipper._sanear_recorte(inicio, fin, duracion, pico)
+
+        prompt = clipper._llm_prompt("canal", "risa", [], [], 30, 12, True)
+        self.assertIn("brainrot", prompt)
+        self.assertIn("clip_start_s", prompt)
+        self.assertIn("No rellenes tiempo", prompt)
+        self.assertIn("una sola frase corta", prompt)
 
     def test_codex_recibe_el_prompt_por_stdin(self):
         respuesta = _respuesta_editorial()
@@ -422,6 +473,8 @@ class EstabilidadTests(unittest.TestCase):
     def test_llm_rechaza_descripcion_y_hashtags_invalidos(self):
         for respuesta, esperado in (
             (_respuesta_editorial(descripcion=""), "social_description"),
+            (_respuesta_editorial(descripcion="Primera frase. Segunda frase."),
+             "social_description"),
             (_respuesta_editorial(hashtags=["#uno"]), "hashtags"),
         ):
             with self.subTest(esperado=esperado), \
@@ -576,6 +629,65 @@ class EstabilidadTests(unittest.TestCase):
         self.assertIn("🔥", texto)
         self.assertIn(r"{\fnNoto Emoji}", texto)
         self.assertNotIn(r"{\fnNoto Emoji}", texto_sin_emoji)
+
+    def test_variantes_ass_cambian_color_y_solo_amarillo_lleva_marca(self):
+        words = [{"start": 0, "end": 1, "word": "hola"}]
+        clip = {"start": 0, "end": 10, "hook": "BRO MENUDO MOMENTO 💀"}
+        with tempfile.TemporaryDirectory() as tmp:
+            amarillo = Path(tmp) / "amarillo.ass"
+            azul = Path(tmp) / "azul.ass"
+            with patch.dict(clipper.CONFIG["render"], {"marca": "@cuenta", "sub_size": 80}):
+                clipper._build_ass(words, clip, amarillo,
+                                   color_resaltado="&H0000FFFF&", con_marca=True)
+                clipper._build_ass(words, clip, azul,
+                                   color_resaltado="&H00EEF425&", con_marca=False)
+            texto_amarillo = amarillo.read_text(encoding="utf-8")
+            texto_azul = azul.read_text(encoding="utf-8")
+        self.assertIn("Style: Sub,Arial Black,80", texto_amarillo)
+        self.assertIn(r"\c&H0000FFFF&", texto_amarillo)
+        self.assertIn("@cuenta", texto_amarillo)
+        self.assertIn(r"\c&H00EEF425&", texto_azul)
+        self.assertNotIn("@cuenta", texto_azul)
+
+    def test_render_genera_dos_mp4_dos_txt_y_normaliza_audio(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            trabajo = root / "work" / "canal-20260804-120000"
+            trabajo.mkdir(parents=True)
+            (trabajo / "source.mp4").write_bytes(b"source")
+            (trabajo / "transcript.json").write_text(
+                json.dumps({"words": [{"start": 0, "end": 1, "word": "hola"}]}),
+                encoding="utf-8",
+            )
+            (trabajo / "clips.json").write_text(json.dumps({"clips": [{
+                "id": "01", "start": 0, "end": 10,
+                "hook": "BRO MENUDO MOMENTO 💀",
+                "social_description": "Se quedó sin palabras.",
+                "hashtags": ["#uno", "#dos", "#tres", "#cuatro"],
+            }]}), encoding="utf-8")
+            comandos = []
+
+            def ejecutar(comando, cwd=None):
+                comandos.append(comando)
+                Path(comando[-1]).write_bytes(b"video")
+                return SimpleNamespace(stdout="", stderr="", returncode=0)
+
+            args = SimpleNamespace(slug=trabajo.name, only=None, layout="irl")
+            with patch.object(clipper, "WORK", root / "work"), \
+                 patch.object(clipper, "OUT", root / "out"), \
+                 patch.object(clipper, "recargar_config"), \
+                 patch.object(clipper, "_vf", return_value="[0:v]null[v]"), \
+                 patch.object(clipper, "run", side_effect=ejecutar):
+                clipper.cmd_render(args)
+
+            salida = root / "out" / trabajo.name
+            for variante in ("amarillo", "azul"):
+                self.assertTrue((salida / f"{trabajo.name}-01-{variante}.mp4").exists())
+                self.assertTrue((salida / f"{trabajo.name}-01-{variante}.txt").exists())
+            self.assertEqual(len(comandos), 2)
+            for comando in comandos:
+                self.assertIn("-af", comando)
+                self.assertIn("loudnorm=I=-16:LRA=11:TP=-1.5", comando)
 
 
 if __name__ == "__main__":

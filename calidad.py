@@ -55,7 +55,8 @@ FUERZA = re.compile(
     r"(\d|[?¿!¡]|\bnunca\b|\bjam[aá]s\b|\bnadie\b|\btodo el mundo\b|\bincre[ií]ble\b|"
     r"\bbrutal\b|\bimposible\b|\bperd[ií]\b|\bgan[eé]\b|\beuros?\b|\bmillon\b|"
     r"\bmejor\b|\bpeor\b|\bprimera vez\b|\bse acab[oó]\b|\bbronca\b|\berror\b|"
-    r"\bfall[oó]\b|\bnadie sabe\b|\bharto\b|\bcansado\b)", re.IGNORECASE)
+    r"\bfall[oó]\b|\bnadie sabe\b|\bharto\b|\bcansado\b|\bbro\b|\bwtf\b|"
+    r"\blocura\b|\bloco\b|\bhumill|\bdestroz|\brompi)", re.IGNORECASE)
 
 
 def _gancho_flojo(hook: str) -> str | None:
@@ -126,9 +127,8 @@ def evaluar(mp4: Path, clip: dict, segmentos: list,
             limites: tuple[float, float] | None = None) -> tuple[bool, list[str]]:
     """Devuelve (apto, motivos). Motivos vacio = listo para publicar.
 
-    `limites` llega desde fuera a proposito: el modo largo cambia la duracion
-    objetivo en memoria, y cualquier recarga de config.json la pisaria. Quien
-    decide la duracion es quien la pasa aqui, no el fichero.
+    `limites` llega desde fuera para validar exactamente el rango que recibió
+    Luna cuando eligió el recorte.
     """
     rc = CONFIG["render"]
     q = CONFIG.get("calidad", {})

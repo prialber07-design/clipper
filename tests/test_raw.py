@@ -15,6 +15,7 @@ def _llm():
     return {
         "decision": "publicar", "score": 90, "confidence": 0.9,
         "reason": "momento claro", "social_description": "Descripción.",
+        "clip_start_s": 0.0, "clip_end_s": 30.0,
         "hashtags": ["#uno", "#dos", "#tres", "#cuatro"],
         "visual_summary": "Dos personas conversan.", "visual_timeline": [],
         "people": [], "visible_text": [], "visual_warnings": [],
@@ -93,6 +94,48 @@ class RawTests(unittest.TestCase):
         self.assertEqual(manifest["status"], "completado")
         self.assertEqual(manifest["luna"]["image_count"], 3)
         self.assertIn("LUNA_VISUAL_FINISHED", raw.RAW_LOG.read_text(encoding="utf-8"))
+
+    def test_recorte_de_luna_publica_la_pareja_completa(self):
+        raw_id = self.candidato()
+        manifest = raw._read(raw_id)
+        llm = _llm()
+        llm.update({"clip_start_s": 4.0, "clip_end_s": 16.0})
+        clip_renderizado = {}
+
+        def renderizar(args):
+            trabajo = clipper.WORK / args.slug
+            clip_renderizado.update(json.loads(
+                (trabajo / "clips.json").read_text(encoding="utf-8")
+            )["clips"][0])
+            salida = clipper.OUT / args.slug
+            salida.mkdir(parents=True, exist_ok=True)
+            for variante in ("amarillo", "azul"):
+                base = salida / f"{args.slug}-01-{variante}"
+                base.with_suffix(".mp4").write_bytes(b"video")
+                base.with_suffix(".txt").write_text("texto", encoding="utf-8")
+
+        def publicar(items):
+            return [Path(f"00{i}_canal_2026-08-04_{meta['variante']}.mp4")
+                    for i, (_, meta) in enumerate(items, 1)]
+
+        with patch.object(raw.clipper, "WORK", self.root / "work"), \
+             patch.object(raw.clipper, "cmd_render", side_effect=renderizar), \
+             patch.object(raw.calidad, "evaluar", return_value=(True, [])) as evaluar, \
+             patch.object(raw.notify, "publicar_pareja", side_effect=publicar) as publicar_mock, \
+             patch.object(raw.bloqueo, "exclusivo_si", return_value=nullcontext()):
+            resultado = raw._render_and_publish(
+                manifest, raw.RAW / f"{raw_id}.mp4", "BRO MENUDO MOMENTO 💀", llm
+            )
+
+        self.assertEqual((clip_renderizado["start"], clip_renderizado["end"]), (4.0, 16.0))
+        self.assertEqual(resultado["queue"], "LISTOS")
+        self.assertEqual(len(resultado["names"]), 2)
+        self.assertEqual(evaluar.call_count, 2)
+        self.assertEqual(publicar_mock.call_count, 1)
+        self.assertEqual(
+            [meta["variante"] for _, meta in publicar_mock.call_args.args[0]],
+            ["amarillo", "azul"],
+        )
 
     def test_fallo_visual_conserva_raw_y_programa_reintento(self):
         raw_id = self.candidato()

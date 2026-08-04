@@ -71,7 +71,25 @@ def registrar_listo(mp4: Path, meta: dict) -> Path:
         return _registrar_listo(mp4, meta)
 
 
-def _registrar_listo(mp4: Path, meta: dict) -> Path:
+def registrar_pareja(items: list[tuple[Path, dict]]) -> list[Path]:
+    """Registra todas las variantes o no deja ninguna en LISTOS."""
+    with bloqueo.exclusivo(SALIDA_LOCK, etiqueta="registro de pareja lista"):
+        destinos = []
+        try:
+            for mp4, meta in items:
+                destinos.append(_registrar_listo(mp4, meta, sincronizar=False))
+        except Exception:
+            for destino in destinos:
+                destino.unlink(missing_ok=True)
+                destino.with_suffix(".txt").unlink(missing_ok=True)
+            raise
+        for destino in destinos:
+            txt = destino.with_suffix(".txt")
+            _sincronizar(destino, txt if txt.exists() else None)
+        return destinos
+
+
+def _registrar_listo(mp4: Path, meta: dict, *, sincronizar: bool = True) -> Path:
     """Copia el clip a la bandeja de salida con numeracion exclusiva."""
     LISTOS.mkdir(parents=True, exist_ok=True)
     ts = datetime.now()
@@ -79,20 +97,28 @@ def _registrar_listo(mp4: Path, meta: dict) -> Path:
     # El numero va delante y manda: es el mismo que uso al darte el guion, para
     # que "el 007" signifique lo mismo en la carpeta, en el movil y en el chat.
     base = f"{n:03d}_{meta.get('canal','clip')}_{ts:%Y-%m-%d}"
+    variante = str(meta.get("variante", "")).strip().lower()
+    if variante:
+        base = f"{base}_{variante}"
     if (LISTOS / f"{base}.mp4").exists():
         base = f"{base}_{ts:%H%M%S}"
     meta["n"] = n
 
     destino = LISTOS / f"{base}.mp4"
-    shutil.copy2(mp4, destino)
-
     txt = mp4.with_suffix(".txt")
     txt_destino = None
-    if txt.exists():
-        txt_destino = LISTOS / f"{base}.txt"
-        shutil.copy2(txt, txt_destino)
+    try:
+        shutil.copy2(mp4, destino)
+        if txt.exists():
+            txt_destino = LISTOS / f"{base}.txt"
+            shutil.copy2(txt, txt_destino)
+    except Exception:
+        destino.unlink(missing_ok=True)
+        (txt_destino or LISTOS / f"{base}.txt").unlink(missing_ok=True)
+        raise
 
-    _sincronizar(destino, txt_destino)
+    if sincronizar:
+        _sincronizar(destino, txt_destino)
 
     return destino
 
@@ -188,8 +214,7 @@ def avisar(titulo: str, mensaje: str, adjunto: Path | None = None,
         LOG.warning("⚠️ NTFY NO ENVIADO\n   MOTIVO: %s\n   EL CLIP SIGUE GUARDADO", e)
 
 
-def publicar(mp4: Path, meta: dict) -> Path:
-    destino = registrar_listo(mp4, meta)
+def _avisar_publicado(destino: Path, meta: dict):
     gancho = meta.get("hook", "") or "(sin gancho)"
     dur = meta.get("duracion", "?")
     canal = meta.get("canal", "desconocido")
@@ -218,7 +243,19 @@ def publicar(mp4: Path, meta: dict) -> Path:
         adjunto=destino,
         enlace=enlace,
     )
+
+
+def publicar(mp4: Path, meta: dict) -> Path:
+    destino = registrar_listo(mp4, meta)
+    _avisar_publicado(destino, meta)
     return destino
+
+
+def publicar_pareja(items: list[tuple[Path, dict]]) -> list[Path]:
+    destinos = registrar_pareja(items)
+    for destino, (_, meta) in zip(destinos, items):
+        _avisar_publicado(destino, meta)
+    return destinos
 
 
 def avisar_inicio_directo(canal: str, plataforma: str, url: str):

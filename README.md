@@ -19,7 +19,9 @@ pico → ventana → Cloudflare Whisper (respaldo local, timestamps por palabra)
         ↓
 out/RAW (MP4 limpio + manifiesto) → storyboard temporal (1 imagen/s + pico)
         ↓
-Luna multimodal + filtro de calidad → ffmpeg (9:16 + subtítulos + gancho)
+Luna multimodal + recorte 8-40 s + filtro de calidad
+        ↓
+ffmpeg → amarillo con marca + azul sin marca (cada uno con su TXT)
         ↓
 bandeja numerada + aviso al móvil (ntfy)
 ```
@@ -45,9 +47,13 @@ Todo lo demás va a `out/REVISAR/` con el motivo escrito; nunca se borra solo.
 **Dos montajes.** `reaccion` (webcam arriba, contenido abajo) y `irl` (una sola
 cámara). Se elige por canal.
 
-**Duración variable.** 1 de cada 3 clips pasa del minuto, porque TikTok solo
-monetiza a partir de ahí; el resto se quedan cortos, que rinden mejor en Reels
-y Shorts.
+**Duración guiada por el momento.** Luna recibe hasta 40 segundos de contexto y
+elige el tramo completo más corto entre 8 y 40 segundos. No se rellena un clip
+hasta una duración fija ni se conserva conversación posterior al remate.
+
+**Dos versiones por clip.** Cada decisión genera una versión con palabra activa
+amarilla y la marca `CLIPPER_MARCA`, y otra azul sin marca. Ambas normalizan el
+audio a -16 LUFS y llevan su propio TXT listo para publicar.
 
 ## Uso
 
@@ -70,9 +76,8 @@ python servidor.py --estado
 El supervisor permite hasta tres transcripciones simultáneas en Cloudflare.
 Whisper local y el render conservan una sola cola de CPU, y el modelo local se
 libera al terminar para no acumular una copia por canal. La evaluación de Luna
-también es única por candidato y genera
-hook, descripción y hashtags; los nombres nuevos incluyen fecha para no
-colisionar.
+también es única por candidato y genera el recorte final, un hook breve de tono
+joven, una descripción corta y hashtags; los nombres incluyen fecha y variante.
 El buffer se poda tambien mientras Whisper o ffmpeg estan trabajando y los
 datos se conservan siete dias.
 
@@ -86,8 +91,8 @@ Después de Whisper cada candidato queda en `out/RAW/` con su MP4 limpio y un
 manifiesto privado. El supervisor extrae temporalmente un JPEG 768x432 por
 segundo y cinco imágenes adicionales alrededor del pico. Un `codex exec`
 autenticado con ChatGPT recibe esas imágenes ordenadas, la transcripción, el chat y el canal, y
-devuelve el análisis visual junto con la decisión, el hook, la descripción y
-los hashtags. Los JPEG se eliminan siempre al terminar.
+devuelve el análisis visual junto con la decisión, el inicio y final elegidos,
+el hook, la descripción y los hashtags. Los JPEG se eliminan siempre al terminar.
 
 Los fallos de Luna o render se reintentan a 1, 5 y 15 minutos y después cada
 hora. No se registran prompts, transcripciones, chat, tokens ni análisis
