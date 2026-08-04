@@ -30,6 +30,65 @@ LOG = obtener("bloqueo")
 PRIORIDAD_MAX_S = 300
 
 
+def _intentar(f) -> bool:
+    try:
+        if os.name == "nt":
+            f.seek(0, os.SEEK_END)
+            if f.tell() == 0:
+                f.write(b"\0")
+                f.flush()
+            f.seek(0)
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except OSError:
+        return False
+
+
+def _soltar(f):
+    try:
+        if os.name == "nt":
+            f.seek(0)
+            msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+    except OSError:
+        pass
+
+
+@contextmanager
+def limitado(ruta: Path, limite: int, etiqueta: str = "", aviso_tras: float = 5.0):
+    """Ocupa una de varias plazas compartidas entre procesos."""
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    archivos = [open(ruta.with_name(f"{ruta.name}.{i}"), "a+b")
+                for i in range(max(1, int(limite)))]
+    adquirido = None
+    inicio = time.time()
+    avisado = False
+    try:
+        while adquirido is None:
+            for numero, f in enumerate(archivos, 1):
+                if _intentar(f):
+                    adquirido = (numero, f)
+                    break
+            if adquirido is None:
+                if not avisado and time.time() - inicio > aviso_tras:
+                    LOG.info("⏳ ESPERANDO PLAZA%s",
+                             f" · TAREA: {etiqueta}" if etiqueta else "")
+                    avisado = True
+                time.sleep(0.2)
+        numero, f = adquirido
+        LOG.info("🔓 PLAZA CONSEGUIDA · %d/%d%s", numero, len(archivos),
+                 f" · TAREA: {etiqueta}" if etiqueta else "")
+        yield numero
+    finally:
+        if adquirido is not None:
+            _soltar(adquirido[1])
+        for f in archivos:
+            f.close()
+
+
 def _marca_prioridad(ruta: Path) -> Path:
     return ruta.with_name(ruta.name + ".prioridad")
 
@@ -93,18 +152,13 @@ def exclusivo(ruta: Path, etiqueta: str = "", aviso_tras: float = 5.0,
                     avisado = True
                 time.sleep(0.5)
                 continue
-            try:
-                if os.name == "nt":
-                    msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
-                else:
-                    fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if _intentar(f):
                 break
-            except OSError:
-                if not avisado and time.time() - inicio > aviso_tras:
-                    LOG.info("⏳ ESPERANDO TURNO DE CPU%s",
-                             f" · TAREA: {etiqueta}" if etiqueta else "")
-                    avisado = True
-                time.sleep(0.5)
+            if not avisado and time.time() - inicio > aviso_tras:
+                LOG.info("⏳ ESPERANDO TURNO DE CPU%s",
+                         f" · TAREA: {etiqueta}" if etiqueta else "")
+                avisado = True
+            time.sleep(0.5)
         # Ya se tiene el turno: retirar la marca cuanto antes para no frenar a
         # los demas durante todo el trabajo.
         if prioritario:
@@ -115,12 +169,5 @@ def exclusivo(ruta: Path, etiqueta: str = "", aviso_tras: float = 5.0,
     finally:
         if prioritario:
             marca.unlink(missing_ok=True)
-        try:
-            if os.name == "nt":
-                f.seek(0)
-                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-        except OSError:
-            pass
+        _soltar(f)
         f.close()

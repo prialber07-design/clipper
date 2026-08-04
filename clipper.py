@@ -27,6 +27,7 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+import bloqueo
 from registro import obtener
 
 ROOT = Path(__file__).resolve().parent
@@ -38,6 +39,8 @@ OUT = DATA / "out"
 # Con cerrojos distintos cada uno creia tener la maquina entera y acababan
 # solapandose, que es justo lo que se queria evitar.
 CPU_LOCK = DATA / ".cpu.lock"
+CLOUDFLARE_LOCK = DATA / ".cloudflare-whisper"
+CLOUDFLARE_CONCURRENCY = 3
 LOG = obtener("clipper")
 
 
@@ -786,12 +789,21 @@ def cmd_transcribe(args):
             return [], []
         return segs, words
 
+    def _intento_local(dev, comp):
+        with bloqueo.exclusivo_si(
+                serializar_cpu(), CPU_LOCK,
+                etiqueta=f"transcripcion local de {args.slug}"):
+            return _intento(dev, comp)
+
     if device == "cloudflare":
         inicio_cloudflare = time.monotonic()
         try:
             LOG.info("TRANSCRIPCION INICIADA\n   PROVEEDOR: CLOUDFLARE\n"
                      "   MODELO: @cf/openai/whisper\n   AUDIO: %s", audio)
-            segs, words = _transcribir_cloudflare(audio)
+            with bloqueo.limitado(
+                    CLOUDFLARE_LOCK, CLOUDFLARE_CONCURRENCY,
+                    etiqueta=f"Cloudflare Whisper de {args.slug}"):
+                segs, words = _transcribir_cloudflare(audio)
             LOG.info("TRANSCRIPCION CLOUDFLARE COMPLETADA\n   LATENCIA: %.1f S",
                      time.monotonic() - inicio_cloudflare)
         except Exception as e:
@@ -801,13 +813,13 @@ def cmd_transcribe(args):
 
     if device == "cuda":
         try:
-            segs, words = _intento("cuda", "float16")
+            segs, words = _intento_local("cuda", "float16")
         except Exception as e:
             LOG.warning("⚠️ CUDA FALLÓ · CAMBIO A CPU\n   MOTIVO: %s", str(e).splitlines()[0])
             device = "cpu"
-            segs, words = _intento("cpu", wcfg["compute_type"])
+            segs, words = _intento_local("cpu", wcfg["compute_type"])
     elif device == "cpu":
-        segs, words = _intento("cpu", wcfg["compute_type"])
+        segs, words = _intento_local("cpu", wcfg["compute_type"])
 
     (d / "transcript.json").write_text(
         json.dumps({"segments": segs, "words": words}, ensure_ascii=False, indent=1), encoding="utf-8")

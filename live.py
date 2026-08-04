@@ -476,14 +476,12 @@ def procesar(cap: Captura, t_video: float, canal: str, motivo: str, device: str,
     fuente, t_pico = montar_ventana(cap, t_video, slug, antes=antes)
 
     args = argparse.Namespace(slug=slug, n=1, device=device, func=None, defer_clips=True)
-    # Una unica cola de Whisper entre todos los vigilantes del servidor.
-    # El modelo se cachea por proceso; el cerrojo evita inferencias solapadas.
-    with bloqueo.exclusivo_si(clipper.serializar_cpu(), clipper.CPU_LOCK,
-                              etiqueta=f"transcripcion de {canal}"):
-        try:
-            clipper.cmd_transcribe(args)
-        finally:
-            clipper.liberar_whisper_model()
+    # Cloudflare admite tres trabajos simultaneos; el fallback local toma el
+    # cerrojo de CPU dentro de cmd_transcribe.
+    try:
+        clipper.cmd_transcribe(args)
+    finally:
+        clipper.liberar_whisper_model()
 
     d = WORK / slug
     datos = json.loads((d / "transcript.json").read_text(encoding="utf-8"))

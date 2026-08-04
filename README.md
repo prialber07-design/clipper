@@ -67,9 +67,10 @@ python servidor.py                 # todos los canales de config.json
 python servidor.py --estado
 ```
 
-El supervisor mantiene una sola cola de Whisper: los trabajos se procesan en
-serie y el modelo se libera al terminar cada transcripción para no acumular una
-copia por canal. La evaluación de Luna también es única por candidato y genera
+El supervisor permite hasta tres transcripciones simultáneas en Cloudflare.
+Whisper local y el render conservan una sola cola de CPU, y el modelo local se
+libera al terminar para no acumular una copia por canal. La evaluación de Luna
+también es única por candidato y genera
 hook, descripción y hashtags; los nombres nuevos incluyen fecha para no
 colisionar.
 El buffer se poda tambien mientras Whisper o ffmpeg estan trabajando y los

@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -17,6 +18,7 @@ import live
 import notify
 import publicar_todo
 import web
+import bloqueo
 
 
 def _incrementar_contador(contadores, bloqueo_path, repeticiones):
@@ -24,6 +26,16 @@ def _incrementar_contador(contadores, bloqueo_path, repeticiones):
     live.CONTADORES_LOCK = Path(bloqueo_path)
     for _ in range(repeticiones):
         live.elegir_duracion("canal")
+
+
+def _ocupar_plaza(ruta, activos, maximo, mutex):
+    with bloqueo.limitado(Path(ruta), 3):
+        with mutex:
+            activos.value += 1
+            maximo.value = max(maximo.value, activos.value)
+        time.sleep(0.1)
+        with mutex:
+            activos.value -= 1
 
 
 def _respuesta_editorial(titulo="Título sólido", descripcion="Una reacción clara.",
@@ -45,6 +57,30 @@ def _respuesta_editorial(titulo="Título sólido", descripcion="Una reacción cl
 
 
 class EstabilidadTests(unittest.TestCase):
+
+    def test_limite_cloudflare_admite_tres_y_libera_tras_error(self):
+        with tempfile.TemporaryDirectory() as td:
+            ruta = Path(td) / "cloudflare"
+            ctx = multiprocessing.get_context("spawn" if os.name == "nt" else "fork")
+            activos = ctx.Value("i", 0, lock=False)
+            maximo = ctx.Value("i", 0, lock=False)
+            mutex = ctx.Lock()
+            procesos = [ctx.Process(target=_ocupar_plaza,
+                                    args=(ruta, activos, maximo, mutex))
+                        for _ in range(6)]
+            for proceso in procesos:
+                proceso.start()
+            for proceso in procesos:
+                proceso.join(10)
+
+            self.assertTrue(all(proceso.exitcode == 0 for proceso in procesos))
+            self.assertEqual(maximo.value, 3)
+            with self.assertRaisesRegex(RuntimeError, "fallo"):
+                with bloqueo.limitado(ruta, 1):
+                    raise RuntimeError("fallo")
+            with bloqueo.limitado(ruta, 1):
+                pass
+
     def test_run_expone_fallos_del_comando(self):
         with self.assertRaises(FileNotFoundError):
             clipper.run(["__binario_que_no_existe__"])
@@ -82,6 +118,33 @@ class EstabilidadTests(unittest.TestCase):
         self.assertTrue(peticion.full_url.endswith("?language=es"))
         self.assertEqual(peticion.headers["Content-type"], "audio/mpeg")
         self.assertEqual(peticion.data, b"mp3")
+
+    def test_whisper_local_conserva_el_cerrojo_cpu(self):
+        segmento = SimpleNamespace(
+            start=0.0, end=1.0, text="hola",
+            words=[SimpleNamespace(start=0.0, end=1.0, word="hola")])
+        with tempfile.TemporaryDirectory() as tmp:
+            anterior = clipper.WORK
+            clipper.WORK = Path(tmp)
+            trabajo = clipper.WORK / "prueba"
+            trabajo.mkdir()
+            (trabajo / "audio.wav").write_bytes(b"wav")
+            try:
+                with patch.dict(os.environ, {
+                    "CLOUDFLARE_ACCOUNT_ID": "", "CLOUDFLARE_ACCOUNT": "",
+                    "CLOUDFLARE_AI_TOKEN": "",
+                }), patch.object(clipper, "get_whisper_model", return_value=object()), \
+                     patch.object(clipper, "_transcribir", return_value=([segmento], None)), \
+                     patch.object(clipper, "_energy_curve", return_value=[]), \
+                     patch.object(clipper, "_auto_candidates", return_value=[]), \
+                     patch.object(bloqueo, "exclusivo_si") as exclusivo:
+                    clipper.cmd_transcribe(SimpleNamespace(
+                        slug="prueba", device="cpu", n=1, defer_clips=True))
+                exclusivo.assert_called_once()
+                self.assertEqual(exclusivo.call_args.args[:2],
+                                 (clipper.serializar_cpu(), clipper.CPU_LOCK))
+            finally:
+                clipper.WORK = anterior
 
     def test_nombres_antiguos_y_nuevos(self):
         self.assertEqual(clipper.canal_desde_nombre("elcalvolol-193235-01.mp4"), "elcalvolol")
