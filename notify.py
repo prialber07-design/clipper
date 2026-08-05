@@ -136,12 +136,80 @@ def _ya_publicado(mp4: Path) -> Path | None:
     return None
 
 
+HUELLAS = LISTOS / "huellas.json"
+
+# Calibrado comparando los 728 clips con material, todos contra todos:
+#   0.62  mismo momento desde dos canales (peereira7-203219 / agustin51-203215)
+#   0.27  otros momentos de esa misma colaboracion -> son clips distintos, pasan
+#   0.11  momentos sin relacion
+# 0.55 cae en el hueco: caza el duplicado y deja pasar el resto de la sesion.
+PARECIDO_MAXIMO = 0.55
+
+
+def _huella(slug: str, mp4: Path | None = None) -> list:
+    """Bigramas de lo que se dice dentro del clip.
+
+    El md5 no ve estos duplicados: cuando dos creadores que vigilo juegan en el
+    mismo lobby, los dos canales graban la misma conversacion con camaras
+    distintas, asi que el video difiere byte a byte pero el clip es el mismo
+    momento. Peereira y Agustin51 lo hicieron a las 20:32 y ninguno de los dos
+    guardianes se habria enterado.
+    """
+    d = clipper.WORK / slug
+    try:
+        clip = json.loads((d / "clips.json").read_text(encoding="utf-8"))["clips"][0]
+        pal = json.loads((d / "transcript.json").read_text(encoding="utf-8"))["words"]
+    except (OSError, KeyError, IndexError, ValueError):
+        return []
+    dentro = [re.sub(r"[^\wáéíóúüñ]", "", w["word"].lower())
+              for w in pal if clip["start"] <= w["start"] <= clip["end"]]
+    dentro = [p for p in dentro if p]
+    return sorted({f"{a} {b}" for a, b in zip(dentro, dentro[1:])})
+
+
+def _mismo_momento(huella: list) -> tuple[str, float] | None:
+    """Busca un clip ya publicado que diga practicamente lo mismo."""
+    if len(huella) < 12:      # muy corto: cualquier parecido seria casualidad
+        return None
+    try:
+        previas = json.loads(HUELLAS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    mia = set(huella)
+    for nombre, otra in previas.items():
+        otra = set(otra)
+        if not otra:
+            continue
+        parecido = len(mia & otra) / len(mia | otra)
+        if parecido >= PARECIDO_MAXIMO:
+            return nombre, parecido
+    return None
+
+
+def _guardar_huella(nombre: str, huella: list):
+    if not huella:
+        return
+    try:
+        previas = json.loads(HUELLAS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        previas = {}
+    previas[nombre] = huella
+    HUELLAS.write_text(json.dumps(previas, ensure_ascii=False), encoding="utf-8")
+
+
 def registrar_listo(mp4: Path, meta: dict) -> Path:
     """Copia el clip a la bandeja de salida y lo apunta en el indice."""
     LISTOS.mkdir(parents=True, exist_ok=True)
     if repetido := _ya_publicado(mp4):
         print(f"[!] Ya estaba publicado como {repetido.name}. No se duplica.")
         return repetido
+
+    huella = _huella(meta.get("slug", ""), mp4)
+    if gemelo := _mismo_momento(huella):
+        nombre, parecido = gemelo
+        print(f"[!] Dice lo mismo que {nombre} ({parecido:.0%} igual): "
+              f"seria el mismo momento desde otra camara. No se duplica.")
+        return LISTOS / nombre
     ts = datetime.now()
     n = _siguiente_numero()
     # Numero + canal + gancho: el nombre del archivo ya dice de que va el clip,
@@ -153,6 +221,7 @@ def registrar_listo(mp4: Path, meta: dict) -> Path:
 
     destino = LISTOS / f"{base}.mp4"
     shutil.copy2(mp4, destino)
+    _guardar_huella(destino.name, huella)
 
     txt = mp4.with_suffix(".txt")
     txt_destino = None
