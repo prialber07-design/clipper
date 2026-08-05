@@ -356,6 +356,144 @@ def _partir_hook(txt: str) -> str:
     return r"\N".join(_lineas_hook(txt)[:MAX_LINEAS_HOOK])
 
 
+def ajustar_corte(words, inicio: float, fin: float, colchon: float = 0.4):
+    """Aparta los cortes de dentro de una palabra.
+
+    Elegir el final mirando el `start` de la ultima palabra corta esa palabra
+    por la mitad: el 087 cerro en 119.4 y "necesario" empezaba en 119.38, asi
+    que el clip acababa en "para lo justo y" y a negro. Aqui el final se
+    empuja al `end` real de la ultima palabra que entra, y el principio se
+    retrasa al arranque de la primera, mas un colchon de aire a cada lado.
+    """
+    if not words:
+        return inicio, fin
+
+    def _fin(w):
+        # Whisper estira el `end` de una palabra hasta la siguiente cuando hay
+        # pausa: a "perderlo" (085) le daba 2.2s y parecia que el corte la
+        # partia, cuando en realidad ya habia terminado. Ninguna palabra en
+        # castellano dura mas de un segundo hablando normal.
+        return min(w.get("end", w["start"] + 0.4), w["start"] + 1.0)
+
+    dentro = [w for w in words if _fin(w) > inicio and w["start"] < fin]
+    if not dentro:
+        return inicio, fin
+
+    # Si el corte cae dentro de la primera/ultima palabra, la dejo fuera entera
+    # en vez de colarla partida.
+    primera, ultima = dentro[0], dentro[-1]
+    if primera["start"] < inicio:
+        dentro = dentro[1:] or dentro
+        primera = dentro[0]
+    if _fin(ultima) > fin:
+        dentro = dentro[:-1] or dentro
+        ultima = dentro[-1]
+
+    # El colchon no puede invadir a los vecinos. Hablando encadenado la palabra
+    # siguiente arranca en el mismo instante en que acaba la anterior (pasó dos
+    # veces: «...gracias por su atención | ¿Y» y «...hacer algo, tío | Si»), y
+    # entonces el margen mete media frase de mas al final del clip.
+    ini_c = max(0.0, primera["start"] - colchon)
+    antes = [w for w in words if _fin(w) <= primera["start"]]
+    if antes:
+        ini_c = max(ini_c, _fin(antes[-1]) + 0.01)
+
+    fin_c = _fin(ultima) + colchon
+    despues = [w for w in words if w["start"] >= _fin(ultima)]
+    if despues:
+        fin_c = min(fin_c, despues[0]["start"] - 0.01)
+
+    return round(ini_c, 2), round(fin_c, 2)
+
+
+PAUSA_FRASE = 0.35      # silencio que basta por si solo para marcar frase nueva
+PAUSA_CORTA = 0.15      # con mayuscula detras, tambien vale
+
+def _hueco_antes(words, i: int) -> float:
+    if i <= 0:
+        return 9.9
+    previa = words[i - 1]
+    return round(words[i]["start"] - previa.get("end", previa["start"]), 2)
+
+
+def principio_de_frase(words, i: int) -> bool:
+    """¿La palabra i abre una frase, mirando solo los silencios?
+
+    Ojo: esto falla con quien habla sin respirar. En el 092, «...lo ven» acaba
+    en 50.43 y «Yo no se lo que decia» empieza en 50.43 — cero pausa — y es un
+    corte de frase evidente. Para eso estan los segmentos, que Whisper calcula
+    con el contexto entero: usa `arranques_de_frase()` siempre que los tengas.
+    """
+    hueco = _hueco_antes(words, i)
+    if hueco >= PAUSA_FRASE:
+        return True
+    return hueco >= PAUSA_CORTA and words[i]["word"][:1].isupper()
+
+
+def arranques_de_frase(transcripcion: dict) -> list:
+    """Instantes donde empieza una frase, segun los segmentos de Whisper.
+
+    Es la señal buena: los silencios no sirven con los que hablan encadenado,
+    y la mayuscula tampoco basta. Whisper parte los segmentos usando el
+    contexto completo, asi que sus principios de segmento son principios de
+    frase de verdad.
+    """
+    return sorted(round(float(s["start"]), 2)
+                  for s in transcripcion.get("segments", []))
+
+
+def arranque_en_frio(words, inicio: float) -> float:
+    """Silencio que hay justo antes del primer segundo del clip.
+
+    Si sale ~0, el clip abre cortando una frase que ya venia rodando y el
+    espectador entra sin saber de que se habla. Medido sobre los 54 clips con
+    material: 22 abrian asi, el 40%.
+    """
+    for i, w in enumerate(words):
+        if w["start"] >= inicio:
+            return 9.9 if i == 0 else _hueco_antes(words, i)
+    return 0.0
+
+
+def arranque_limpio(words, inicio: float, frases: list | None = None,
+                    tolerancia: float = 0.35) -> bool:
+    """¿El clip abre en principio de frase? Es la comprobacion que hay que usar.
+
+    Con `frases` (de `arranques_de_frase`) mira si el corte cae sobre uno de
+    ellos. Sin ellas se conforma con los silencios, que es peor.
+    """
+    if frases:
+        return any(abs(inicio - f) <= tolerancia for f in frases)
+    for i, w in enumerate(words):
+        if w["start"] >= inicio:
+            return principio_de_frase(words, i)
+    return False
+
+
+def mejor_arranque(words, deseado: float, margen: float = 8.0,
+                   frases: list | None = None) -> float:
+    """Mueve el inicio al principio de frase mas cercano.
+
+    Los 3 primeros segundos deciden si alguien se queda: no se pueden gastar en
+    «lo, lo...» ni en «va a». Se busca el arranque de frase (silencio previo de
+    al menos PAUSA_FRASE) mas proximo al punto pedido, dentro de `margen`, y se
+    prefiere el que ademas traiga mas palabras en esos 3 segundos.
+    """
+    if frases:
+        candidatos = [f for f in frases if abs(f - deseado) <= margen]
+    else:
+        candidatos = [w["start"] for i, w in enumerate(words)
+                      if abs(w["start"] - deseado) <= margen
+                      and principio_de_frase(words, i)]
+    opciones = []
+    for t in candidatos:
+        densidad = sum(1 for x in words if t <= x["start"] <= t + 3.0)
+        opciones.append((abs(t - deseado) - densidad * 0.15, t))
+    if not opciones:
+        return deseado
+    return min(opciones)[1]
+
+
 def _build_ass(words, clip, path: Path):
     rc = CONFIG["render"]
     start, end = clip["start"], clip["end"]
@@ -619,14 +757,25 @@ def cmd_rejilla(args):
 def hashtags_para(canal: str, extra=None, texto: str = "") -> list:
     """Etiquetas del clip, no del canal.
 
-    Los canales de clips con traccion usan exactamente 5, siempre con la misma
-    estructura: 2 del creador, 2 del contexto de ESE clip y 1 generico. Los del
-    contexto son los que hacen que te encuentren; llenarlo de #viral #parati
-    #fyp no descubre a nadie porque los pone todo el mundo.
+    Medido el 5-8-2026 en las paginas de descubrimiento de TikTok, sobre clips
+    de 1,4 a 10,1 millones: usan de 10 a 17 etiquetas en cuatro bloques, y
+    siempre incluyen la variante «creador+clips» (#roierclips, #auronplayclips,
+    #westcolclips, #riversggclips). Antes aqui se ponian 5 exactas, regla que
+    salio de 18 publicaciones de cuentas pequeñas y era erronea.
+
+    El orden importa: primero lo especifico (creador y contexto), que es lo que
+    de verdad hace que te encuentren, y al final categoria y alcance.
     """
     h = CONFIG.get("hashtags", {})
-    tope = int(h.get("maximo", 5))
-    canal_tags = (h.get("por_canal") or {}).get(canal, [])[:2]
+    tope = int(h.get("maximo", 12))
+    canal_tags = list((h.get("por_canal") or {}).get(canal, [])[:2])
+
+    # La variante «<creador>clips» la usan todas las cuentas grandes y es la
+    # que busca la gente que ya sigue clips de ese streamer.
+    if canal_tags:
+        raiz = str(canal_tags[0]).lstrip("#")
+        if not raiz.endswith("clips"):
+            canal_tags.append(f"#{raiz}clips")
 
     # Contexto: lo que se nombra en el clip. Se usa `etiquetas`, no `temas`:
     # los temas incluyen verbos ("colar", "ligar") que detectan bien el gancho
@@ -656,7 +805,10 @@ def hashtags_para(canal: str, extra=None, texto: str = "") -> list:
     # detras delata que la etiqueta se ha puesto por rellenar.
     otros = {str(v).lstrip("#").lower() for k, v in por_estilo.items() if k != estilo}
     base = [t for t in h.get("base", []) if str(t).lstrip("#").lower() not in otros]
-    finales = ([generico] if generico else []) + base
+    # Categoria y alcance van al final: no descubren a nadie por si solos, pero
+    # las ponen todas las cuentas grandes y no cuestan nada.
+    finales = ([generico] if generico else []) + base + \
+        list(h.get("categoria", [])) + list(h.get("alcance", []))
 
     salida, vistos = [], set()
     for grupo in (canal_tags, contexto, finales):
