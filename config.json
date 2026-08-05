@@ -172,7 +172,7 @@
       "verificado": true,
       "detector": "reaccion",
       "permiso_clips": "PENDIENTE",
-      "layout": "irl",
+      "layout": "completo",
       "temas": [
         "vtc",
         "taxi",
@@ -198,7 +198,8 @@
         "cliente",
         "taxi",
         "visage"
-      ]
+      ],
+      "_layout_nota": "Comprobado el 3-8-2026 con un fotograma del buffer: no es IRL de calle, es juego a pantalla completa con dos camaras apiladas arriba a la derecha. Lo suyo seria 'reaccion' con cam_rect sobre la camara de la cara; 'completo' mientras tanto no pierde nada."
     },
     {
       "nombre": "Viviendo en la calle",
@@ -622,7 +623,7 @@
       "verificado": true,
       "detector": "solo_audio",
       "permiso_clips": "PENDIENTE",
-      "layout": "completo",
+      "layout": "crop",
       "_nota_layout": "Canal de los hermanos Ramos (Carlos y Daniel): streams de casting, Slots & Casino y contenido de 'La Casa de los Gemelos'. Planos cambiantes, sin webcam fija que recortar -> completo.",
       "_nota_contenido": "Emiten tambien contenido de apuestas/casino (Slots & Casino). Filtrar esos tramos igual que se filtra logistica/gameplay rutinario en otros canales: no son el tipo de momento que se clipea.",
       "temas": [
@@ -651,7 +652,8 @@
         "reality",
         "casa",
         "gemelos"
-      ]
+      ],
+      "_layout_nota": "Comprobado el 4-8-2026 con fotogramas del buffer: plato fijo, una persona, chat a la derecha. El recorte centrado deja la cabeza entera y quita el chat y los marcos."
     },
     {
       "nombre": "Zona Gemelos (YouTube)",
@@ -891,14 +893,26 @@
         "#casadelosgemelos"
       ]
     },
-    "maximo": 5,
-    "_nota": "Exactamente 5, como los canales de clips con traccion: 2 del creador, 2 del contexto de ESE clip y 1 generico. Los de contexto salen de los temas que se nombran en la transcripcion y son los que hacen que te encuentren. Llenarlo de #parati #fyp #clips no descubre a nadie: los pone todo el mundo.",
+    "maximo": 12,
+    "_nota": "De 10 a 12 etiquetas, en cuatro bloques: (1) creador, (2) creador+clips -la variante que usan todos: #roierclips, #auronplayclips, #westcolclips-, (3) contexto de ESE clip, (4) categoria y alcance. Medido el 5-8-2026 en las paginas de descubrimiento de TikTok sobre clips de 1,4M a 10,1M. La regla anterior de 'exactamente 5' salio de cuentas pequeñas y era erronea.",
     "_nota_etiquetas": "Las etiquetas de contexto salen del campo `etiquetas` de cada canal, no de `temas`: temas incluye verbos que detectan bien el gancho pero como hashtag no los busca nadie.",
     "generico_por_estilo": {
       "noticia": "#viral",
       "complice": "#humor"
     },
-    "_nota_estilo": "Dos estilos de gancho, ver ESTILO.md. 'noticia' = titular con sujeto, verbo con carga y objeto, para opinion y polemica. 'complice' = cita del streamer mas un parentesis con la coletilla del chat, para humor: es el que se comparte, y compartir es lo que dispara el alcance."
+    "_nota_estilo": "Dos estilos de gancho, ver ESTILO.md. 'noticia' = titular con sujeto, verbo con carga y objeto, para opinion y polemica. 'complice' = cita del streamer mas un parentesis con la coletilla del chat, para humor: es el que se comparte, y compartir es lo que dispara el alcance.",
+    "categoria": [
+      "#clipsdetwitch",
+      "#clips",
+      "#twitch",
+      "#streamer"
+    ],
+    "alcance": [
+      "#parati",
+      "#fyp",
+      "#viral"
+    ],
+    "_nota_alcance": "#parati #fyp #viral no descubren a nadie por si solos, pero TODAS las cuentas grandes los ponen y no cuestan nada. Los de contexto siguen siendo los que hacen que te encuentren, por eso van antes."
   },
   "cpu": {
     "una_tarea_pesada_a_la_vez": true,

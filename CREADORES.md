@@ -47,13 +47,101 @@ python clipper.py mosaico <slug>
 | **davooxeneize** | `reaccion` | **NO** |
 | **lacobraaa** | `reaccion` | **NO** |
 | **rdjavi** | `reaccion` | **NO** |
-| mariotaxi · viviendoenlacalle | `irl` | NO |
+| mariotaxi | `completo` | a medias · ver abajo |
+| viviendoenlacalle | `irl` | NO |
 | josenogales1 · agustin51 | `reaccion` | NO |
 | zonagemelosoficial | `completo` | NO |
 
 Los tres primeros en negrita son **los de más audiencia de toda la lista** (2,03 M,
 1,83 M y 969 k). Cuando alguno entre en directo, lo primero es mirar el
 fotograma; lo segundo, escribirle el gancho.
+
+## MarioTaxi necesita un recorte que no existe todavía
+
+Comprobado el 3-8-2026 con fotogramas del buffer. Emite **desde dentro del
+taxi**, cámara en el salpicadero, y sale **de perfil en el tercio izquierdo**
+del plano. Encima lleva superpuestos caja de chat, un QR y la barra de
+donaciones.
+
+Por qué ninguno de los layouts actuales vale:
+
+- `irl` (lo que tenía puesto): mal, no es un plano de móvil vertical.
+- `completo`: entra todo, incluidos el QR y la barra; él queda diminuto.
+- `crop`: recorta por el centro y **él está a la izquierda**, así que se queda
+  medio fuera.
+
+Haría falta un `crop_izq`, o sea el mismo recorte con la ventana desplazada
+(sobre 1920×1080 escalado, `x ≈ (iw-ow)*0.13`). Mientras tanto está en
+`completo`, que al menos no pierde nada.
+
+**No es prioritario**: 6k seguidores, el canal más pequeño de la lista, y el
+problema medido del canal es justo lo contrario — demasiados clips de los
+creadores pequeños.
+
+## En exteriores, la transcripción es el cuello de botella
+
+Noche del 3 al 4 de agosto de 2026: **cuatro clips publicables se cayeron por
+transcripción**, no por contenido. Todos de IRL en la calle o en el agua
+(Franbeuve en el río, LopezFNX en Grecia):
+
+| Lo que dijo | Lo que escribió Whisper |
+|---|---|
+| «mejor una muerte digna que una vida sin honor» | «...digna es con una mierda / con una vida sin honor» |
+| «no cumple con las expectativas» | «las tetapidas» / «las estapidas» |
+| «la experiencia me ha decepcionado» | «me ha decidido» |
+| bloque entero sobre la gente riéndose de él | sin puntuación y con trozos sin sentido |
+
+Los subtítulos van quemados, así que una palabra rota se ve en pantalla. Y
+reconstruir a mano lo que no se puede oír no es una opción: se acaba poniendo
+en boca de alguien algo que no dijo.
+
+Se corrige una palabra **solo** cuando no existe en castellano y tiene un único
+destino posible («dribb»→drip, «estapidas»→expectativas, «Newe»→Nietzsche).
+Palabras reales pero raras en su contexto («decidido» por «decepcionado») se
+esquivan con el corte, no se cambian.
+
+**Medido el 4 de agosto de 2026** sobre el clip del bug de Agustín (24 s con
+ruido de juego encima de la voz):
+
+| | `large-v3-turbo` (el de config) | `large-v3` |
+|---|---|---|
+| Segundo 0 | «¡Que yo no me ha gustado!» | **«¡Uh! ¡Me cago en la boca!»** |
+| Segundo 4 | «Pero que va poder pegar tanto a Nao 쓰» | **«¿Pero cómo puedes pegar tanto?»** |
+| Segundos 11-22 | **nada** (los da por silencio) | **«¡Ja, ja, ja, ja!» ×4** |
+
+Lo grave no es que se equivoque, es que **se come tramos enteros**: catorce
+segundos de risas que el turbo daba por vacíos. Por eso parecía que había que
+recortar el clip, cuando lo que había era transcripción incompleta.
+
+Cambiarlo en `config.json` afecta a los cinco canales y es más lento, así que
+está sin tocar. Para los canales de IRL en la calle (LopezFNX, Franbeuve) es
+donde más rentaría.
+
+## Cuidado cuando dos vigilados juegan juntos
+
+**Peereira7 y Agustín51 colaboran a menudo** (el 3 de agosto, una noche entera de
+minijuegos). Cuando pasa, los dos canales graban la misma conversación con
+cámaras distintas: el vídeo difiere byte a byte, así que el guardián de md5 no
+ve nada, pero el clip es el mismo momento. Publicarlo dos veces bajo dos nombres
+es contenido duplicado y hunde el alcance de los dos.
+
+Desde el 3 de agosto lo corta `notify._mismo_momento()`, que compara lo que se
+dice en vez de los bytes. Medido: mismo momento = 0,62 de parecido; otros
+momentos de esa misma sesión = 0,27; sin relación = 0,11.
+
+**Pero el duplicado también es una segunda oportunidad.** Antes de descartar un
+momento por transcripción mala, mirar la otra cámara: la misma conversación sale
+distinta según el micro. Dos casos la noche del 3 al 4 de agosto:
+
+| Momento | Cámara mala | Cámara buena |
+|---|---|---|
+| El audio a Willy (093) | Peereira: hueco sin transcribir justo en el audio | Agustín: la nota de voz entera |
+| La votación (106) | Agustín: 31 s en un solo bloque, sin cortes de frase | Peereira: frase a frase |
+
+No gana siempre la del protagonista: gana la que Whisper haya entendido.
+
+Ojo, cubre 50 de las 76 filas del índice: las filas viejas recuperadas a mano no
+tienen `slug`, y sin `slug` no hay material del que sacar la huella.
 
 ## Peereira7 · el caso que hay que copiar
 

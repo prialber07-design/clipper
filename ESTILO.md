@@ -26,6 +26,43 @@ cada 10 espectadores lo reenvió. TikTok lo mide y lo empuja. Un clip informativ
 se ve y se olvida; un chiste interno **se le manda a un amigo que también lo
 sigue**. Ahí está toda la diferencia.
 
+### Clipero y creador no juegan al mismo juego (4 clips, 3-8-2026)
+
+| Cuenta | Texto del post | Etiq. | Dur. | Likes | Coment. | Compart. | Comp./like |
+|---|---|---|---|---|---|---|---|
+| @xdrake797 *clipero* | *te sigo sigo lo juro por mi madre (ya jurastes)* | 5 | 0:28 | 35,9K | 41 | 20,4K | **0,57** |
+| @peereiracastor_ *clipero* | *permabaneao* | 1 | 0:10 | 15,5K | 61 | 4.216 | **0,27** |
+| @peereira7 *creador* | *si me hice una italiana el otro día* | 0 | 0:45 | 48,3K | 114 | 6.197 | 0,13 |
+| @elxokas *creador* | *último video que veo de Clers* | 0 | 1:03 | 72,4K | 404 | 2.102 | 0,03 |
+
+El creador publica para quien ya le sigue y recoge likes. **El clipero vive de que
+lo reenvíen**, y ahí saca entre 2 y 19 veces más ratio. Somos lo segundo.
+
+Los comentarios no importan: 41 y 61 en clips con 20.400 y 4.216 comparticiones.
+No hay que escribir para provocar debate, hay que escribir para que alguien se lo
+mande a un amigo.
+
+**La duración no es un factor.** Funcionan 10 s, 28 s, 45 s y 63 s. Dejar de dar
+vueltas a esto.
+
+### El texto del post: una etiqueta, no una sinopsis
+
+Es el error más caro que se estaba cometiendo. Comparar:
+
+- Ellos: **«permabaneao»** — una palabra.
+- Ellos: **«te sigo sigo lo juro por mi madre (ya jurastes)»** — cita + réplica
+  entre paréntesis, todo en minúsculas.
+- Nosotros (clip 088): *«le preguntan a qué destino viajaría y contesta que le da
+  igual, que estaría bien "aunque sea un zulo precario" mientras esté con él;
+  acto seguido se frena…»*
+
+Eso es **resumen de periodista**, y nadie reenvía un resumen. La descripción se
+escribe con **la voz del clipero, en minúsculas, en una línea corta**, y muchas
+veces continúa el chiste en vez de explicarlo. Si hay que leer dos renglones
+para entenderla, está mal.
+
+Regla: **si la descripción explica el clip, sobra. Si lo etiqueta, sirve.**
+
 ## Los dos estilos
 
 ### A) Titular de noticia — para opinión y polémica
@@ -120,6 +157,101 @@ Son dos piezas distintas y cumplen funciones distintas:
 - Gancho: *Sus amigos le dicen que nunca tendrá novia*
 - Descripción: *El Calvo se entera en directo de lo que opinan sus amigos sobre
   su vida amorosa · #elcalvolol #elcalvo #irl #clips #parati*
+
+## EL HALLAZGO QUE LO CAMBIA TODO: el gancho no habla del streamer
+
+Medido el 5 de agosto de 2026 leyendo las **portadas** de clips virales, que es
+donde se ve el gancho tal y como sale quemado en pantalla:
+
+| Clip | Reproducciones | Gancho en pantalla | Texto del post |
+|---|---|---|---|
+| Peereira / @xdrake797 | 215 K | *«mi amigo borrachísimo después de que le hayan rechazado todas en la fiesta»* | *te sigo sigo lo juro por mi madre (ya jurastes)* |
+| Auronplay / @editsss_twitch | **3,5 M** | **«Yo:»** | *auron representando p.100 xd* |
+| Westcol / @bastian_clips6 | **5,5 M** | *«Yo una semana después de entender la indirecta que me tiró»* | *jajaja* |
+| Carrera / @alinatulip | 1,4 M | *(ninguno)* | *NO PUEDO* |
+
+**Tres de cuatro no dicen nada del directo.** El gancho describe **una escena de
+la vida del espectador**, y el streamer solo pone la cara. «Yo:» es la forma más
+pura: dos caracteres.
+
+### Por qué funciona, y por qué lo que hacíamos no
+
+- **Gancho nuestro**: *«su bisabuela podía parar el tren cuando quisiera»*.
+  Te hace tener curiosidad **por el streamer**. Lo ves y sigues bajando.
+- **Gancho suyo**: *«Yo una semana después de entender la indirecta»*.
+  Te reconoces **tú**, y sobre todo reconoces **a un amigo tuyo** — así que se
+  lo mandas.
+
+Ahí está la conexión con lo ya medido: el clipero vive de que le compartan
+(0,57 compartidos por like frente a 0,03 del creador). **El formato «Yo:» es una
+máquina de compartir**, porque etiquetar al amigo que sale retratado es el gesto
+natural. Un titular informativo no tiene ese gesto.
+
+### Qué momentos hay que cazar, entonces
+
+Deja de buscar **la frase buena**. Hay que buscar **la cara**: una reacción que
+sirva de ilustración de algo que le pasa a todo el mundo. El clip de Westcol con
+5,5 M es un tío tumbado en una cama sin decir nada.
+
+### Y la producción no importa
+
+El de Westcol es vídeo pixelado, en un recuadro pequeño, con barras negras
+arriba y abajo y texto plano encima. 5,5 millones. Pulir el render no es donde
+está el dinero.
+
+## LO MÁS IMPORTANTE: los 3 primeros segundos
+
+Con gancho efectivo en los 3 primeros segundos, la retención medida por TikTok
+es del **85 %**. Sin él, del **12 %**. No hay ningún otro ajuste del sistema que
+mueva la aguja ni parecido.
+
+**Y ahí es donde se estaban perdiendo los clips.** Medido sobre los 54 clips
+publicados con material: **22 (el 40 %) abrían cortando una frase que ya venía
+rodando** —hueco de silencio previo de 0,00 s— y otros 4 llegaban a los 3
+segundos con menos de cinco palabras. Casi la mitad del catálogo entraba así:
+
+| Clip | Sus 3 primeros segundos |
+|---|---|
+| 031 | *«lo, lo…»* |
+| 083 | *«va a»* |
+| 037 | *«chepa ni entrada tus»* |
+| 076 | *«disfrutar que pasase»* |
+| 092 | *«del año, tío. No, os explico…»* |
+
+### La inversión: el gancho explica, el vídeo remata
+
+Lo que se hacía mal, y venía de aplicar al pie de la letra la regla de «empieza
+20 s antes del pico»:
+
+- **Antes**: el gancho insinuaba y el vídeo explicaba. Resultado: abre por el
+  carraspeo, la frase buena llega en el segundo 15, y para entonces ya se han
+  ido. El clip *se entiende*, pero nadie llega a entenderlo.
+- **Ahora**: el contexto va **escrito en el gancho**, que se lee en medio
+  segundo, y el vídeo **abre por lo más fuerte que tenga**.
+
+El clip de referencia lo hace exactamente así: el texto del post es
+*«te sigo sigo lo juro por mi madre (ya jurastes)»* — o sea, **la cita ya está
+en el texto**. No promete nada, lo entrega, y el vídeo solo tiene que rematarlo.
+
+### Las tres condiciones del arranque
+
+1. **Empieza en principio de frase.** Silencio previo de al menos 0,35 s. Lo
+   comprueba `clipper.arranque_en_frio()` y lo corrige `clipper.mejor_arranque()`.
+2. **La primera frase se sostiene sola.** Si hay que oír quince segundos para
+   que signifique algo, ese contexto va en el gancho o el clip no vale.
+3. **Si el momento necesita mucho montaje para funcionar, no es el momento.**
+
+Cuidado: `mejor_arranque()` arregla lo mecánico, **no el criterio**. Sobre el
+037 devuelve *«ni chepa ni entrada tus»*: ya no parte una frase, pero sigue sin
+decir nada. Elegir qué frase abre el clip no lo hace la función.
+
+### Y dónde termina: nunca en el `start` de la última palabra
+
+Elegir el final mirando dónde *empieza* la última palabra la corta por la mitad.
+Pasó en el 087: cierre en 119,4 con *"necesario"* empezando en 119,38, o sea
+*"para lo justo y"* y a negro. Para eso está `clipper.ajustar_corte()`, que
+además ignora el `end` que da Whisper cuando lo estira hasta la palabra
+siguiente (a *"perderlo"* le asignaba 2,2 s).
 
 ## Los hashtags: exactamente 5, con estructura fija
 
