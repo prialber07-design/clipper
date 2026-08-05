@@ -1,4 +1,4 @@
-"""Publica la variante azul en redes sociales sin frenar el pipeline."""
+"""Publica cada variante en su cuenta sin frenar el pipeline."""
 
 import hashlib
 import hmac
@@ -22,6 +22,7 @@ OUT = clipper.OUT
 STATE = DATA / "publicaciones.json"
 PLATAFORMAS = ("youtube", "instagram", "tiktok")
 AUTOMATICAS = ("youtube", "instagram")
+CUENTAS = ("yo", "amigo")
 REINTENTOS = (60, 300, 900)
 LOG = obtener("publicacion")
 
@@ -63,6 +64,10 @@ def _es_azul(path: Path) -> bool:
     return bool(re.search(r"[-_]azul$", path.stem, re.IGNORECASE))
 
 
+def _es_amarillo(path: Path) -> bool:
+    return bool(re.search(r"[-_]amarillo$", path.stem, re.IGNORECASE))
+
+
 def _azul_desde_variante(path: Path) -> Path:
     stem = re.sub(r"([-_])amarillo$", r"\1azul", path.stem, flags=re.IGNORECASE)
     return path.with_name(stem + path.suffix)
@@ -73,20 +78,31 @@ def _amarillo_desde_azul(path: Path) -> Path:
     return path.with_name(stem + path.suffix)
 
 
-def _validar_clip(nombre: str, origen: str) -> Path:
+def _cuenta_valida(cuenta: str) -> str:
+    cuenta = str(cuenta or "yo").lower()
+    if cuenta not in CUENTAS:
+        raise PublicacionError("cuenta de publicación no válida")
+    return cuenta
+
+
+def _validar_clip(nombre: str, origen: str, cuenta: str = "yo") -> Path:
     if not nombre or Path(nombre).name != nombre or not nombre.lower().endswith(".mp4"):
         raise PublicacionError("nombre de clip inválido")
     if origen not in {"LISTOS", "REVISAR"}:
         raise PublicacionError("origen de clip inválido")
+    cuenta = _cuenta_valida(cuenta)
     path = OUT / origen / nombre
-    path = _azul_desde_variante(path)
+    path = (_azul_desde_variante(path) if cuenta == "yo"
+            else _amarillo_desde_azul(path))
     try:
         if not path.resolve().is_relative_to((OUT / origen).resolve()):
             raise PublicacionError("ruta de clip inválida")
     except OSError as error:
         raise PublicacionError("ruta de clip inválida") from error
-    if not _es_azul(path) or not path.is_file():
-        raise PublicacionError("la variante azul no existe")
+    variante_correcta = _es_azul(path) if cuenta == "yo" else _es_amarillo(path)
+    if not variante_correcta or not path.is_file():
+        raise PublicacionError(
+            f"la variante {'azul' if cuenta == 'yo' else 'amarilla'} no existe")
     return path
 
 
@@ -114,26 +130,30 @@ def _hook_revision(path: Path) -> str:
     return encontrado.group(1).strip() if encontrado else _caption(path).splitlines()[0]
 
 
-def _crear_item(path: Path, titulo: str, caption: str, origen: str) -> dict:
+def _crear_item(path: Path, titulo: str, caption: str, origen: str,
+                cuenta: str) -> dict:
     return {
         "path": _relativa(path),
         "title": titulo.strip()[:100] or caption.splitlines()[0][:100],
         "caption": caption,
         "source": origen,
+        "account": cuenta,
         "created_at": time.time(),
         "platforms": {},
     }
 
 
 def _encolar(path: Path, titulo: str, caption: str, origen: str,
-             plataformas: tuple[str, ...]):
+             plataformas: tuple[str, ...], cuenta: str = "yo"):
+    cuenta = _cuenta_valida(cuenta)
     clave = _relativa(path)
     titulo = titulo.strip()[:100] or caption.splitlines()[0][:100]
     with _STATE_MUTEX:
         datos = _cargar()
-        item = datos["items"].setdefault(clave, _crear_item(path, titulo, caption, origen))
+        item = datos["items"].setdefault(
+            clave, _crear_item(path, titulo, caption, origen, cuenta))
         item.update({"path": clave, "title": titulo, "caption": caption,
-                     "source": origen})
+                     "source": origen, "account": cuenta})
         for plataforma in plataformas:
             actual = item["platforms"].get(plataforma, {})
             if actual.get("status") not in {"published", "submitted"}:
@@ -153,24 +173,31 @@ def encolar_listos(destinos: list[Path], items: list[tuple[Path, dict]]):
         if str(meta.get("variante", "")).lower() != "azul":
             continue
         _encolar(destino, str(meta.get("hook", "")), _caption(destino),
-                 "LISTOS", AUTOMATICAS)
-        LOG.info("📤 PUBLICACIÓN AUTOMÁTICA ENCOLADA\n   ARCHIVO: %s", destino.name)
+                 "LISTOS", AUTOMATICAS, "yo")
+        LOG.info("📤 PUBLICACIÓN AUTOMÁTICA ENCOLADA\n   CUENTA: YO\n"
+                 "   VARIANTE: AZUL\n   ARCHIVO: %s", destino.name)
 
 
 def encolar_revision(nombre: str, plataforma: str) -> dict:
     return encolar_manual(nombre, plataforma, "REVISAR")
 
 
-def encolar_manual(nombre: str, plataforma: str, origen: str) -> dict:
+def encolar_manual(nombre: str, plataforma: str, origen: str,
+                   cuenta: str = "yo") -> dict:
     if plataforma not in PLATAFORMAS:
         raise PublicacionError("plataforma no válida")
-    path = _validar_clip(nombre, origen)
-    _encolar(path, _hook_revision(path), _caption(path), origen, (plataforma,))
-    return estado(path)
+    cuenta = _cuenta_valida(cuenta)
+    if cuenta == "amigo" and plataforma != "youtube":
+        raise PublicacionError("la cuenta del amigo solo publica en YouTube")
+    path = _validar_clip(nombre, origen, cuenta)
+    _encolar(path, _hook_revision(path), _caption(path), origen, (plataforma,), cuenta)
+    return estado(path, cuenta)
 
 
-def estado(path: Path) -> dict:
-    path = _azul_desde_variante(path)
+def estado(path: Path, cuenta: str | None = None) -> dict:
+    cuenta = _cuenta_valida(cuenta or ("amigo" if _es_amarillo(path) else "yo"))
+    path = (_amarillo_desde_azul(path) if cuenta == "amigo"
+            else _azul_desde_variante(path))
     try:
         clave = _relativa(path)
     except PublicacionError:
@@ -181,8 +208,9 @@ def estado(path: Path) -> dict:
     return {
         **{p: plataformas.get(p, {}) for p in PLATAFORMAS},
         "complete": all(plataformas.get(p, {}).get("status") == "published"
-                        for p in AUTOMATICAS),
-        "configured": {p: configurada(p) for p in PLATAFORMAS},
+                        for p in (("youtube",) if cuenta == "amigo" else AUTOMATICAS)),
+        "account": cuenta,
+        "configured": {p: configurada(p, cuenta) for p in PLATAFORMAS},
     }
 
 
@@ -190,11 +218,13 @@ def revision_completada(path: Path) -> bool:
     return bool(estado(path).get("complete"))
 
 
-def descartar_revision(nombre: str) -> list[str]:
-    path = _validar_revision(nombre)
+def descartar_revision(nombre: str, cuenta: str = "yo", origen: str = "REVISAR") -> list[str]:
+    cuenta = _cuenta_valida(cuenta)
+    path = _validar_clip(nombre, origen, cuenta)
     borrados = []
     with _OPERACION_MUTEX:
-        for mp4 in (path, _amarillo_desde_azul(path)):
+        variantes = (path,) if cuenta == "amigo" else (path, _amarillo_desde_azul(path))
+        for mp4 in variantes:
             for candidato in (mp4, mp4.with_suffix(".txt"),
                               mp4.with_suffix(".motivos.txt")):
                 if candidato.is_file():
@@ -202,16 +232,22 @@ def descartar_revision(nombre: str) -> list[str]:
                     borrados.append(candidato.name)
         with _STATE_MUTEX:
             datos = _cargar()
-            datos["items"].pop(_relativa(path), None)
+            for mp4 in variantes:
+                datos["items"].pop(_relativa(mp4), None)
             _guardar(datos)
-    LOG.info("🗑️ CANDIDATO DESCARTADO\n   ARCHIVOS: %s", ", ".join(borrados))
+    LOG.info("🗑️ CANDIDATO DESCARTADO\n   CUENTA: %s\n   ARCHIVOS: %s",
+             cuenta.upper(), ", ".join(borrados))
     return borrados
 
 
-def configurada(plataforma: str) -> bool:
+def configurada(plataforma: str, cuenta: str = "yo") -> bool:
+    cuenta = _cuenta_valida(cuenta)
     if plataforma == "youtube":
-        claves = ("CLIPPER_YOUTUBE_CLIENT_ID", "CLIPPER_YOUTUBE_CLIENT_SECRET",
-                  "CLIPPER_YOUTUBE_REFRESH_TOKEN")
+        prefijo = "CLIPPER_YOUTUBE" if cuenta == "yo" else "CLIPPER_YOUTUBE_AMIGO"
+        claves = tuple(f"{prefijo}_{sufijo}" for sufijo in
+                       ("CLIENT_ID", "CLIENT_SECRET", "REFRESH_TOKEN"))
+    elif cuenta == "amigo":
+        return False
     elif plataforma == "instagram":
         claves = ("CLIPPER_INSTAGRAM_ACCOUNT_ID", "CLIPPER_INSTAGRAM_ACCESS_TOKEN",
                   "CLIPPER_URL_PUBLICA", "CLIPPER_WEB_CLAVE")
@@ -256,11 +292,16 @@ def _json_request(url: str, *, method="GET", form=None, payload=None,
     return datos
 
 
-def _youtube_token() -> str:
+def _youtube_prefijo(cuenta: str) -> str:
+    return "CLIPPER_YOUTUBE" if _cuenta_valida(cuenta) == "yo" else "CLIPPER_YOUTUBE_AMIGO"
+
+
+def _youtube_token(cuenta: str = "yo") -> str:
+    prefijo = _youtube_prefijo(cuenta)
     datos = _json_request("https://oauth2.googleapis.com/token", method="POST", form={
-        "client_id": os.environ["CLIPPER_YOUTUBE_CLIENT_ID"],
-        "client_secret": os.environ["CLIPPER_YOUTUBE_CLIENT_SECRET"],
-        "refresh_token": os.environ["CLIPPER_YOUTUBE_REFRESH_TOKEN"],
+        "client_id": os.environ[f"{prefijo}_CLIENT_ID"],
+        "client_secret": os.environ[f"{prefijo}_CLIENT_SECRET"],
+        "refresh_token": os.environ[f"{prefijo}_REFRESH_TOKEN"],
         "grant_type": "refresh_token",
     }, timeout=30)
     token = datos.get("access_token")
@@ -269,8 +310,10 @@ def _youtube_token() -> str:
     return token
 
 
-def _youtube_iniciar(path: Path, item: dict, token: str) -> str:
-    privacidad = os.environ.get("CLIPPER_YOUTUBE_PRIVACY", "public").lower()
+def _youtube_iniciar(path: Path, item: dict, token: str,
+                     cuenta: str = "yo") -> str:
+    privacidad = os.environ.get(
+        f"{_youtube_prefijo(cuenta)}_PRIVACY", "public").lower()
     if privacidad not in {"public", "private", "unlisted"}:
         raise PublicacionError("CLIPPER_YOUTUBE_PRIVACY no es válida")
     tags = [tag[1:] for tag in re.findall(r"#[\wáéíóúüñÁÉÍÓÚÜÑ]+", item["caption"])]
@@ -316,17 +359,17 @@ def _youtube_put(url: str, token: str, *, body=None, headers=None) -> tuple[int,
 
 
 def _youtube_publicar(path: Path, item: dict, session_url: str,
-                      guardar_session) -> str:
-    token = _youtube_token()
+                      guardar_session, cuenta: str = "yo") -> str:
+    token = _youtube_token(cuenta)
     total = path.stat().st_size
     if not session_url:
-        session_url = _youtube_iniciar(path, item, token)
+        session_url = _youtube_iniciar(path, item, token, cuenta)
         guardar_session(session_url)
 
     status, headers, cuerpo = _youtube_put(session_url, token, headers={
         "Content-Length": "0", "Content-Range": f"bytes */{total}"})
     if status == 404:
-        session_url = _youtube_iniciar(path, item, token)
+        session_url = _youtube_iniciar(path, item, token, cuenta)
         guardar_session(session_url)
         status, headers, cuerpo = 308, {}, b""
     if status in {200, 201}:
@@ -582,8 +625,10 @@ def _siguiente_trabajo():
     with _STATE_MUTEX:
         datos = _cargar()
         for clave, item in datos["items"].items():
+            cuenta = str(item.get("account", "yo"))
             for plataforma, estado_plataforma in item.get("platforms", {}).items():
-                if plataforma not in PLATAFORMAS or not configurada(plataforma):
+                if (plataforma not in PLATAFORMAS or
+                        not configurada(plataforma, cuenta)):
                     continue
                 status = estado_plataforma.get("status", "pending")
                 colgado = status == "publishing" and ahora - estado_plataforma.get(
@@ -596,7 +641,7 @@ def _siguiente_trabajo():
                 estado_plataforma["started_at"] = ahora
                 estado_plataforma["attempts"] = int(estado_plataforma.get("attempts", 0)) + 1
                 _guardar(datos)
-                return clave, json.loads(json.dumps(item)), plataforma
+                return clave, json.loads(json.dumps(item)), plataforma, cuenta
     return None
 
 
@@ -604,7 +649,7 @@ def procesar_una() -> bool:
     trabajo = _siguiente_trabajo()
     if not trabajo:
         return False
-    clave, item, plataforma = trabajo
+    clave, item, plataforma, cuenta = trabajo
     path = DATA / item["path"]
     with _OPERACION_MUTEX:
         try:
@@ -615,7 +660,7 @@ def procesar_una() -> bool:
                 remoto = _youtube_publicar(
                     path, item, intermedio.get("upload_url", ""),
                     lambda valor: _guardar_intermedio(
-                        clave, plataforma, "upload_url", valor))
+                        clave, plataforma, "upload_url", valor), cuenta)
             elif plataforma == "instagram":
                 remoto = _instagram_publicar(
                     path, item, intermedio.get("container_id", ""),
@@ -635,8 +680,11 @@ def procesar_una() -> bool:
                 estado_plataforma.update({"status": "error", "last_error": str(error)[:500],
                                           "next_retry_at": time.time() + espera})
                 _guardar(datos)
-            LOG.warning("⚠️ PUBLICACIÓN FALLIDA\n   RED: %s\n   ARCHIVO: %s\n   MOTIVO: %s",
-                        plataforma.upper(), path.name, error)
+            LOG.warning("⚠️ PUBLICACIÓN FALLIDA\n   CUENTA: %s\n   RED: %s\n"
+                        "   VARIANTE: %s\n   ARCHIVO: %s\n   MOTIVO: %s",
+                        cuenta.upper(), plataforma.upper(),
+                        "AMARILLA" if _es_amarillo(path) else "AZUL",
+                        path.name, error)
             return True
 
         with _STATE_MUTEX:
@@ -647,9 +695,11 @@ def procesar_una() -> bool:
                 "published_at": time.time(), "last_error": "", "next_retry_at": 0,
             })
             _guardar(datos)
-        LOG.info("✅ %s\n   RED: %s\n   ARCHIVO: %s\n   ID: %s",
+        LOG.info("✅ %s\n   CUENTA: %s\n   RED: %s\n   VARIANTE: %s\n"
+                 "   ARCHIVO: %s\n   ID: %s",
                  "ENVIADO AL INBOX" if plataforma == "tiktok" else "PUBLICADO",
-                 plataforma.upper(), path.name, remoto)
+                 cuenta.upper(), plataforma.upper(),
+                 "AMARILLA" if _es_amarillo(path) else "AZUL", path.name, remoto)
         return True
 
 
@@ -669,8 +719,10 @@ def arrancar_worker():
         return _WORKER
     _WORKER = threading.Thread(target=_bucle_worker, name="social-publisher", daemon=True)
     _WORKER.start()
-    LOG.info("📡 WORKER DE PUBLICACIÓN ACTIVO\n   YOUTUBE: %s\n   INSTAGRAM: %s\n   TIKTOK: %s",
+    LOG.info("📡 WORKER DE PUBLICACIÓN ACTIVO\n   YOUTUBE YO: %s\n"
+             "   YOUTUBE AMIGO: %s\n   INSTAGRAM: %s\n   TIKTOK: %s",
              "CONFIGURADO" if configurada("youtube") else "SIN CREDENCIALES",
+             "CONFIGURADO" if configurada("youtube", "amigo") else "SIN CREDENCIALES",
              "CONFIGURADO" if configurada("instagram") else "SIN CREDENCIALES",
              "CONFIGURADO" if configurada("tiktok") else "SIN CREDENCIALES")
     return _WORKER

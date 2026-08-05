@@ -292,6 +292,13 @@ class EstabilidadTests(unittest.TestCase):
             cargar.index('replaceChildren(errorState')
         )
 
+    def test_web_incluye_filtros_de_persona_streamer_y_cuenta(self):
+        self.assertIn('data-person="yo"', web.HTML_TEMPLATE)
+        self.assertIn('data-person="amigo"', web.HTML_TEMPLATE)
+        self.assertIn('id="streamerFilter"', web.HTML_TEMPLATE)
+        self.assertIn('account: state.person', web.HTML_TEMPLATE)
+        self.assertIn('clip.variante === "amarillo"', web.HTML_TEMPLATE)
+
     def test_web_muestra_evaluacion_llm_en_revisar(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

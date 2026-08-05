@@ -80,11 +80,46 @@ class PublicacionTests(unittest.TestCase):
         for plataforma in publicacion.AUTOMATICAS:
             item["platforms"][plataforma]["status"] = "published"
         publicacion.STATE.write_text(json.dumps(datos), encoding="utf-8")
-        self.assertTrue(publicacion.revision_completada(amarillo))
+        self.assertTrue(publicacion.revision_completada(azul))
         borrados = publicacion.descartar_revision(azul.name)
         self.assertIn(azul.name, borrados)
         self.assertFalse(azul.exists())
         self.assertFalse(amarillo.exists())
+
+    def test_amigo_revisa_amarillo_y_descartarlo_conserva_azul(self):
+        amarillo, azul = self._pareja("LISTOS")
+        publicacion.encolar_manual(
+            amarillo.name, "youtube", "LISTOS", cuenta="amigo")
+
+        datos = json.loads(publicacion.STATE.read_text(encoding="utf-8"))
+        self.assertEqual(list(datos["items"]), ["out/LISTOS/clip-01-amarillo.mp4"])
+        item = next(iter(datos["items"].values()))
+        self.assertEqual(item["account"], "amigo")
+        self.assertEqual(set(item["platforms"]), {"youtube"})
+
+        borrados = publicacion.descartar_revision(
+            amarillo.name, cuenta="amigo", origen="LISTOS")
+        self.assertIn(amarillo.name, borrados)
+        self.assertFalse(amarillo.exists())
+        self.assertTrue(azul.exists())
+
+    def test_amigo_usa_sus_credenciales_de_youtube(self):
+        entorno = {
+            "CLIPPER_YOUTUBE_CLIENT_ID": "id-yo",
+            "CLIPPER_YOUTUBE_CLIENT_SECRET": "secret-yo",
+            "CLIPPER_YOUTUBE_REFRESH_TOKEN": "refresh-yo",
+            "CLIPPER_YOUTUBE_AMIGO_CLIENT_ID": "id-amigo",
+            "CLIPPER_YOUTUBE_AMIGO_CLIENT_SECRET": "secret-amigo",
+            "CLIPPER_YOUTUBE_AMIGO_REFRESH_TOKEN": "refresh-amigo",
+        }
+        with patch.dict(os.environ, entorno, clear=False), \
+             patch.object(publicacion, "_json_request",
+                          return_value={"access_token": "token"}) as request:
+            self.assertEqual(publicacion._youtube_token("amigo"), "token")
+        form = request.call_args.kwargs["form"]
+        self.assertEqual(form["client_id"], "id-amigo")
+        self.assertEqual(form["client_secret"], "secret-amigo")
+        self.assertEqual(form["refresh_token"], "refresh-amigo")
 
     def test_url_temporal_solo_da_acceso_al_mp4_azul(self):
         _, azul = self._pareja()

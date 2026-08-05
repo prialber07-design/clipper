@@ -78,8 +78,10 @@ retención configurada; nunca borra pendientes o errores.
 
 ## Publicación en YouTube, Instagram y TikTok
 
-Solo se publica la variante azul. Las redes cuyas credenciales estén
-incompletas quedan desactivadas y no interfieren con el resto de Clipper.
+La variante azul se publica automáticamente en la cuenta propia. La amarilla
+usa una segunda cuenta de YouTube y siempre exige revisión manual. Las redes
+cuyas credenciales estén incompletas quedan desactivadas y no interfieren con
+el resto de Clipper.
 
 ### YouTube
 
@@ -96,6 +98,18 @@ CLIPPER_YOUTUBE_CLIENT_SECRET=...
 CLIPPER_YOUTUBE_REFRESH_TOKEN=...
 CLIPPER_YOUTUBE_PRIVACY=public
 ```
+
+Para la cuenta del amigo, repite el OAuth con su canal y añade:
+
+```env
+CLIPPER_YOUTUBE_AMIGO_CLIENT_ID=...
+CLIPPER_YOUTUBE_AMIGO_CLIENT_SECRET=...
+CLIPPER_YOUTUBE_AMIGO_REFRESH_TOKEN=...
+CLIPPER_YOUTUBE_AMIGO_PRIVACY=public
+```
+
+Estos clips nunca se encolan automáticamente. Se publican desde el filtro
+`Mi amigo · amarillo` del dashboard.
 
 Google restringe a `private` las subidas de proyectos no auditados creados
 después del 28 de julio de 2020. Haz primero una prueba con `private` y solicita

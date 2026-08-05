@@ -637,6 +637,68 @@ HTML_TEMPLATE = r"""<!doctype html>
       font-size: 11px;
     }
 
+    .scope-bar {
+      display: grid;
+      grid-template-columns: 1fr minmax(220px, 320px);
+      gap: 12px;
+      margin-bottom: 18px;
+      padding: 10px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--mint);
+    }
+
+    .scope-group,
+    .streamer-filter {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .scope-label {
+      color: var(--dim);
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 10px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .person-filter {
+      min-height: 40px;
+      padding: 7px 12px;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--line);
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 11px;
+    }
+
+    .person-filter.active {
+      color: var(--bg);
+      background: var(--mint);
+      border-color: var(--mint);
+    }
+
+    .person-filter[data-person="amigo"].active {
+      color: #17120a;
+      background: var(--amber);
+      border-color: var(--amber);
+    }
+
+    .streamer-filter {
+      justify-content: flex-end;
+    }
+
+    .streamer-filter select {
+      min-width: 150px;
+      min-height: 40px;
+      padding: 7px 34px 7px 11px;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--line);
+      font: inherit;
+    }
+
     .toolbar {
       display: flex;
       align-items: center;
@@ -1189,6 +1251,17 @@ HTML_TEMPLATE = r"""<!doctype html>
     }
 
     @media (max-width: 760px) {
+      .scope-bar {
+        grid-template-columns: 1fr;
+      }
+
+      .scope-group,
+      .streamer-filter {
+        align-items: stretch;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+      }
+
       .topbar {
         align-items: flex-start;
         flex-direction: column;
@@ -1405,6 +1478,24 @@ HTML_TEMPLATE = r"""<!doctype html>
         <strong id="systemState">Sincronizando</strong>
         <span id="systemDetail">Consultando LISTOS y REVISAR</span>
       </div>
+    </section>
+
+    <section class="scope-bar" aria-label="Filtros de publicación">
+      <div class="scope-group" role="group" aria-label="Persona y variante">
+        <span class="scope-label">Persona</span>
+        <button class="person-filter active" type="button" data-person="yo">
+          Yo · azul
+        </button>
+        <button class="person-filter" type="button" data-person="amigo">
+          Mi amigo · amarillo
+        </button>
+      </div>
+      <label class="streamer-filter" for="streamerFilter">
+        <span class="scope-label">Streamer</span>
+        <select id="streamerFilter">
+          <option value="all">Todos los streamers</option>
+        </select>
+      </label>
     </section>
 
     <section class="stats" aria-label="Resumen de la galería">
@@ -1730,6 +1821,8 @@ HTML_TEMPLATE = r"""<!doctype html>
       const state = {
         tab: "listos",
         path: "",
+        person: sessionStorage.getItem("clipper-person") === "amigo" ? "amigo" : "yo",
+        streamer: sessionStorage.getItem("clipper-streamer") || "all",
         clips: {
           listos: [],
           revisar: [],
@@ -1983,7 +2076,13 @@ HTML_TEMPLATE = r"""<!doctype html>
           const response = await fetch("/api/revision", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({name: clip.nombre, action, platform, source})
+            body: JSON.stringify({
+              name: clip.nombre,
+              action,
+              platform,
+              source,
+              account: state.person
+            })
           });
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || "La acción falló");
@@ -2092,12 +2191,17 @@ HTML_TEMPLATE = r"""<!doctype html>
         download.innerHTML = icon("download") + "<span>Descargar</span>";
         actions.appendChild(download);
 
-        const isBlue = /(?:-|_)azul\.mp4$/i.test(clip.nombre || "");
-        if (kind === "revisar" && isBlue) {
-          [
-            ["youtube", "YouTube"],
-            ["instagram", "Instagram"]
-          ].forEach(([platform, label]) => {
+        const isBlue = (clip.variante || "") === "azul" ||
+          /(?:-|_)azul\.mp4$/i.test(clip.nombre || "");
+        const isYellow = (clip.variante || "") === "amarillo" ||
+          /(?:-|_)amarillo\.mp4$/i.test(clip.nombre || "");
+        const friendReview = kind === "revisar" && state.person === "amigo" && isYellow;
+        const ownReview = kind === "revisar" && state.person === "yo" && isBlue;
+        if (friendReview || ownReview) {
+          const platforms = friendReview
+            ? [["youtube", "YouTube"]]
+            : [["youtube", "YouTube"], ["instagram", "Instagram"]];
+          platforms.forEach(([platform, label]) => {
             const status = socialState(clip, platform);
             const publish = text("button", "button quiet", label + " · " + status);
             publish.type = "button";
@@ -2105,20 +2209,23 @@ HTML_TEMPLATE = r"""<!doctype html>
               status === "Enviado al inbox" || status === "Publicando" ||
               status === "Pendiente";
             publish.addEventListener("click", () =>
-              reviewAction(clip, "publish", platform, "REVISAR", publish));
+              reviewAction(clip, "publish", platform, clip.source || "REVISAR", publish));
             actions.appendChild(publish);
           });
           const discard = text("button", "button quiet", "Descartar");
           discard.type = "button";
           discard.addEventListener("click", () => {
-            if (window.confirm("¿Descartar las dos versiones de este candidato?")) {
-              reviewAction(clip, "discard", "", "REVISAR", discard);
+            const message = friendReview
+              ? "¿Descartar solo la versión amarilla?"
+              : "¿Descartar las dos versiones de este candidato?";
+            if (window.confirm(message)) {
+              reviewAction(clip, "discard", "", clip.source || "REVISAR", discard);
             }
           });
           actions.appendChild(discard);
         }
 
-        if ((kind === "listos" || kind === "revisar") && isBlue) {
+        if ((kind === "listos" || kind === "revisar") && isBlue && state.person === "yo") {
           const status = socialState(clip, "tiktok");
           const tiktok = text("button", "button quiet", "TikTok · " + status);
           tiktok.type = "button";
@@ -2183,6 +2290,48 @@ HTML_TEMPLATE = r"""<!doctype html>
         return box;
       }
 
+      function matchesStreamer(clip) {
+        return state.streamer === "all" || clip.canal === state.streamer;
+      }
+
+      function clipsFor(kind) {
+        if (kind === "raw") {
+          return (state.clips.raw || []).filter(matchesStreamer);
+        }
+        if (state.person === "yo") {
+          return (state.clips[kind] || []).filter((clip) =>
+            clip.variante === "azul" &&
+            matchesStreamer(clip) &&
+            (kind !== "revisar" || !(clip.publications || {}).complete)
+          );
+        }
+
+        const yellow = (state.clips.listos || [])
+          .concat(state.clips.revisar || [])
+          .filter((clip) => clip.variante === "amarillo" && matchesStreamer(clip));
+        const published = (clip) =>
+          (((clip.publications || {}).youtube || {}).status === "published");
+        return yellow
+          .filter((clip) => kind === "listos" ? published(clip) : !published(clip))
+          .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
+      }
+
+      function updateStreamerOptions() {
+        const select = $("#streamerFilter");
+        const channels = Array.from(new Set(
+          (state.clips.listos || [])
+            .concat(state.clips.revisar || [], state.clips.raw || [])
+            .map((clip) => clip.canal)
+            .filter(Boolean)
+        )).sort((a, b) => a.localeCompare(b));
+        if (state.streamer !== "all" && !channels.includes(state.streamer)) {
+          state.streamer = "all";
+        }
+        select.replaceChildren(new Option("Todos los streamers", "all"));
+        channels.forEach((channel) => select.appendChild(new Option(channel, channel)));
+        select.value = state.streamer;
+      }
+
       function render(kind) {
         const grid = {
           listos: $("#listosGrid"),
@@ -2196,7 +2345,7 @@ HTML_TEMPLATE = r"""<!doctype html>
         grid.replaceChildren();
         grid.setAttribute("aria-busy", "false");
 
-        const clips = state.clips[kind] || [];
+        const clips = clipsFor(kind);
         if (!clips.length) {
           grid.appendChild(emptyState(kind));
           return;
@@ -2267,9 +2416,9 @@ HTML_TEMPLATE = r"""<!doctype html>
       }
 
       function summary() {
-        const listos = state.clips.listos || [];
-        const revisar = state.clips.revisar || [];
-        const raw = state.clips.raw || [];
+        const listos = clipsFor("listos");
+        const revisar = clipsFor("revisar");
+        const raw = clipsFor("raw");
         const all = listos.concat(revisar, raw);
         const channels = new Set(
           all.map((clip) => clip.canal).filter(Boolean)
@@ -2314,7 +2463,8 @@ HTML_TEMPLATE = r"""<!doctype html>
         );
         setText(
           "#listosNote",
-          listos.length + " archivos · actualización automática"
+          listos.length + " archivos · " +
+            (state.person === "yo" ? "publicación automática" : "publicados por tu amigo")
         );
         setText(
           "#revisarNote",
@@ -2342,6 +2492,7 @@ HTML_TEMPLATE = r"""<!doctype html>
 
             state.clips = clean;
             state.signature = signature;
+            updateStreamerOptions();
             summary();
 
             if (changed) {
@@ -2631,6 +2782,29 @@ HTML_TEMPLATE = r"""<!doctype html>
         });
       });
 
+      $$(".person-filter").forEach((button) => {
+        button.classList.toggle("active", button.dataset.person === state.person);
+        button.addEventListener("click", () => {
+          state.person = button.dataset.person;
+          sessionStorage.setItem("clipper-person", state.person);
+          $$(".person-filter").forEach((item) =>
+            item.classList.toggle("active", item === button));
+          summary();
+          render("listos");
+          render("revisar");
+          render("raw");
+        });
+      });
+
+      $("#streamerFilter").addEventListener("change", (event) => {
+        state.streamer = event.target.value || "all";
+        sessionStorage.setItem("clipper-streamer", state.streamer);
+        summary();
+        render("listos");
+        render("revisar");
+        render("raw");
+      });
+
       $("#searchListos").addEventListener("input", () => filter("listos"));
       $("#searchRevisar").addEventListener("input", () => filter("revisar"));
       $("#searchRaw").addEventListener("input", () => filter("raw"));
@@ -2845,9 +3019,12 @@ class Handler(SimpleHTTPRequestHandler):
             if accion == "publish":
                 resultado = publicacion.encolar_manual(
                     nombre, str(datos.get("platform", "")),
-                    str(datos.get("source", "")))
+                    str(datos.get("source", "")),
+                    str(datos.get("account", "yo")))
             elif accion == "discard":
-                resultado = {"deleted": publicacion.descartar_revision(nombre)}
+                resultado = {"deleted": publicacion.descartar_revision(
+                    nombre, str(datos.get("account", "yo")),
+                    str(datos.get("source", "REVISAR")))}
             else:
                 raise publicacion.PublicacionError("acción no válida")
         except publicacion.PublicacionError as error:
@@ -2876,9 +3053,10 @@ class Handler(SimpleHTTPRequestHandler):
             return clips
 
         for mp4 in sorted(dir_path.glob("*.mp4"), reverse=True):
-            if es_revisar and publicacion.revision_completada(mp4):
-                continue
             canal = clipper.canal_desde_nombre(mp4.name)
+            variante = ("amarillo" if re.search(r"[-_]amarillo$", mp4.stem, re.I)
+                        else "azul" if re.search(r"[-_]azul$", mp4.stem, re.I)
+                        else "")
 
             try:
                 timestamp = mp4.stat().st_mtime
@@ -2916,6 +3094,8 @@ class Handler(SimpleHTTPRequestHandler):
 
             clips.append({
                 "nombre": mp4.name,
+                "source": "REVISAR" if es_revisar else "LISTOS",
+                "variante": variante,
                 "timestamp": timestamp,
                 "canal": canal,
                 "duracion": round(duracion),

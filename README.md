@@ -58,12 +58,12 @@ amarilla y la marca `CLIPPER_MARCA`, y otra azul sin marca. Ambas normalizan el
 audio a -16 LUFS y llevan su propio TXT listo para publicar.
 
 **Publicación social reanudable.** La variante azul de cada clip nuevo en
-`LISTOS` se publica automáticamente en YouTube o Instagram si están
-configurados. TikTok solo se envía manualmente al inbox mediante un botón en
-`LISTOS` o `REVISAR`; la publicación se completa desde la app. En `REVISAR`
-también hay acciones independientes para YouTube e Instagram y un descarte de
-la pareja. El estado y los IDs remotos sobreviven a redeploys en
-`publicaciones.json`, por lo que un reintento no vuelve a crear el mismo vídeo.
+`LISTOS` se publica automáticamente en la cuenta propia de YouTube o Instagram
+si están configurados. Los amarillos aparecen siempre en la revisión manual del
+amigo y solo su botón de YouTube usa la segunda cuenta. Los filtros de persona y
+streamer separan ambas bandejas. TikTok solo se envía manualmente al inbox. El
+estado y los IDs remotos sobreviven a redeploys en `publicaciones.json`, por lo
+que un reintento no vuelve a crear el mismo vídeo.
 
 ## Uso
 
