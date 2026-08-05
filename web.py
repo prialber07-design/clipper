@@ -20,6 +20,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 import clipper
+import publicacion
 import raw
 
 DATA = clipper.DATA
@@ -1964,6 +1965,36 @@ HTML_TEMPLATE = r"""<!doctype html>
         return panel;
       }
 
+      function socialState(clip, platform) {
+        const publications = clip.publications || {};
+        const current = publications[platform] || {};
+        if (!((publications.configured || {})[platform])) return "Sin configurar";
+        if (current.status === "published") return "Publicado";
+        if (current.status === "submitted") return "Enviado al inbox";
+        if (current.status === "publishing") return "Publicando";
+        if (current.status === "pending") return "Pendiente";
+        if (current.status === "error") return "Error · reintento automático";
+        return "Sin enviar";
+      }
+
+      async function reviewAction(clip, action, platform, source, button) {
+        button.disabled = true;
+        try {
+          const response = await fetch("/api/revision", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({name: clip.nombre, action, platform, source})
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || "La acción falló");
+          notify(action === "discard" ? "Candidato descartado" : "Publicación encolada", false);
+          await cargarClips(false);
+        } catch (error) {
+          notify(error.message || "No se pudo completar la acción", true);
+          button.disabled = false;
+        }
+      }
+
       function makeCard(clip, kind) {
         const article = text("article", "clip-card");
         article.dataset.search = [
@@ -2060,6 +2091,44 @@ HTML_TEMPLATE = r"""<!doctype html>
         );
         download.innerHTML = icon("download") + "<span>Descargar</span>";
         actions.appendChild(download);
+
+        const isBlue = /(?:-|_)azul\.mp4$/i.test(clip.nombre || "");
+        if (kind === "revisar" && isBlue) {
+          [
+            ["youtube", "YouTube"],
+            ["instagram", "Instagram"]
+          ].forEach(([platform, label]) => {
+            const status = socialState(clip, platform);
+            const publish = text("button", "button quiet", label + " · " + status);
+            publish.type = "button";
+            publish.disabled = status === "Sin configurar" || status === "Publicado" ||
+              status === "Enviado al inbox" || status === "Publicando" ||
+              status === "Pendiente";
+            publish.addEventListener("click", () =>
+              reviewAction(clip, "publish", platform, "REVISAR", publish));
+            actions.appendChild(publish);
+          });
+          const discard = text("button", "button quiet", "Descartar");
+          discard.type = "button";
+          discard.addEventListener("click", () => {
+            if (window.confirm("¿Descartar las dos versiones de este candidato?")) {
+              reviewAction(clip, "discard", "", "REVISAR", discard);
+            }
+          });
+          actions.appendChild(discard);
+        }
+
+        if ((kind === "listos" || kind === "revisar") && isBlue) {
+          const status = socialState(clip, "tiktok");
+          const tiktok = text("button", "button quiet", "TikTok · " + status);
+          tiktok.type = "button";
+          tiktok.disabled = status === "Sin configurar" ||
+            status === "Enviado al inbox" || status === "Publicando" ||
+            status === "Pendiente";
+          tiktok.addEventListener("click", () =>
+            reviewAction(clip, "publish", "tiktok", kind.toUpperCase(), tiktok));
+          actions.appendChild(tiktok);
+        }
 
         body.appendChild(actions);
         article.appendChild(body);
@@ -2635,12 +2704,15 @@ class Handler(SimpleHTTPRequestHandler):
                 and hmac.compare_digest(clave, self.clave))
 
     def do_HEAD(self):
-        path = urlparse(self.path).path
+        url_parsed = urlparse(self.path)
+        path = url_parsed.path
         if path == "/salud":
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Length", "2")
             self.end_headers()
             return
+        if path.startswith("/social-media/"):
+            return self._servir_social(url_parsed, head=True)
         if not self._autorizado():
             return self._pedir_credenciales()
         if path.startswith("/files/"):
@@ -2697,10 +2769,13 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(cuerpo)
             return
 
+        url_parsed = urlparse(self.path)
+        if url_parsed.path.startswith("/social-media/"):
+            return self._servir_social(url_parsed)
+
         if not self._autorizado():
             return self._pedir_credenciales()
 
-        url_parsed = urlparse(self.path)
         path = url_parsed.path
 
         if path in ["/", "/index.html"]:
@@ -2726,6 +2801,62 @@ class Handler(SimpleHTTPRequestHandler):
 
         super().do_GET()
 
+    def _servir_social(self, url_parsed, head=False):
+        query = parse_qs(url_parsed.query)
+        relativa = unquote(url_parsed.path[len("/social-media/"):])
+        target = publicacion.validar_url_temporal(
+            relativa,
+            query.get("expires", [""])[0],
+            query.get("signature", [""])[0],
+        )
+        if target is None:
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        self.path = "/" + target.relative_to(DATA.resolve()).as_posix()
+        if head:
+            return super().do_HEAD()
+        return super().do_GET()
+
+    def _origen_valido(self) -> bool:
+        origen = self.headers.get("Origin", "")
+        return not origen or urlparse(origen).netloc == self.headers.get("Host", "")
+
+    def do_POST(self):
+        if not self._autorizado():
+            return self._pedir_credenciales()
+        if not self._origen_valido():
+            return self._responder_json({"error": "origen no permitido"}, HTTPStatus.FORBIDDEN)
+        try:
+            longitud = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            longitud = 0
+        if longitud <= 0 or longitud > 16_384:
+            return self._responder_json({"error": "petición inválida"},
+                                        HTTPStatus.BAD_REQUEST)
+        try:
+            datos = json.loads(self.rfile.read(longitud))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return self._responder_json({"error": "JSON inválido"}, HTTPStatus.BAD_REQUEST)
+        if urlparse(self.path).path != "/api/revision" or not isinstance(datos, dict):
+            return self._responder_json({"error": "ruta no encontrada"}, HTTPStatus.NOT_FOUND)
+        try:
+            accion = datos.get("action")
+            nombre = str(datos.get("name", ""))
+            if accion == "publish":
+                resultado = publicacion.encolar_manual(
+                    nombre, str(datos.get("platform", "")),
+                    str(datos.get("source", "")))
+            elif accion == "discard":
+                resultado = {"deleted": publicacion.descartar_revision(nombre)}
+            else:
+                raise publicacion.PublicacionError("acción no válida")
+        except publicacion.PublicacionError as error:
+            return self._responder_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+        except OSError as error:
+            return self._responder_json({"error": str(error)},
+                                        HTTPStatus.INTERNAL_SERVER_ERROR)
+        self._responder_json(resultado, HTTPStatus.ACCEPTED)
+
     def _handle_api_clips(self):
         listos_dir = OUT / "LISTOS"
         revisar_dir = OUT / "REVISAR"
@@ -2745,6 +2876,8 @@ class Handler(SimpleHTTPRequestHandler):
             return clips
 
         for mp4 in sorted(dir_path.glob("*.mp4"), reverse=True):
+            if es_revisar and publicacion.revision_completada(mp4):
+                continue
             canal = clipper.canal_desde_nombre(mp4.name)
 
             try:
@@ -2794,6 +2927,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "url": rel_url,
                 "txt_url": txt_url,
                 "txt_size": txt_size,
+                "publications": publicacion.estado(mp4),
             })
         return clips
 

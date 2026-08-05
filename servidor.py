@@ -20,6 +20,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 import clipper
+import publicacion
 import raw
 from registro import obtener
 
@@ -297,6 +298,8 @@ def main():
         web.arrancar(en_hilo=True)
     except Exception as e:
         LOG.warning("⚠️ GALERÍA WEB NO DISPONIBLE\n   MOTIVO: %s\n   LOS CLIPS SIGUEN EN: %s", e, OUT)
+
+    publicacion.arrancar_worker()
 
     vigilantes = [Vigilante(f) for f in lista]
     for v in vigilantes:

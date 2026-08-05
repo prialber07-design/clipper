@@ -23,7 +23,9 @@ Luna multimodal + recorte 8-40 s + filtro de calidad
         ↓
 ffmpeg → amarillo con marca + azul sin marca (cada uno con su TXT)
         ↓
-bandeja numerada + aviso al móvil (ntfy)
+bandeja numerada + publicación automática del azul en YouTube/Instagram
+        ↓
+aviso al móvil (ntfy)
 ```
 
 Del pico al archivo listo: **~30 s con GPU**.
@@ -54,6 +56,14 @@ hasta una duración fija ni se conserva conversación posterior al remate.
 **Dos versiones por clip.** Cada decisión genera una versión con palabra activa
 amarilla y la marca `CLIPPER_MARCA`, y otra azul sin marca. Ambas normalizan el
 audio a -16 LUFS y llevan su propio TXT listo para publicar.
+
+**Publicación social reanudable.** La variante azul de cada clip nuevo en
+`LISTOS` se publica automáticamente en YouTube o Instagram si están
+configurados. TikTok solo se envía manualmente al inbox mediante un botón en
+`LISTOS` o `REVISAR`; la publicación se completa desde la app. En `REVISAR`
+también hay acciones independientes para YouTube e Instagram y un descarte de
+la pareja. El estado y los IDs remotos sobreviven a redeploys en
+`publicaciones.json`, por lo que un reintento no vuelve a crear el mismo vídeo.
 
 ## Uso
 

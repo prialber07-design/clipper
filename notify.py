@@ -253,6 +253,14 @@ def publicar(mp4: Path, meta: dict) -> Path:
 
 def publicar_pareja(items: list[tuple[Path, dict]]) -> list[Path]:
     destinos = registrar_pareja(items)
+    try:
+        import publicacion
+        publicacion.encolar_listos(destinos, items)
+    except Exception as e:
+        # Publicar en redes es secundario: un fallo externo nunca debe perder
+        # el clip ni hacer que Luna vuelva a renderizar la misma pareja.
+        LOG.warning("⚠️ PUBLICACIÓN SOCIAL NO ENCOLADA\n   MOTIVO: %s\n"
+                    "   LOS CLIPS SIGUEN EN: LISTOS", e)
     for destino, (_, meta) in zip(destinos, items):
         _avisar_publicado(destino, meta)
     return destinos

@@ -75,3 +75,70 @@ reintentos y próximo intento en su manifiesto JSON.
 
 La limpieza automática solo elimina RAW completados que hayan superado la
 retención configurada; nunca borra pendientes o errores.
+
+## Publicación en YouTube, Instagram y TikTok
+
+Solo se publica la variante azul. Las redes cuyas credenciales estén
+incompletas quedan desactivadas y no interfieren con el resto de Clipper.
+
+### YouTube
+
+1. Crea un proyecto en Google Cloud y habilita **YouTube Data API v3**.
+2. Configura la pantalla de consentimiento y añade tu cuenta como usuario de
+   prueba mientras la aplicación siga en modo de pruebas.
+3. Crea un cliente OAuth y autoriza el scope
+   `https://www.googleapis.com/auth/youtube.upload` con acceso offline.
+4. Guarda en EasyPanel:
+
+```env
+CLIPPER_YOUTUBE_CLIENT_ID=...
+CLIPPER_YOUTUBE_CLIENT_SECRET=...
+CLIPPER_YOUTUBE_REFRESH_TOKEN=...
+CLIPPER_YOUTUBE_PRIVACY=public
+```
+
+Google restringe a `private` las subidas de proyectos no auditados creados
+después del 28 de julio de 2020. Haz primero una prueba con `private` y solicita
+la auditoría antes de activar `public`.
+
+### Instagram
+
+1. Usa una cuenta de Instagram profesional enlazada a una página de Facebook.
+2. Crea una app de Meta con `instagram_basic`, `instagram_content_publish`,
+   `pages_show_list` y `pages_read_engagement`.
+3. Obtén un Page Access Token de larga duración y el ID de
+   `instagram_business_account`.
+4. Configura:
+
+```env
+CLIPPER_INSTAGRAM_ACCOUNT_ID=...
+CLIPPER_INSTAGRAM_ACCESS_TOKEN=...
+CLIPPER_META_API_VERSION=v25.0
+CLIPPER_URL_PUBLICA=https://tu-dominio
+```
+
+Meta descarga el MP4 mediante una URL firmada de una hora. El dominio debe ser
+HTTPS y accesible desde Internet. El token nunca aparece en esa URL ni en los
+logs. Los reintentos y resultados quedan en
+`/app/clips/publicaciones.json`.
+
+### TikTok
+
+TikTok no es automático: el botón del dashboard envía el MP4 azul al inbox y
+la publicación se termina desde la aplicación móvil.
+
+1. Crea una app en [TikTok for Developers](https://developers.tiktok.com/).
+2. Añade Login Kit y Content Posting API y solicita el scope `video.upload`.
+3. Autoriza tu cuenta con OAuth y cambia el código por un refresh token.
+4. Configura:
+
+```env
+CLIPPER_TIKTOK_CLIENT_KEY=...
+CLIPPER_TIKTOK_CLIENT_SECRET=...
+CLIPPER_TIKTOK_REFRESH_TOKEN=...
+```
+
+El access token se renueva automáticamente. Si TikTok rota el refresh token,
+Clipper conserva el nuevo valor en `/app/clips/.tiktok-oauth.json`. TikTok no
+permite prellenar descripción o hashtags en el flujo de inbox: se copian desde
+el TXT del clip al completar la publicación.
