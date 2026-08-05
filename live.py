@@ -188,7 +188,69 @@ RE_RISA = re.compile(r"(j[aeiou]j[aeiou]|kekw|omegalul|\blul\b|lmao|\bxd+\b|pog|
 RE_PIDE_CLIP = re.compile(r"\bclip\w*\b|\bcl1p\w*", re.I)
 RE_SORPRESA = re.compile(r"(\?{3,}|!{3,}|wtf|\bomg\b|madre m[ií]a|no way|qu[eé] ha dicho|"
                          r"qu[eé] dijo|\bdios\b|brutal|increible|incre[ií]ble)", re.I)
-RE_PRIVMSG = re.compile(r"^:[^!]+![^ ]+ PRIVMSG #[^ ]+ :(.*)$")
+RE_PRIVMSG = re.compile(r"^:([^!]+)![^ ]+ PRIVMSG #[^ ]+ :(.*)$")
+
+
+class DiarioChat:
+    """Guarda el chat en disco con marca de tiempo, un JSON por linea.
+
+    Hasta ahora el chat se usaba y se tiraba: solo servia para medir el pico y
+    se perdia segun llegaba. Pero el chat es la mitad de la señal para decidir
+    que momento vale -dice de que se rie la gente y cuando-, y sin registro no
+    se le puede dar a nadie ese contexto despues.
+
+    Se escribe por tandas y no mensaje a mensaje: un canal con publico llega a
+    picos de decenas de mensajes por segundo y no conviene un `write` por cada
+    uno mientras corre la captura.
+    """
+
+    LIMITE_TANDA = 40
+    SEGUNDOS_TANDA = 5.0
+
+    def __init__(self, canal: str, carpeta: Path):
+        self.canal = canal
+        self.carpeta = carpeta / "chat" / canal
+        self.buffer: list[str] = []
+        self.ultimo_volcado = time.monotonic()
+        self.cerrado = False
+        self._lock = threading.Lock()
+        self.escritos = 0
+
+    def _fichero(self) -> Path:
+        return self.carpeta / f"{time.strftime('%Y-%m-%d')}.jsonl"
+
+    def anotar(self, t: float, autor: str, texto: str, peso: int):
+        if self.cerrado or not texto:
+            return
+        linea = json.dumps({"t": round(t, 2), "u": autor or "", "m": texto,
+                            "p": peso}, ensure_ascii=False)
+        with self._lock:
+            self.buffer.append(linea)
+            lleno = len(self.buffer) >= self.LIMITE_TANDA
+            viejo = time.monotonic() - self.ultimo_volcado >= self.SEGUNDOS_TANDA
+        if lleno or viejo:
+            self.volcar()
+
+    def volcar(self):
+        with self._lock:
+            if not self.buffer:
+                self.ultimo_volcado = time.monotonic()
+                return
+            tanda, self.buffer = self.buffer, []
+            self.ultimo_volcado = time.monotonic()
+        try:
+            self.carpeta.mkdir(parents=True, exist_ok=True)
+            with self._fichero().open("a", encoding="utf-8") as f:
+                f.write("\n".join(tanda) + "\n")
+            self.escritos += len(tanda)
+        except OSError as e:
+            # El registro es un extra: si falla, la captura sigue igual.
+            LOG.warning("⚠️ NO SE PUDO GUARDAR EL CHAT\n   CANAL: %s\n   MOTIVO: %s",
+                        self.canal, e)
+
+    def cerrar(self):
+        self.volcar()
+        self.cerrado = True
 
 
 def peso_mensaje(texto: str) -> int:
@@ -207,10 +269,11 @@ def peso_mensaje(texto: str) -> int:
 class ChatTwitch(threading.Thread):
     daemon = True
 
-    def __init__(self, canal: str, eventos: queue.Queue):
+    def __init__(self, canal: str, eventos: queue.Queue, diario: "DiarioChat | None" = None):
         super().__init__()
         self.canal, self.eventos, self.parar_flag = canal.lower(), eventos, threading.Event()
         self.conectado = threading.Event()
+        self.diario = diario
 
     def run(self):
         while not self.parar_flag.is_set():
@@ -237,8 +300,12 @@ class ChatTwitch(threading.Thread):
                             s.send(b"PONG :tmi.twitch.tv\r\n")
                         elif "PRIVMSG" in ln:
                             m = RE_PRIVMSG.match(ln)
-                            texto = m.group(1) if m else ""
-                            self.eventos.put((time.time(), peso_mensaje(texto), texto))
+                            autor = m.group(1) if m else ""
+                            texto = m.group(2) if m else ""
+                            ahora, peso = time.time(), peso_mensaje(texto)
+                            self.eventos.put((ahora, peso, texto))
+                            if self.diario:
+                                self.diario.anotar(ahora, autor, texto, peso)
             except OSError as e:
                 if not self.parar_flag.is_set():
                     LOG.warning("⚠️ CHAT TWITCH NO DISPONIBLE\n   CANAL: %s\n   MOTIVO: %s\n   REINTENTO: 5s",
@@ -546,8 +613,12 @@ def cmd_watch(args):
 
         eventos = queue.Queue()
         chat = None
+        # El registro del chat no lo consume la captura: es material para
+        # decidir despues que momentos valen, con la transcripcion delante.
+        diario = (DiarioChat(args.canal, DATA)
+                  if LIVE.get("registro_chat", True) and not args.solo_audio else None)
         if args.plataforma == "twitch" and not args.solo_audio:
-            chat = ChatTwitch(args.canal, eventos)
+            chat = ChatTwitch(args.canal, eventos, diario)
             chat.start()
             if not chat.conectado.wait(5):
                 LOG.warning("⚠️ CHAT TWITCH NO CONFIRMADO\n   CANAL: %s\n   LA CAPTURA CONTINÚA SIN CHAT",
@@ -556,11 +627,13 @@ def cmd_watch(args):
             import kick
             class ChatKickThread(threading.Thread):
                 daemon = True
-                def __init__(self, canal: str, data_dir: Path, queue_eventos: queue.Queue):
+                def __init__(self, canal: str, data_dir: Path, queue_eventos: queue.Queue,
+                             diario: "DiarioChat | None" = None):
                     super().__init__()
                     self.canal, self.data_dir, self.queue_eventos = canal, data_dir, queue_eventos
                     self.parar_flag = threading.Event()
                     self.conectado = threading.Event()
+                    self.diario = diario
                 def run(self):
                     listener = kick.KickChatListener(self.canal, self.data_dir)
                     loop = asyncio.new_event_loop()
@@ -583,7 +656,11 @@ def cmd_watch(args):
                                     LOG.warning("🔌 CHAT KICK DESCONECTADO\n   CANAL: %s\n   REINTENTANDO",
                                                 self.canal)
                                 for texto in listener.poll_and_reset():
-                                    self.queue_eventos.put((time.time(), peso_mensaje(texto), texto))
+                                    ahora, peso = time.time(), peso_mensaje(texto)
+                                    self.queue_eventos.put((ahora, peso, texto))
+                                    if self.diario:
+                                        # Kick no entrega el autor por esta via.
+                                        self.diario.anotar(ahora, "", texto, peso)
                         finally:
                             await listener.stop()
                     try:
@@ -594,7 +671,7 @@ def cmd_watch(args):
                         self.conectado.clear()
                         asyncio.set_event_loop(None)
                         loop.close()
-            chat_kick = ChatKickThread(args.canal, DATA, eventos)
+            chat_kick = ChatKickThread(args.canal, DATA, eventos, diario)
             chat = chat_kick
             chat_kick.start()
         else:
@@ -668,12 +745,19 @@ def cmd_watch(args):
             cap.parar()
             if chat:
                 chat.parar_flag.set()
+            if diario:
+                diario.cerrar()
             return
         finally:
             cap.parar()
             if chat:
                 chat.parar_flag.set()
                 chat.join(timeout=5)
+            # Despues del join, para no perder la ultima tanda sin volcar.
+            if diario:
+                diario.cerrar()
+                LOG.info("💾 CHAT GUARDADO\n   CANAL: %s\n   MENSAJES: %d",
+                         args.canal, diario.escritos)
 
         LOG.info("⏹️ DIRECTO TERMINADO\n   CANAL: %s", args.canal)
 

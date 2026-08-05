@@ -18,3 +18,7 @@ live.pid
 __pycache__/
 *.pyc
 .venv/
+
+# Datos que genera el sistema, no van al repositorio
+transcripcion/
+chat/
